@@ -1,0 +1,2 @@
+ALTER TABLE public.customer_activities ADD COLUMN IF NOT EXISTS task_done_at timestamptz;
+CREATE INDEX IF NOT EXISTS customer_activities_task_idx ON public.customer_activities (customer_id, task_done_at, due_at) WHERE next_task IS NOT NULL;
