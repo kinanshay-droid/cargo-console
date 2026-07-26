@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Package } from "lucide-react";
 
 export function AuthLayout({
   title,
@@ -15,11 +14,8 @@ export function AuthLayout({
   return (
     <div className="auth-shell">
       <div className="w-full max-w-md">
-        <div className="mb-8 flex items-center gap-2 text-primary">
-          <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Package className="h-5 w-5" />
-          </div>
-          <span className="text-lg font-semibold tracking-tight">Cargo Console</span>
+        <div className="mb-8 flex justify-center">
+          <img src="/afik-logo-white.png" alt="AFIK Logistics Platform — The Intelligence Behind Every Shipment." className="h-auto w-full max-w-sm rounded-2xl" />
         </div>
         <div className="rounded-xl border bg-card p-8 shadow-sm">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">

@@ -13,12 +13,12 @@ import { cn } from "@/lib/utils";
 export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
-      { title: "Sign up — Cargo Console" },
+      { title: "Sign up — AFIK Logistics Platform" },
       {
         name: "description",
         content: "Create a new organization or join an existing one with a code.",
       },
-      { property: "og:title", content: "Sign up — Cargo Console" },
+      { property: "og:title", content: "Sign up — AFIK Logistics Platform" },
       {
         property: "og:description",
         content: "Create a new organization or join an existing one with a code.",

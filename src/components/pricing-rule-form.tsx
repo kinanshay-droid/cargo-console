@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Lookup } from "@/components/lookup";
 import type { PricingRule, PricingRuleInput, PricingUnit, PricingStatus } from "@/lib/pricing-engine.functions";
 
 type Props = {
@@ -59,7 +60,13 @@ export function PricingRuleForm({ open, onOpenChange, initial, onSubmit, saving 
             </Select>
           </Field>
           <Field label="מטבע">
-            <Input value={f.currency ?? "USD"} onChange={(e) => set("currency", e.target.value.toUpperCase())} />
+            <Lookup
+              type="currencies"
+              matchBy="code"
+              value={f.currency ?? "USD"}
+              onChange={(item) => set("currency", item?.code ?? "USD")}
+              placeholder="בחר מטבע..."
+            />
           </Field>
 
           <div className="col-span-2 mt-2 text-sm font-semibold text-slate-500">בסיס תמחור</div>
@@ -81,15 +88,42 @@ export function PricingRuleForm({ open, onOpenChange, initial, onSubmit, saving 
           <Field label="מס (%)"><Input type="number" step="0.01" value={f.tax_pct ?? 0} onChange={(e) => set("tax_pct", num(e.target.value))} /></Field>
 
           <div className="col-span-2 mt-2 text-sm font-semibold text-slate-500">תנאי התאמה (השאר ריק = תואם הכל)</div>
-          <Field label="שירות"><Input value={f.service_type ?? ""} onChange={(e) => set("service_type", e.target.value || null)} /></Field>
-          <Field label="טווח טמפרטורה"><Input value={f.temperature_range ?? ""} onChange={(e) => set("temperature_range", e.target.value || null)} /></Field>
-          <Field label="אריזה"><Input value={f.packaging ?? ""} onChange={(e) => set("packaging", e.target.value || null)} /></Field>
-          <Field label="סוג משלוח"><Input value={f.shipment_type ?? ""} onChange={(e) => set("shipment_type", e.target.value || null)} /></Field>
-          <Field label="Incoterm"><Input value={f.incoterm ?? ""} onChange={(e) => set("incoterm", e.target.value || null)} /></Field>
-          <Field label="מדינת מוצא"><Input value={f.origin_country ?? ""} onChange={(e) => set("origin_country", e.target.value || null)} /></Field>
-          <Field label="מדינת יעד"><Input value={f.destination_country ?? ""} onChange={(e) => set("destination_country", e.target.value || null)} /></Field>
-          <Field label="נמל מוצא (IATA)"><Input value={f.origin_airport ?? ""} onChange={(e) => set("origin_airport", e.target.value || null)} /></Field>
-          <Field label="נמל יעד (IATA)"><Input value={f.destination_airport ?? ""} onChange={(e) => set("destination_airport", e.target.value || null)} /></Field>
+          <Field label="שירות">
+            <Lookup type="service_types" matchBy="code" value={f.service_type ?? null}
+              onChange={(item) => set("service_type", item?.code ?? null)} placeholder="כל שירות..." />
+          </Field>
+          <Field label="טווח טמפרטורה">
+            <Lookup type="temperature_ranges" matchBy="code" value={f.temperature_range ?? null}
+              onChange={(item) => set("temperature_range", item?.code ?? null)} placeholder="כל טווח..." />
+          </Field>
+          <Field label="אריזה">
+            <Lookup type="packaging" matchBy="code" value={f.packaging ?? null}
+              onChange={(item) => set("packaging", item?.code ?? null)} placeholder="כל אריזה..." />
+          </Field>
+          <Field label="סוג משלוח">
+            <Lookup type="shipment_types" matchBy="code" value={f.shipment_type ?? null}
+              onChange={(item) => set("shipment_type", item?.code ?? null)} placeholder="כל סוג..." />
+          </Field>
+          <Field label="Incoterm">
+            <Lookup type="incoterms" matchBy="code" value={f.incoterm ?? null}
+              onChange={(item) => set("incoterm", item?.code ?? null)} placeholder="כל Incoterm..." />
+          </Field>
+          <Field label="מדינת מוצא">
+            <Lookup type="countries" matchBy="code" value={f.origin_country ?? null}
+              onChange={(item) => set("origin_country", item?.code ?? null)} placeholder="כל מדינה..." />
+          </Field>
+          <Field label="מדינת יעד">
+            <Lookup type="countries" matchBy="code" value={f.destination_country ?? null}
+              onChange={(item) => set("destination_country", item?.code ?? null)} placeholder="כל מדינה..." />
+          </Field>
+          <Field label="נמל מוצא (IATA)">
+            <Lookup type="airports" matchBy="code" value={f.origin_airport ?? null}
+              onChange={(item) => set("origin_airport", item?.code ?? null)} placeholder="כל נמל..." />
+          </Field>
+          <Field label="נמל יעד (IATA)">
+            <Lookup type="airports" matchBy="code" value={f.destination_airport ?? null}
+              onChange={(item) => set("destination_airport", item?.code ?? null)} placeholder="כל נמל..." />
+          </Field>
           <Field label="משקל מ־"><Input type="number" value={f.weight_from ?? ""} onChange={(e) => set("weight_from", e.target.value === "" ? null : Number(e.target.value))} /></Field>
           <Field label="משקל עד"><Input type="number" value={f.weight_to ?? ""} onChange={(e) => set("weight_to", e.target.value === "" ? null : Number(e.target.value))} /></Field>
           <Field label="תוקף מ־"><Input type="date" value={f.effective_from ?? ""} onChange={(e) => set("effective_from", e.target.value || null)} /></Field>

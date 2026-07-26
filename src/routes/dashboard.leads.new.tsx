@@ -17,11 +17,12 @@ import {
 } from "@/components/ui/select";
 import { createCustomer, saveCommercial, saveContacts, saveAddresses } from "@/lib/customers.functions";
 import { createActivity } from "@/lib/customer-activities.functions";
+import { Lookup } from "@/components/lookup";
 
 export const Route = createFileRoute("/dashboard/leads/new")({
   head: () => ({
     meta: [
-      { title: "לקוח פוטנציאלי חדש — Cargo Console" },
+      { title: "לקוח פוטנציאלי חדש — AFIK Logistics Platform" },
       { name: "description", content: "פתיחת תיק לקוח פוטנציאלי (Lead) עם פרטי חברה, נתונים מסחריים ופוטנציאל עסקי." },
       { property: "og:title", content: "לקוח פוטנציאלי חדש" },
       { property: "og:description", content: "טופס מלא לפתיחת ליד — פרטי חברה, מסחרי, פוטנציאל, אנשי קשר, סניפים ופעילות." },
@@ -296,7 +297,10 @@ function NewLeadPage() {
           </Field>
           <Field label="אתר אינטרנט"><Input dir="ltr" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" /></Field>
           <Field label="LinkedIn"><Input dir="ltr" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="linkedin.com/company/..." /></Field>
-          <Field label="מדינה"><Input value={country} onChange={(e) => setCountry(e.target.value)} /></Field>
+          <Field label="מדינה">
+            <Lookup type="countries" matchBy="code" value={country || null}
+              onChange={(item) => setCountry(item?.code ?? "")} placeholder="בחר מדינה..." />
+          </Field>
           <Field label="מטה החברה"><Input value={hq} onChange={(e) => setHq(e.target.value)} /></Field>
           <Field label="שנת הקמה"><Input value={foundedYear} onChange={(e) => setFoundedYear(e.target.value)} type="number" /></Field>
           <Field label="מספר עובדים"><Input value={employees} onChange={(e) => setEmployees(e.target.value)} type="number" /></Field>
@@ -311,7 +315,10 @@ function NewLeadPage() {
           <Field label="דירוג D&B"><Input value={dnb} onChange={(e) => setDnb(e.target.value)} /></Field>
           <Field label="דירוג אשראי"><Input value={creditRating} onChange={(e) => setCreditRating(e.target.value)} /></Field>
           <Field label="מסגרת אשראי"><Input value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} /></Field>
-          <Field label="תנאי תשלום"><Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} placeholder="שוטף +30" /></Field>
+          <Field label="תנאי תשלום">
+            <Lookup type="payment_terms" matchBy="code" value={paymentTerms || null}
+              onChange={(item) => setPaymentTerms(item?.code ?? "")} placeholder="בחר תנאי תשלום..." />
+          </Field>
           <Field label="ספק מועדף"><Input value={preferredSupplier} onChange={(e) => setPreferredSupplier(e.target.value)} /></Field>
           <div className="md:col-span-3 flex flex-wrap items-center gap-6 pt-2">
             <label className="flex items-center gap-2 text-sm">
@@ -409,7 +416,10 @@ function NewLeadPage() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="מדינה"><Input value={l.country} onChange={(e) => updateLocation(i, { country: e.target.value })} /></Field>
+              <Field label="מדינה">
+                <Lookup type="countries" matchBy="code" value={l.country || null}
+                  onChange={(item) => updateLocation(i, { country: item?.code ?? "" })} placeholder="בחר מדינה..." />
+              </Field>
               <Field label="עיר"><Input value={l.city} onChange={(e) => updateLocation(i, { city: e.target.value })} /></Field>
               <Field label="רחוב"><Input value={l.street} onChange={(e) => updateLocation(i, { street: e.target.value })} /></Field>
               <Field label="איש קשר"><Input value={l.contact} onChange={(e) => updateLocation(i, { contact: e.target.value })} /></Field>

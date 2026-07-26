@@ -9,9 +9,9 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/forgot-password")({
   head: () => ({
     meta: [
-      { title: "Forgot password — Cargo Console" },
+      { title: "Forgot password — AFIK Logistics Platform" },
       { name: "description", content: "Request a password reset link." },
-      { property: "og:title", content: "Forgot password — Cargo Console" },
+      { property: "og:title", content: "Forgot password — AFIK Logistics Platform" },
       { property: "og:description", content: "Request a password reset link." },
     ],
   }),

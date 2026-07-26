@@ -1,9 +1,27 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Pencil } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { toast } from "sonner";
+import { ArrowRight, Eye, FileDown, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getQuote } from "@/lib/quotes.functions";
+import {
+  QuoteDocument,
+  QUOTE_STATUS_BADGE_LIGHT,
+  QUOTE_STATUS_LABELS,
+  QUOTE_STATUS_PICKER_OPTIONS,
+  isRecord,
+  str,
+} from "@/components/quote-document";
+import { getQuote, updateQuoteOpsStatus, type QuoteOpsStatus } from "@/lib/quotes.functions";
+import { createCaseFromQuote, listServiceReps, assignCaseRep, type CaseRep } from "@/lib/operations.functions";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DROP_TYPE_SPECS,
   FIELDS_BY_KIND,
@@ -22,9 +40,9 @@ const SHIPMENT_MODE_LABEL: Record<string, string> = {
 export const Route = createFileRoute("/dashboard/quotes/$id/")({
   head: () => ({
     meta: [
-      { title: "הצעת מחיר — Cargo Console" },
+      { title: "הצעת מחיר — AFIK Logistics Platform" },
       { name: "description", content: "צפייה בפרטי הצעת מחיר." },
-      { property: "og:title", content: "הצעת מחיר — Cargo Console" },
+      { property: "og:title", content: "הצעת מחיר — AFIK Logistics Platform" },
       { property: "og:description", content: "צפייה בפרטי הצעת מחיר." },
     ],
   }),
@@ -42,11 +60,78 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 function QuoteDetail() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const getQuoteFn = useServerFn(getQuote);
+  const updateQuoteOpsStatusFn = useServerFn(updateQuoteOpsStatus);
+  const createCaseFromQuoteFn = useServerFn(createCaseFromQuote);
+  const listServiceRepsFn = useServerFn(listServiceReps);
+  const assignCaseRepFn = useServerFn(assignCaseRep);
+  const queryClient = useQueryClient();
+
+  const { data: serviceReps = [] } = useQuery({
+    queryKey: ["service-reps"],
+    queryFn: () => listServiceRepsFn(),
+  });
   const { data: quote, isLoading, error } = useQuery({
     queryKey: ["quote", id],
     queryFn: () => getQuoteFn({ data: { id } }),
   });
+
+  const payloadRecord = quote && isRecord(quote.payload) ? quote.payload : {};
+  const currentOpsStatus = str(payloadRecord.opsStatus);
+  const isArchived = currentOpsStatus === "archived";
+  const caseNumber = str(payloadRecord.caseNumber);
+  const caseId = str(payloadRecord.caseId);
+
+  const statusMutation = useMutation({
+    mutationFn: (opsStatus: QuoteOpsStatus) => updateQuoteOpsStatusFn({ data: { id, opsStatus } }),
+    onSuccess: () => {
+      toast.success("סטטוס ההצעה עודכן");
+      queryClient.invalidateQueries({ queryKey: ["quote", id] });
+    },
+    onError: () => toast.error("עדכון הסטטוס נכשל"),
+  });
+
+  // "הועבר" is special: it snapshots a full copy of the quote into a new
+  // case in the Operations module (own case number, frozen data), archives
+  // this quote, and navigates over to the case for documentation/handoff.
+  const transferMutation = useMutation({
+    mutationFn: () => createCaseFromQuoteFn({ data: { quoteId: id } }),
+    onSuccess: (caseRow) => {
+      toast.success(`ההצעה הועברה לארכיון ונפתח תיק ${caseRow.case_code} במשלוחים`);
+      queryClient.invalidateQueries({ queryKey: ["quote", id] });
+      sessionStorage.setItem("highlight-case", caseRow.id);
+      navigate({ to: "/dashboard/shipments" });
+    },
+    onError: () => toast.error("העברת ההצעה לתיק נכשלה"),
+  });
+
+  // Picking a handling rep directly on the quote is a shortcut for the same
+  // transfer: it opens the case (if not already open) and assigns the rep
+  // to it in one step, instead of clicking "הועבר" first and assigning the
+  // rep afterward on the case page.
+  const assignRepMutation = useMutation({
+    mutationFn: async (rep: CaseRep) => {
+      const caseRow = await createCaseFromQuoteFn({ data: { quoteId: id } });
+      await assignCaseRepFn({ data: { id: caseRow.id, rep } });
+      return caseRow;
+    },
+    onSuccess: (caseRow) => {
+      toast.success(`ההצעה הועברה לארכיון ונפתח תיק ${caseRow.case_code} במשלוחים`);
+      queryClient.invalidateQueries({ queryKey: ["quote", id] });
+      sessionStorage.setItem("highlight-case", caseRow.id);
+      navigate({ to: "/dashboard/shipments" });
+    },
+    onError: () => toast.error("שיוך הנציג והעברת ההצעה נכשלו"),
+  });
+
+  useEffect(() => {
+    if (!quote) return;
+    if (sessionStorage.getItem("autoprint-quote") !== quote.id) return;
+    sessionStorage.removeItem("autoprint-quote");
+    const t = setTimeout(() => window.print(), 300);
+    return () => clearTimeout(t);
+  }, [quote]);
 
   return (
     <div dir="rtl" className="space-y-6">
@@ -57,11 +142,19 @@ function QuoteDetail() {
             {quote?.quote_code ?? "הצעת מחיר"}
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 print:hidden">
           <Button asChild className="gap-2">
             <Link to="/dashboard/quotes/$id/edit" params={{ id }}>
               <Pencil className="h-4 w-4" /> ערוך הצעה
             </Link>
+          </Button>
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/dashboard/quotes/$id/customer-view" params={{ id }}>
+              <Eye className="h-4 w-4" /> הצעה ללקוח
+            </Link>
+          </Button>
+          <Button type="button" variant="outline" className="gap-2" onClick={() => window.print()}>
+            <FileDown className="h-4 w-4" /> ייצוא ל-PDF
           </Button>
           <Button asChild variant="outline" className="gap-2">
             <Link to="/dashboard/quotes">
@@ -80,8 +173,8 @@ function QuoteDetail() {
           שגיאה בטעינת ההצעה
         </div>
       ) : quote ? (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
-          <aside className="space-y-6 lg:sticky lg:top-4 lg:self-start">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr] print:block print:space-y-6">
+          <aside className="space-y-6 lg:sticky lg:top-4 lg:self-start print:hidden">
             <div className="rounded-2xl border bg-card p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div className="text-sm font-semibold">לקוח</div>
@@ -98,6 +191,92 @@ function QuoteDetail() {
                 <Field label="מס' הצעה" value={<span className="font-mono">{quote.quote_code}</span>} />
                 <Field label="מטבע" value={quote.currency} />
                 <Field label="נוצרה" value={new Date(quote.created_at).toLocaleString("he-IL")} />
+              </div>
+              <div className="mt-4 space-y-2 border-t pt-4">
+                <div className="text-xs text-muted-foreground">סטטוס הצעה</div>
+                {isArchived ? (
+                  <div className="space-y-2 rounded-lg border border-violet-200 bg-violet-50 p-3">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-xs font-medium ${QUOTE_STATUS_BADGE_LIGHT.archived}`}
+                      >
+                        {QUOTE_STATUS_LABELS.archived}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      ההצעה הועברה ונשמרה בארכיון. כל הנתונים הועתקו לתיק {caseNumber || ""} במודול המשלוחים.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        if (caseId) sessionStorage.setItem("highlight-case", caseId);
+                        navigate({ to: "/dashboard/shipments" });
+                      }}
+                    >
+                      עבור לתיק במשלוחים
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1.5">
+                      {QUOTE_STATUS_PICKER_OPTIONS.map((opt) => {
+                        const active = currentOpsStatus === opt.value;
+                        const isTransferred = opt.value === "transferred";
+                        const pending = isTransferred ? transferMutation.isPending : statusMutation.isPending;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            disabled={pending}
+                            onClick={() =>
+                              isTransferred
+                                ? transferMutation.mutate()
+                                : statusMutation.mutate(opt.value as QuoteOpsStatus)
+                            }
+                            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
+                              active
+                                ? (QUOTE_STATUS_BADGE_LIGHT[opt.value] ?? "border-primary bg-primary/10 text-primary")
+                                : "border-border bg-background text-muted-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      סטטוס נוכחי: {currentOpsStatus ? (QUOTE_STATUS_LABELS[currentOpsStatus] ?? currentOpsStatus) : "טרם הועבר"}
+                    </div>
+                    <div className="space-y-1.5 border-t pt-3">
+                      <div className="text-xs text-muted-foreground">שיוך לנציג שירות מטפל</div>
+                      <Select
+                        value=""
+                        onValueChange={(repId) => {
+                          const rep = serviceReps.find((r) => r.id === repId);
+                          if (rep) assignRepMutation.mutate({ id: rep.id, name: rep.name, role: rep.role });
+                        }}
+                        disabled={assignRepMutation.isPending}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="בחר נציג שירות..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {serviceReps.map((rep) => (
+                            <SelectItem key={rep.id} value={rep.id}>
+                              {rep.name} — {rep.role}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground">
+                        בחירת נציג פותחת תיק במשלוחים ומשייכת אותו אליו.
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -116,20 +295,10 @@ function QuoteDetail() {
           </aside>
 
           <div className="space-y-6 min-w-0">
-            <div className="rounded-2xl border bg-card p-5 shadow-sm">
-              <div className="mb-4 text-sm font-semibold">פרטי משלוח</div>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                <Field label="סוג משלוח" value={quote.shipment_kind} />
-                <Field label="Incoterm" value={quote.incoterm} />
-                <Field
-                  label="אופי משלוח"
-                  value={SHIPMENT_MODE_LABEL[quote.shipment_mode] ?? quote.shipment_mode}
-                />
-              </div>
-            </div>
+            <QuoteDocument quote={quote} />
 
-            <div className="rounded-2xl border bg-card p-5 shadow-sm">
-              <div className="mb-4 text-sm font-semibold">מסלול ותאריכים</div>
+            <div className="rounded-2xl border bg-card p-5 shadow-sm print:hidden">
+              <div className="mb-4 text-sm font-semibold">מסלול ותאריכים (פנימי)</div>
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <Field label="נמל מוצא" value={quote.origin_port} />
                 <Field label="נמל יעד" value={quote.dest_port} />
@@ -149,7 +318,9 @@ function QuoteDetail() {
             </div>
 
             {quote.payload && Object.keys(quote.payload as object).length > 0 && (
-              <PayloadSections payload={quote.payload as Record<string, unknown>} />
+              <div className="print:hidden">
+                <PayloadSections payload={quote.payload as Record<string, unknown>} />
+              </div>
             )}
           </div>
         </div>
@@ -195,6 +366,61 @@ function renderServices(v: unknown): React.ReactNode {
           className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
         >
           {SERVICE_LABEL[k] ?? k}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Keep in sync with ATTR_OPTIONS in new-quote-dialog.tsx.
+const ATTR_LABEL: Record<string, string> = {
+  coldchain: "שרשרת קירור",
+  valuable: "מטען יקר ערך",
+  gps: "GPS מטען",
+  dangerous: "מטען מסוכן",
+  fragile: "מטען שביר",
+  timeCritical: "מטען קריטי (Time Critical)",
+  dataLogger: "דורש Data Logger",
+  shockIndicator: "דורש Shock Indicator",
+  tiltIndicator: "דורש Tilt Indicator",
+  humidityLogger: "דורש Humidity Logger",
+  chainOfCustody: "דורש שרשרת אחזקה (Chain of Custody)",
+  dryIce: "Dry Ice",
+  cryogenic: "Cryogenic",
+  signatureRequired: "דורש חתימה במסירה",
+  clinical: "משלוח קליני",
+  biological: "חומר ביולוגי",
+  bloodProducts: "דם ומוצרי דם",
+  cellsAndTissues: "תאים ורקמות",
+  dedicatedVehicle: "דורש רכב ייעודי",
+  whiteGlove: "White Glove",
+  obc: "OBC",
+  nfo: "NFO",
+  charter: "Charter",
+  noFlip: "לא להפוך",
+  noStack: "לא לערום",
+  keepUpright: "להחזיק זקוף",
+  moistureSensitive: "רגיש ללחות",
+  lightSensitive: "רגיש לאור",
+  shockSensitive: "רגיש לזעזועים",
+  dryIceRefill: "נדרש מילוי קרח יבש",
+};
+
+// Only the attributes that were actually checked — same "true only" filtering as renderServices.
+function renderAttrs(v: unknown): React.ReactNode {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return fmt(v);
+  const entries = Object.entries(v as Record<string, unknown>).filter(
+    ([, val]) => val === true || val === "true"
+  );
+  if (entries.length === 0) return "—";
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {entries.map(([k]) => (
+        <span
+          key={k}
+          className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary"
+        >
+          {ATTR_LABEL[k] ?? k}
         </span>
       ))}
     </div>
@@ -306,11 +532,14 @@ function PayloadSections({ payload }: { payload: Record<string, unknown> }) {
             ["משטח", pallet],
             ["משקל יחידה", unitWeight],
             ["כמות יחידות", unitQty],
-            ["מאפיינים", attrs],
             ["דרישות מיוחדות", specialReq],
             ["הערות נוספות", extraNotes],
           ]}
         />
+        <div className="mt-4 space-y-1">
+          <div className="text-xs text-muted-foreground">מאפיינים</div>
+          {renderAttrs(attrs)}
+        </div>
       </PayloadCard>
 
       <PayloadCard title="לוגיסטיקה">

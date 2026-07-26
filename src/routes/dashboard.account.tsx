@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/dashboard/account")({
   head: () => ({
     meta: [
-      { title: "Account — Cargo Console" },
+      { title: "Account — AFIK Logistics Platform" },
       { name: "description", content: "Update your password and email." },
     ],
   }),

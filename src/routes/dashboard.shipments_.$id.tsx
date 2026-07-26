@@ -1,17 +1,34 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, FileDown, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowRight, Check, Plus, Save, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { getQuote, reviseQuote } from "@/lib/quotes.functions";
 import { toast } from "sonner";
 import { AirportCombobox } from "@/components/airport-combobox";
 import { Lookup } from "@/components/lookup";
+import {
+  getCase,
+  updateCase,
+  updateCasePipelineStatus,
+  listServiceReps,
+  assignCaseRep,
+  CASE_PIPELINE_STATUS_META,
+  CASE_PIPELINE_STATUS_ORDER,
+  type CasePipelineStatus,
+  type CaseRep,
+} from "@/lib/operations.functions";
 import {
   StopsEditor,
   PackQtyStepper,
@@ -41,15 +58,16 @@ import {
   type StopKind,
 } from "@/lib/drop-stops";
 
-export const Route = createFileRoute("/dashboard/quotes/$id/edit")({
+export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
     meta: [
-      { title: "עריכת הצעה — AFIK Logistics Platform" },
-      { name: "description", content: "עריכת הצעת מחיר ושמירה כגרסה עוקבת." },
+      { title: "תיק משלוח — AFIK Logistics Platform" },
+      { name: "description", content: "פרטי תיק שנפתח מהצעת מחיר, ניתן לעריכה מלאה." },
     ],
   }),
-  component: EditQuote,
+  component: CaseDetail,
 });
+
 
 type Form = {
   customerName: string;
@@ -63,8 +81,9 @@ type Form = {
   agent: string;
   airline: string;
   currency: string;
-  marginPct: string;
   total: string;
+  blNumber: string;
+  houseBlNumber: string;
   pricingItems: PricingItemForm[];
   pricingNotes: string;
   dropType: DropTypeId | null;
@@ -98,12 +117,10 @@ type PricingKey = keyof Omit<PricingItemForm, "id">;
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
 function toText(value: unknown): string {
   if (value == null) return "";
   return String(value);
 }
-
 function firstText(...values: unknown[]): string {
   for (const v of values) {
     if (v == null) continue;
@@ -112,10 +129,7 @@ function firstText(...values: unknown[]): string {
   }
   return "";
 }
-
 function makePricingRow(index: number, item?: Record<string, unknown>): PricingItemForm {
-  // Support both edit-shape ({desc, qty, unitPrice, total, note}) and
-  // dialog-shape ({label/group, price, sourceLabel}) when loading a quote.
   return {
     id: toText(item?.id) || `pricing-${Date.now()}-${index}`,
     desc: firstText(item?.desc, item?.label, item?.group),
@@ -127,14 +141,12 @@ function makePricingRow(index: number, item?: Record<string, unknown>): PricingI
     note: firstText(item?.note, item?.sourceLabel),
   };
 }
-
 function numericOrNull(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
 }
-
 function cleanText(value: string): string | null {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
@@ -144,13 +156,11 @@ const VALID_CARGO_TYPES: CargoType[] = ["general", "temperature", "nfo", "live",
 function parseCargoType(raw: unknown): CargoType | null {
   return typeof raw === "string" && (VALID_CARGO_TYPES as string[]).includes(raw) ? (raw as CargoType) : null;
 }
-
 const VALID_TEMP_KEYS: TempSeriesKey[] = TEMP_SERIES.map((t) => t.key);
 function parseTempSeriesList(raw: unknown): TempSeriesKey[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((k): k is TempSeriesKey => typeof k === "string" && (VALID_TEMP_KEYS as string[]).includes(k));
 }
-
 function parsePackSelections(raw: unknown): PackSelection[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -159,11 +169,9 @@ function parsePackSelections(raw: unknown): PackSelection[] {
     .map((s) => ({ key: toText(s.key), qty: Number(s.qty) || 0 }))
     .filter((s) => s.key && s.qty > 0);
 }
-
 function emptyAttrs(): Record<AttrKey, boolean> {
   return Object.fromEntries(ATTR_OPTIONS.map((a) => [a.id, false])) as Record<AttrKey, boolean>;
 }
-
 function parseAttrs(raw: unknown): Record<AttrKey, boolean> {
   const base = emptyAttrs();
   if (!isRecord(raw)) return base;
@@ -173,7 +181,6 @@ function parseAttrs(raw: unknown): Record<AttrKey, boolean> {
   }
   return base;
 }
-
 function parseServices(raw: unknown): Record<string, boolean> {
   const base: Record<string, boolean> = Object.fromEntries(SERVICE_LIST.map((s) => [s.id, false]));
   if (!isRecord(raw)) return base;
@@ -183,7 +190,6 @@ function parseServices(raw: unknown): Record<string, boolean> {
   }
   return base;
 }
-
 function parsePackages(raw: unknown): PackageRow[] {
   if (!Array.isArray(raw) || raw.length === 0) return [makePackageRow()];
   const rows = raw
@@ -204,23 +210,70 @@ function parsePackages(raw: unknown): PackageRow[] {
   return rows.length > 0 ? rows : [makePackageRow()];
 }
 
-function EditQuote() {
+function CaseDetail() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
-  const getQuoteFn = useServerFn(getQuote);
-  const reviseFn = useServerFn(reviseQuote);
-  const { data: quote, isLoading } = useQuery({
-    queryKey: ["quote", id],
-    queryFn: () => getQuoteFn({ data: { id } }),
+  const queryClient = useQueryClient();
+  const getCaseFn = useServerFn(getCase);
+  const updateCaseFn = useServerFn(updateCase);
+  const updateCasePipelineStatusFn = useServerFn(updateCasePipelineStatus);
+  const listServiceRepsFn = useServerFn(listServiceReps);
+  const assignCaseRepFn = useServerFn(assignCaseRep);
+
+  const { data: caseRow, isLoading } = useQuery({
+    queryKey: ["operations-case", id],
+    queryFn: () => getCaseFn({ data: { id } }),
   });
+
+  const { data: serviceReps = [] } = useQuery({
+    queryKey: ["service-reps"],
+    queryFn: () => listServiceRepsFn(),
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: (status: CasePipelineStatus) => updateCasePipelineStatusFn({ data: { id, status } }),
+    onSuccess: () => {
+      toast.success("סטטוס התיק עודכן");
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+      queryClient.invalidateQueries({ queryKey: ["operations-cases"] });
+    },
+    onError: () => toast.error("עדכון הסטטוס נכשל"),
+  });
+
+  const assignRepMutation = useMutation({
+    mutationFn: (rep: CaseRep) => assignCaseRepFn({ data: { id, rep } }),
+    onSuccess: () => {
+      toast.success("נציג השירות המטפל עודכן");
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+    },
+    onError: () => toast.error("שיוך הנציג נכשל"),
+  });
+
+  const casePayload = caseRow && isRecord(caseRow.payload) ? caseRow.payload : {};
+  const assignedRep: CaseRep = isRecord(casePayload.assignedRep)
+    ? {
+        id: toText(casePayload.assignedRep.id),
+        name: toText(casePayload.assignedRep.name),
+        role: toText(casePayload.assignedRep.role),
+      }
+    : null;
+  const commercialRep = isRecord(casePayload.accountManager)
+    ? { name: toText(casePayload.accountManager.name), email: toText(casePayload.accountManager.email) }
+    : null;
+  const pipelineStatusRaw = toText(casePayload.pipelineStatus);
+  const currentPipelineStatus: CasePipelineStatus = CASE_PIPELINE_STATUS_ORDER.includes(
+    pipelineStatusRaw as CasePipelineStatus,
+  )
+    ? (pipelineStatusRaw as CasePipelineStatus)
+    : "new";
 
   const [form, setForm] = useState<Form | null>(null);
   const [originalPayload, setOriginalPayload] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!quote) return;
-    const payload = isRecord(quote.payload) ? quote.payload : {};
+    if (!caseRow) return;
+    const payload = isRecord(caseRow.payload) ? caseRow.payload : {};
     const pricingItems = Array.isArray(payload.pricingItems)
       ? payload.pricingItems
           .map((item, index) => (isRecord(item) ? makePricingRow(index, item) : null))
@@ -242,10 +295,9 @@ function EditQuote() {
               id: toText(s.id) || `stop-${Date.now()}-${i}`,
               kind: kind as StopKind,
             };
-            for (const f of DROP_TYPE_SPECS[dropType].allowedKinds.flatMap(() => [])) void f;
             const copyFields = [
-              "company","address","contact","phone","plannedTime","etaAt","ataAt",
-              "temperature","signature","photo","status","notes",
+              "company", "address", "contact", "phone", "plannedTime", "etaAt", "ataAt",
+              "temperature", "signature", "photo", "status", "notes",
             ] as const;
             for (const f of copyFields) {
               const v = s[f];
@@ -260,19 +312,20 @@ function EditQuote() {
 
     setOriginalPayload(payload);
     setForm({
-      customerName: quote.customer_name ?? "",
-      customerRef: quote.customer_ref ?? "",
-      shipmentKind: quote.shipment_kind ?? "",
-      incoterm: quote.incoterm ?? "",
-      originPort: quote.origin_port ?? "",
-      destPort: quote.dest_port ?? "",
-      departDate: quote.depart_date ?? "",
-      arriveDate: quote.arrive_date ?? "",
-      agent: quote.agent ?? "",
-      airline: quote.airline ?? "",
-      currency: quote.currency ?? "",
-      marginPct: quote.margin_pct != null ? String(quote.margin_pct) : "",
-      total: quote.total != null ? String(quote.total) : "",
+      customerName: caseRow.customer_name ?? "",
+      customerRef: caseRow.customer_ref ?? "",
+      shipmentKind: caseRow.shipment_kind ?? "",
+      incoterm: caseRow.incoterm ?? "",
+      originPort: caseRow.origin_port ?? "",
+      destPort: caseRow.dest_port ?? "",
+      departDate: caseRow.depart_date ?? "",
+      arriveDate: caseRow.arrive_date ?? "",
+      agent: caseRow.agent ?? "",
+      airline: caseRow.airline ?? "",
+      currency: caseRow.currency ?? "",
+      total: caseRow.total != null ? String(caseRow.total) : "",
+      blNumber: toText(payload.blNumber),
+      houseBlNumber: toText(payload.houseBlNumber),
       pricingItems,
       pricingNotes: toText(payload.pricingNotes),
       dropType,
@@ -289,60 +342,38 @@ function EditQuote() {
       specialReq: toText(payload.specialReq),
       extraNotes: toText(payload.extraNotes),
     });
-  }, [quote]);
+  }, [caseRow]);
 
   function upd<K extends keyof Form>(k: K, v: string) {
     setForm((f) => (f ? { ...f, [k]: v } : f));
   }
-
   function updatePricingItem(id: string, key: PricingKey, value: string) {
     setForm((f) =>
       f
-        ? {
-            ...f,
-            pricingItems: f.pricingItems.map((item) =>
-              item.id === id ? { ...item, [key]: value } : item
-            ),
-          }
-        : f
+        ? { ...f, pricingItems: f.pricingItems.map((item) => (item.id === id ? { ...item, [key]: value } : item)) }
+        : f,
     );
   }
-
   function addPricingItem() {
-    setForm((f) =>
-      f
-        ? {
-            ...f,
-            pricingItems: [...f.pricingItems, makePricingRow(f.pricingItems.length)],
-          }
-        : f
-    );
+    setForm((f) => (f ? { ...f, pricingItems: [...f.pricingItems, makePricingRow(f.pricingItems.length)] } : f));
   }
-
   function removePricingItem(id: string) {
-    setForm((f) =>
-      f ? { ...f, pricingItems: f.pricingItems.filter((item) => item.id !== id) } : f
-    );
+    setForm((f) => (f ? { ...f, pricingItems: f.pricingItems.filter((item) => item.id !== id) } : f));
   }
-
   function updatePackage(id: string, patch: Partial<PackageRow>) {
     setForm((f) => (f ? { ...f, packages: f.packages.map((r) => (r.id === id ? { ...r, ...patch } : r)) } : f));
   }
-
   function addPackage() {
     setForm((f) => (f ? { ...f, packages: [...f.packages, makePackageRow()] } : f));
   }
-
   function removePackage(id: string) {
     setForm((f) =>
-      f ? { ...f, packages: f.packages.length > 1 ? f.packages.filter((r) => r.id !== id) : f.packages } : f
+      f ? { ...f, packages: f.packages.length > 1 ? f.packages.filter((r) => r.id !== id) : f.packages } : f,
     );
   }
-
   function getPackQty(key: string) {
     return form?.packSelections.find((s) => s.key === key)?.qty ?? 0;
   }
-
   function setPackQty(key: string, qty: number) {
     setForm((f) => {
       if (!f) return f;
@@ -356,11 +387,9 @@ function EditQuote() {
       };
     });
   }
-
   function toggleTempSeriesNone() {
     setForm((f) => (f ? { ...f, tempSeriesNone: true, tempSeriesList: [], packSelections: [] } : f));
   }
-
   function toggleTempSeries(key: TempSeriesKey) {
     setForm((f) => {
       if (!f) return f;
@@ -375,15 +404,12 @@ function EditQuote() {
       };
     });
   }
-
   function toggleAttr(id: AttrKey) {
     setForm((f) => (f ? { ...f, attrs: { ...f.attrs, [id]: !f.attrs[id] } } : f));
   }
-
   function toggleService(id: string) {
     setForm((f) => (f ? { ...f, services: { ...f.services, [id]: !f.services[id] } } : f));
   }
-
   function normalizedPricingItems() {
     if (!form) return [];
     return form.pricingItems
@@ -399,21 +425,15 @@ function EditQuote() {
       }))
       .filter((item) =>
         Boolean(
-          item.desc ||
-            item.qty != null ||
-            item.unit ||
-            item.unitPrice != null ||
-            item.currency ||
-            item.total != null ||
-            item.note
-        )
+          item.desc || item.qty != null || item.unit || item.unitPrice != null || item.currency || item.total != null || item.note,
+        ),
       );
   }
 
   const packageCalcs = useMemo(() => (form ? form.packages.map((pkg) => getPackageCalc(pkg)) : []), [form?.packages]);
   const packModelCalcs = useMemo(
     () => (form ? form.packSelections.map((sel) => getPackModelCalc(sel)) : []),
-    [form?.packSelections]
+    [form?.packSelections],
   );
   const packageTotals = useMemo(() => {
     const grossWeight =
@@ -428,7 +448,7 @@ function EditQuote() {
     if (!form) return;
     setSaving(true);
     try {
-      const res = await reviseFn({
+      const res = await updateCaseFn({
         data: {
           id,
           edits: {
@@ -443,10 +463,11 @@ function EditQuote() {
             agent: form.agent || null,
             airline: form.airline || null,
             currency: form.currency || null,
-            marginPct: form.marginPct ? Number(form.marginPct) : null,
             total: form.total ? Number(form.total) : null,
             payload: {
               ...originalPayload,
+              blNumber: form.blNumber.trim() || null,
+              houseBlNumber: form.houseBlNumber.trim() || null,
               pricingItems: normalizedPricingItems(),
               pricingNotes: form.pricingNotes.trim() || null,
               dropType: form.dropType,
@@ -479,8 +500,9 @@ function EditQuote() {
           },
         },
       });
-      toast.success(`נשמרה גרסה חדשה: ${res.quote_code}`);
-      navigate({ to: "/dashboard/quotes/$id", params: { id: res.id } });
+      toast.success(`התיק ${res.case_code} נשמר`);
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+      queryClient.invalidateQueries({ queryKey: ["operations-cases"] });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "שגיאה בשמירה");
     } finally {
@@ -492,27 +514,119 @@ function EditQuote() {
     <div dir="rtl" className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-sm text-muted-foreground">מסחרי · עריכת הצעה</div>
+          <div className="text-sm text-muted-foreground">משלוחים · תיק</div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
-            עריכת {quote?.quote_code ?? "הצעה"}
+            תיק {caseRow?.case_code ?? ""}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            השמירה תיצור הצעה חדשה עם מספר עוקב (למשל <span className="font-mono">-R2</span>).
-          </p>
+          {caseRow?.quote_id && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              נפתח מהצעה{" "}
+              <Link to="/dashboard/quotes/$id" params={{ id: caseRow.quote_id }} className="text-primary underline-offset-2 hover:underline">
+                מקורית
+              </Link>
+            </p>
+          )}
         </div>
-        <Button asChild variant="outline" className="gap-2">
-          <Link to="/dashboard/quotes/$id" params={{ id }}>
-            <ArrowRight className="h-4 w-4" /> חזרה להצעה
-          </Link>
-        </Button>
+        {form && caseRow ? (
+          <ActionButtonGroup onSave={handleSave} saving={saving} />
+        ) : (
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/dashboard/shipments">
+              <ArrowRight className="h-4 w-4" /> חזרה למשלוחים
+            </Link>
+          </Button>
+        )}
       </div>
 
-      {isLoading || !form ? (
+      {isLoading || !form || !caseRow ? (
         <div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground shadow-sm">
           טוען...
         </div>
       ) : (
         <div className="space-y-6">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-3 text-sm font-semibold">סטטוס תיק</div>
+            <Select
+              value={currentPipelineStatus}
+              onValueChange={(v) => statusMutation.mutate(v as CasePipelineStatus)}
+              disabled={statusMutation.isPending}
+            >
+              <SelectTrigger className="max-w-md">
+                <SelectValue placeholder="בחר סטטוס...">
+                  {CASE_PIPELINE_STATUS_META[currentPipelineStatus].label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {CASE_PIPELINE_STATUS_ORDER.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {CASE_PIPELINE_STATUS_META[s].label}
+                    <span className="mr-2 text-xs text-muted-foreground">
+                      · {CASE_PIPELINE_STATUS_META[s].description}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {CASE_PIPELINE_STATUS_META[currentPipelineStatus].description}
+            </p>
+          </div>
+
+          <Section title="מסמכי משלוח">
+            <Field label="מספר שטר מטען">
+              <Input
+                value={form.blNumber}
+                onChange={(e) => upd("blNumber", e.target.value)}
+                placeholder="MAWB / MBL..."
+              />
+            </Field>
+            <Field label="מספר שטר מטען פנימי">
+              <Input
+                value={form.houseBlNumber}
+                onChange={(e) => upd("houseBlNumber", e.target.value)}
+                placeholder="HAWB / HBL..."
+              />
+            </Field>
+          </Section>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
+              <UserRound className="h-4 w-4 text-muted-foreground" /> טיפול בתיק
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">נציג שירות מטפל</Label>
+                <Select
+                  value={assignedRep?.id ?? ""}
+                  onValueChange={(repId) => {
+                    const rep = serviceReps.find((r) => r.id === repId);
+                    assignRepMutation.mutate(rep ? { id: rep.id, name: rep.name, role: rep.role } : null);
+                  }}
+                  disabled={assignRepMutation.isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר נציג שירות...">
+                      {assignedRep ? `${assignedRep.name} — ${assignedRep.role}` : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {serviceReps.map((rep) => (
+                      <SelectItem key={rep.id} value={rep.id}>
+                        {rep.name} — {rep.role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">נציג מסחרי שפתח את התיק</Label>
+                <div className="flex h-9 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">
+                  {commercialRep?.name || "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Section title="פרטי לקוח ומשלוח">
             <Field label="שם לקוח"><Input value={form.customerName} onChange={(e) => upd("customerName", e.target.value)} /></Field>
             <Field label="Ref לקוח"><Input value={form.customerRef} onChange={(e) => upd("customerRef", e.target.value)} /></Field>
@@ -546,7 +660,6 @@ function EditQuote() {
               <Lookup type="currencies" matchBy="code" value={form.currency || null}
                 onChange={(item) => upd("currency", item?.code ?? "")} placeholder="בחר מטבע..." />
             </Field>
-            <Field label="אחוז רווח"><Input type="number" value={form.marginPct} onChange={(e) => upd("marginPct", e.target.value)} /></Field>
             <Field label='סה"כ'><Input type="number" value={form.total} onChange={(e) => upd("total", e.target.value)} /></Field>
           </Section>
 
@@ -558,15 +671,7 @@ function EditQuote() {
                 onChange={(e) => {
                   const v = e.target.value;
                   const next = isDropTypeId(v) ? v : null;
-                  setForm((f) =>
-                    f
-                      ? {
-                          ...f,
-                          dropType: next,
-                          stops: next ? seedStopsForDropType(next) : [],
-                        }
-                      : f
-                  );
+                  setForm((f) => (f ? { ...f, dropType: next, stops: next ? seedStopsForDropType(next) : [] } : f));
                 }}
                 className="h-9 rounded-md border bg-background px-2 text-sm"
               >
@@ -578,14 +683,8 @@ function EditQuote() {
             </div>
             {form.dropType ? (
               <>
-                <div className="mb-3 text-xs text-muted-foreground">
-                  {DROP_TYPE_SPECS[form.dropType].desc}
-                </div>
-                <StopsEditor
-                  dropType={form.dropType}
-                  stops={form.stops}
-                  onChange={(stops) => setForm((f) => (f ? { ...f, stops } : f))}
-                />
+                <div className="mb-3 text-xs text-muted-foreground">{DROP_TYPE_SPECS[form.dropType].desc}</div>
+                <StopsEditor dropType={form.dropType} stops={form.stops} onChange={(stops) => setForm((f) => (f ? { ...f, stops } : f))} />
               </>
             ) : (
               <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
@@ -594,10 +693,8 @@ function EditQuote() {
             )}
           </div>
 
-
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4 text-sm font-semibold">אופי מטען</div>
-
             <div className="mb-4">
               <div className="mb-2 text-xs text-muted-foreground">סוג מטען</div>
               <div className="flex flex-wrap gap-2">
@@ -610,7 +707,7 @@ function EditQuote() {
                       onClick={() => setForm((f) => (f ? { ...f, cargoType: t.id } : f))}
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        on ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
+                        on ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted",
                       )}
                     >
                       {t.label}
@@ -619,7 +716,6 @@ function EditQuote() {
                 })}
               </div>
             </div>
-
             <div className="mb-4">
               <div className="mb-2 text-xs text-muted-foreground">מאפיינים</div>
               <div className="flex flex-wrap gap-2">
@@ -632,7 +728,7 @@ function EditQuote() {
                       onClick={() => toggleAttr(a.id)}
                       className={cn(
                         "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        on ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground hover:bg-muted"
+                        on ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground hover:bg-muted",
                       )}
                     >
                       {on && <Check className="h-3 w-3" />}
@@ -642,7 +738,6 @@ function EditQuote() {
                 })}
               </div>
             </div>
-
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">דרישות מיוחדות</Label>
@@ -662,7 +757,6 @@ function EditQuote() {
                 <Plus className="h-4 w-4" /> הוסף חבילה
               </Button>
             </div>
-
             <div className="space-y-3">
               {form.packages.map((pkg) => {
                 const calc = getPackageCalc(pkg);
@@ -737,9 +831,7 @@ function EditQuote() {
                     onClick={() => toggleTempSeries(t.key)}
                     className={
                       "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors " +
-                      (form.tempSeriesList.includes(t.key)
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "bg-background hover:bg-muted")
+                      (form.tempSeriesList.includes(t.key) ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted")
                     }
                   >
                     {t.icon} {t.label} <span className="opacity-70">({t.range})</span>
@@ -802,7 +894,6 @@ function EditQuote() {
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4 text-sm font-semibold">לוגיסטיקה</div>
-
             <div className="mb-4">
               <div className="mb-2 text-xs text-muted-foreground">שירותים כלולים</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -815,7 +906,7 @@ function EditQuote() {
                       onClick={() => toggleService(s.id)}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border px-3 py-2 text-right text-xs transition",
-                        on ? "border-primary bg-primary/5" : "text-muted-foreground hover:bg-muted/30"
+                        on ? "border-primary bg-primary/5" : "text-muted-foreground hover:bg-muted/30",
                       )}
                     >
                       <div className={cn("flex h-4 w-4 items-center justify-center rounded border", on ? "border-primary bg-primary" : "border-muted-foreground/30")}>
@@ -827,7 +918,6 @@ function EditQuote() {
                 })}
               </div>
             </div>
-
             <label className="mb-4 flex items-center gap-2 rounded-lg border bg-muted/20 p-3 text-sm">
               <input
                 type="checkbox"
@@ -835,9 +925,8 @@ function EditQuote() {
                 onChange={(e) => setForm((f) => (f ? { ...f, routeApproved: e.target.checked } : f))}
                 className="h-4 w-4 rounded border-muted-foreground/30 accent-primary"
               />
-              <span>אישרתי את המסלול המוצע</span>
+              <span>אושר המסלול</span>
             </label>
-
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">הערות תכנון לוגיסטי</Label>
               <Textarea value={form.logisticsNotes} onChange={(e) => setForm((f) => (f ? { ...f, logisticsNotes: e.target.value } : f))} rows={3} />
@@ -851,7 +940,6 @@ function EditQuote() {
                 <Plus className="h-4 w-4" /> הוסף שורת תמחור
               </Button>
             </div>
-
             {form.pricingItems.length > 0 ? (
               <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full min-w-[920px] text-sm">
@@ -870,35 +958,15 @@ function EditQuote() {
                   <tbody>
                     {form.pricingItems.map((item) => (
                       <tr key={item.id} className="border-t align-top">
+                        <td className="px-2 py-2"><Input value={item.desc} onChange={(e) => updatePricingItem(item.id, "desc", e.target.value)} /></td>
+                        <td className="px-2 py-2"><Input type="number" value={item.qty} onChange={(e) => updatePricingItem(item.id, "qty", e.target.value)} /></td>
+                        <td className="px-2 py-2"><Input value={item.unit} onChange={(e) => updatePricingItem(item.id, "unit", e.target.value)} /></td>
+                        <td className="px-2 py-2"><Input type="number" value={item.unitPrice} onChange={(e) => updatePricingItem(item.id, "unitPrice", e.target.value)} /></td>
+                        <td className="px-2 py-2"><Input value={item.currency} onChange={(e) => updatePricingItem(item.id, "currency", e.target.value)} /></td>
+                        <td className="px-2 py-2"><Input type="number" value={item.total} onChange={(e) => updatePricingItem(item.id, "total", e.target.value)} /></td>
+                        <td className="px-2 py-2"><Input value={item.note} onChange={(e) => updatePricingItem(item.id, "note", e.target.value)} /></td>
                         <td className="px-2 py-2">
-                          <Input value={item.desc} onChange={(e) => updatePricingItem(item.id, "desc", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input type="number" value={item.qty} onChange={(e) => updatePricingItem(item.id, "qty", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input value={item.unit} onChange={(e) => updatePricingItem(item.id, "unit", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input type="number" value={item.unitPrice} onChange={(e) => updatePricingItem(item.id, "unitPrice", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input value={item.currency} onChange={(e) => updatePricingItem(item.id, "currency", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input type="number" value={item.total} onChange={(e) => updatePricingItem(item.id, "total", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input value={item.note} onChange={(e) => updatePricingItem(item.id, "note", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removePricingItem(item.id)}
-                            aria-label="מחק שורת תמחור"
-                          >
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removePricingItem(item.id)} aria-label="מחק שורת תמחור">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </td>
@@ -909,27 +977,42 @@ function EditQuote() {
               </div>
             ) : (
               <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                אין עדיין שורות תמחור להצעה הזו.
+                אין עדיין שורות תמחור בתיק הזה.
               </div>
             )}
-
             <div className="mt-4 max-w-2xl space-y-1.5">
               <Label className="text-xs text-muted-foreground">הערות תמחור</Label>
               <Input value={form.pricingNotes} onChange={(e) => upd("pricingNotes", e.target.value)} />
             </div>
           </div>
 
-          <div className="flex justify-end gap-2">
-            <Button asChild variant="outline">
-              <Link to="/dashboard/quotes/$id" params={{ id }}>ביטול</Link>
-            </Button>
-            <Button onClick={handleSave} disabled={saving} className="gap-2">
-              <Save className="h-4 w-4" />
-              {saving ? "שומר..." : "שמור כגרסה עוקבת"}
-            </Button>
+          <div className="flex justify-end">
+            <ActionButtonGroup onSave={handleSave} saving={saving} />
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Shared button group so the same actions (primary save first, then cancel,
+// then a plain back-to-list link) appear identically at both the top and
+// bottom of the page.
+function ActionButtonGroup({ onSave, saving }: { onSave: () => void; saving: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button onClick={onSave} disabled={saving} className="gap-2">
+        <Save className="h-4 w-4" />
+        {saving ? "שומר..." : "שמור שינויים"}
+      </Button>
+      <Button asChild variant="outline">
+        <Link to="/dashboard/shipments">ביטול</Link>
+      </Button>
+      <Button asChild variant="outline" className="gap-2">
+        <Link to="/dashboard/shipments">
+          <ArrowRight className="h-4 w-4" /> חזרה למשלוחים
+        </Link>
+      </Button>
     </div>
   );
 }
@@ -942,7 +1025,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">

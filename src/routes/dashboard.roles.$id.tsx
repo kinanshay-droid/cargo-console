@@ -33,7 +33,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 export const Route = createFileRoute("/dashboard/roles/$id")({
   head: () => ({
     meta: [
-      { title: "Role — Cargo Console" },
+      { title: "Role — AFIK Logistics Platform" },
       { name: "description", content: "Manage a role's permissions and members." },
     ],
   }),

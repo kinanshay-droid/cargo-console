@@ -22,13 +22,15 @@ import {
 import { PricingRuleForm } from "@/components/pricing-rule-form";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { TONE_BADGE } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/pricelists")({
   head: () => ({
     meta: [
-      { title: "ניהול מחירונים — Cargo Console" },
+      { title: "ניהול מחירונים — AFIK Logistics Platform" },
       { name: "description", content: "מחירונים, חוקיות תמחור ולוג חישוב עבור מנוע התמחור." },
-      { property: "og:title", content: "ניהול מחירונים — Cargo Console" },
+      { property: "og:title", content: "ניהול מחירונים — AFIK Logistics Platform" },
       { property: "og:description", content: "מחירונים, חוקיות תמחור ולוג חישוב עבור מנוע התמחור." },
     ],
   }),
@@ -101,50 +103,50 @@ function CustomerPriceListsTab() {
   const withFile = rows.filter((r) => r.priceListFile).length;
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-50 px-6 py-6 md:flex-row md:items-center md:px-8">
+    <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+      <div className="flex flex-col justify-between gap-4 border-b border-border px-6 py-6 md:flex-row md:items-center md:px-8">
         <div>
-          <h2 className="text-2xl font-extrabold text-[#001F3F]">מחירונים ללקוחות</h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <h2 className="text-2xl font-extrabold text-primary">מחירונים ללקוחות</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {filtered.length} תוצאות · {rows.length} סה"כ · {withFile} עם קובץ
           </p>
         </div>
         <div className="relative w-full md:w-80">
-          <Search className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש לפי לקוח או מחירון..."
-            className="w-full rounded-2xl border-none bg-slate-50 py-2.5 pr-10 text-sm text-[#001F3F] placeholder:text-slate-400" />
+            className="w-full rounded-2xl border-none bg-muted py-2.5 pr-10 text-sm text-primary placeholder:text-muted-foreground" />
         </div>
       </div>
-      {isLoading ? <div className="px-6 py-16 text-center text-sm text-slate-400">טוען...</div>
+      {isLoading ? <div className="px-6 py-16 text-center text-sm text-muted-foreground">טוען...</div>
         : filtered.length === 0 ? (
-          <div className="px-6 py-16 text-center text-sm text-slate-400">
+          <div className="px-6 py-16 text-center text-sm text-muted-foreground">
             <FileText className="mx-auto mb-2 h-8 w-8 opacity-40" /> אין מחירונים משויכים עדיין
           </div>
         ) : (
           <ul className="grid grid-cols-1 gap-3 p-6 md:grid-cols-2 md:p-8">
             {filtered.map((r) => (
-              <li key={r.customerId} className="group flex flex-col gap-3 rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-[#004080]/20 hover:shadow-[0_10px_30px_rgb(0,31,63,0.08)]">
+              <li key={r.customerId} className="group flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-lg">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-base font-semibold text-[#001F3F]">{r.companyName}</div>
-                    {r.customerCode && <div className="font-mono text-[11px] text-slate-400">{r.customerCode}</div>}
+                    <div className="truncate text-base font-semibold text-primary">{r.companyName}</div>
+                    {r.customerCode && <div className="font-mono text-[11px] text-muted-foreground">{r.customerCode}</div>}
                   </div>
-                  {r.discount && <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">הנחה {r.discount}%</span>}
+                  {r.discount && <span className={cn("shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium", TONE_BADGE.success)}>הנחה {r.discount}%</span>}
                 </div>
-                <div className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs">
-                  <FileText className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="truncate text-slate-600">{r.priceListName || r.priceList || "מחירון ללא שם"}</span>
-                  {r.currency && <span className="mr-auto shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{r.currency.split(",")[0]}</span>}
+                <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-xs">
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate text-muted-foreground">{r.priceListName || r.priceList || "מחירון ללא שם"}</span>
+                  {r.currency && <span className="mr-auto shrink-0 rounded bg-card px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">{r.currency.split(",")[0]}</span>}
                 </div>
-                <div className="flex items-center justify-between gap-2 border-t border-slate-50 pt-2">
-                  <span className="text-[11px] text-slate-400">{r.updatedAt ? `עודכן ${new Date(r.updatedAt).toLocaleDateString("he-IL")}` : "—"}</span>
+                <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
+                  <span className="text-[11px] text-muted-foreground">{r.updatedAt ? `עודכן ${new Date(r.updatedAt).toLocaleDateString("he-IL")}` : "—"}</span>
                   <div className="flex items-center gap-1.5">
                     {r.priceListFile && (
                       <Button size="sm" variant="outline" onClick={() => openFile(r.priceListFile!)} className="h-7 gap-1 rounded-lg text-[11px]">
                         <Download className="h-3 w-3" /> קובץ
                       </Button>
                     )}
-                    <Button asChild size="sm" className="h-7 gap-1 rounded-lg bg-[#001F3F] text-[11px] text-white hover:bg-[#003366]">
+                    <Button asChild size="sm" className="h-7 gap-1 rounded-lg bg-primary text-[11px] text-primary-foreground hover:bg-primary/90">
                       <Link to="/dashboard/customers/$id" params={{ id: r.customerId }} search={{ tab: "commercial" } as never}>
                         <Eye className="h-3 w-3" /> תיק לקוח
                       </Link>
@@ -212,40 +214,40 @@ function PricingRulesTab() {
   const openEdit = (r: PricingRule) => { setEditing(r); setOpen(true); };
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-      <div className="flex flex-col justify-between gap-4 border-b border-slate-50 px-6 py-6 md:flex-row md:items-center md:px-8">
+    <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+      <div className="flex flex-col justify-between gap-4 border-b border-border px-6 py-6 md:flex-row md:items-center md:px-8">
         <div>
-          <h2 className="text-2xl font-extrabold text-[#001F3F]">חוקיות תמחור (Pricing Rules)</h2>
-          <p className="mt-1 text-sm text-slate-400">{filtered.length} מתוך {rules.length} חוקים · העדיפות הגבוהה ביותר מנצחת</p>
+          <h2 className="text-2xl font-extrabold text-primary">חוקיות תמחור (Pricing Rules)</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{filtered.length} מתוך {rules.length} חוקים · העדיפות הגבוהה ביותר מנצחת</p>
         </div>
         <div className="flex items-center gap-2">
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as "all" | "draft" | "published" | "archived")}
-            className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm">
+            className="rounded-2xl border border-border bg-card px-3 py-2 text-sm">
             <option value="all">כל הסטטוסים</option>
             <option value="draft">טיוטה</option>
             <option value="published">מפורסם</option>
             <option value="archived">בארכיון</option>
           </select>
           <div className="relative w-56">
-            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש..." className="rounded-2xl border-none bg-slate-50 pr-9 text-sm" />
+            <Search className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="חיפוש..." className="rounded-2xl border-none bg-muted pr-9 text-sm" />
           </div>
-          <Button onClick={openNew} className="gap-1.5 rounded-2xl bg-[#001F3F] text-white hover:bg-[#003366]">
+          <Button onClick={openNew} className="gap-1.5 rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90">
             <Plus className="h-4 w-4" /> חוק חדש
           </Button>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="px-6 py-16 text-center text-sm text-slate-400">טוען...</div>
+        <div className="px-6 py-16 text-center text-sm text-muted-foreground">טוען...</div>
       ) : filtered.length === 0 ? (
-        <div className="px-6 py-16 text-center text-sm text-slate-400">
+        <div className="px-6 py-16 text-center text-sm text-muted-foreground">
           <Sparkles className="mx-auto mb-2 h-8 w-8 opacity-40" /> אין חוקיות תמחור עדיין. הוסף חוק חדש כדי להתחיל.
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+            <thead className="bg-muted text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">שם</th>
                 <th className="px-4 py-3">סטטוס</th>
@@ -260,8 +262,8 @@ function PricingRulesTab() {
             </thead>
             <tbody>
               {filtered.map((r) => (
-                <tr key={r.id} className="border-t border-slate-100 hover:bg-slate-50/40">
-                  <td className="px-4 py-3 font-semibold text-[#001F3F]">{r.name}</td>
+                <tr key={r.id} className="border-t border-border hover:bg-muted/40">
+                  <td className="px-4 py-3 font-semibold text-primary">{r.name}</td>
                   <td className="px-4 py-3">
                     <Badge variant={r.status === "published" ? "default" : r.status === "draft" ? "secondary" : "outline"}>
                       {r.status === "published" ? "מפורסם" : r.status === "draft" ? "טיוטה" : "ארכיון"}
@@ -272,7 +274,7 @@ function PricingRulesTab() {
                   <td className="px-4 py-3">{Number(r.base_price).toFixed(2)}</td>
                   <td className="px-4 py-3">{Number(r.rate).toFixed(2)} / {r.unit}</td>
                   <td className="px-4 py-3 font-mono text-xs">{r.currency}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
+                  <td className="px-4 py-3 text-xs text-muted-foreground">
                     {[r.origin_country && `מ:${r.origin_country}`, r.destination_country && `אל:${r.destination_country}`, r.service_type, r.temperature_range]
                       .filter(Boolean).join(" · ") || "כללי"}
                   </td>
@@ -280,13 +282,13 @@ function PricingRulesTab() {
                     <div className="flex items-center justify-end gap-1">
                       <Button size="sm" variant="ghost" onClick={() => openEdit(r)} title="ערוך"><Pencil className="h-3.5 w-3.5" /></Button>
                       {r.status !== "published" && (
-                        <Button size="sm" variant="ghost" onClick={() => publish.mutate(r.id)} title="פרסם"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => publish.mutate(r.id)} title="פרסם"><CheckCircle2 className="h-3.5 w-3.5 text-success" /></Button>
                       )}
                       {r.status !== "archived" && (
                         <Button size="sm" variant="ghost" onClick={() => archive.mutate(r.id)} title="ארכיון"><Archive className="h-3.5 w-3.5" /></Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => { if (confirm("למחוק את החוק?")) del.mutate(r.id); }} title="מחק">
-                        <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
                       </Button>
                     </div>
                   </td>
@@ -320,21 +322,21 @@ function CalculationLogTab() {
   });
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-      <div className="border-b border-slate-50 px-6 py-6 md:px-8">
-        <h2 className="text-2xl font-extrabold text-[#001F3F]">לוג חישוב תמחור</h2>
-        <p className="mt-1 text-sm text-slate-400">100 החישובים האחרונים של מנוע התמחור</p>
+    <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+      <div className="border-b border-border px-6 py-6 md:px-8">
+        <h2 className="text-2xl font-extrabold text-primary">לוג חישוב תמחור</h2>
+        <p className="mt-1 text-sm text-muted-foreground">100 החישובים האחרונים של מנוע התמחור</p>
       </div>
       {isLoading ? (
-        <div className="px-6 py-16 text-center text-sm text-slate-400">טוען...</div>
+        <div className="px-6 py-16 text-center text-sm text-muted-foreground">טוען...</div>
       ) : rows.length === 0 ? (
-        <div className="px-6 py-16 text-center text-sm text-slate-400">
+        <div className="px-6 py-16 text-center text-sm text-muted-foreground">
           <ScrollText className="mx-auto mb-2 h-8 w-8 opacity-40" /> אין רשומות עדיין. חישוב תמחור ראשון ייצור רשומה כאן.
         </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-right text-sm">
-            <thead className="bg-slate-50 text-xs text-slate-500">
+            <thead className="bg-muted text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-3">מועד</th>
                 <th className="px-4 py-3">חוק</th>
@@ -346,13 +348,13 @@ function CalculationLogTab() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-t border-slate-100">
-                  <td className="px-4 py-3 text-xs text-slate-500">{new Date(r.created_at).toLocaleString("he-IL")}</td>
-                  <td className="px-4 py-3 font-semibold text-[#001F3F]">{r.rule_used ?? <span className="text-rose-600">No Rule</span>}</td>
+                <tr key={r.id} className="border-t border-border">
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleString("he-IL")}</td>
+                  <td className="px-4 py-3 font-semibold text-primary">{r.rule_used ?? <span className="text-destructive">No Rule</span>}</td>
                   <td className="px-4 py-3 font-mono text-xs">{r.pricing_version ? `v${r.pricing_version}` : "—"}</td>
                   <td className="px-4 py-3 font-semibold">{r.calculated_price != null ? Number(r.calculated_price).toFixed(2) : "—"}</td>
                   <td className="px-4 py-3 font-mono text-xs">{r.currency ?? "—"}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500">{r.execution_time_ms ?? "—"}</td>
+                  <td className="px-4 py-3 text-xs text-muted-foreground">{r.execution_time_ms ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

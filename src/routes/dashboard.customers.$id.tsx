@@ -39,7 +39,7 @@ import {
 export const Route = createFileRoute("/dashboard/customers/$id")({
   head: () => ({
     meta: [
-      { title: "תיק לקוח — Cargo Console" },
+      { title: "תיק לקוח — AFIK Logistics Platform" },
       { name: "description", content: "פרטי תיק לקוח: שיוך ארגוני, כתובות ואנשי קשר." },
     ],
   }),

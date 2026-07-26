@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { createQuote } from "@/lib/quotes.functions";
@@ -50,6 +51,29 @@ import {
   FileText,
   Tag,
   TrendingUp,
+  PackageX,
+  Timer,
+  Activity,
+  Vibrate,
+  Gauge,
+  Droplets,
+  Droplet,
+  Link,
+  CloudSnow,
+  ThermometerSnowflake,
+  FileSignature,
+  Stethoscope,
+  FlaskConical,
+  Dna,
+  Hand,
+  Briefcase,
+  RotateCcw,
+  ArrowUp,
+  Sun,
+  Waves,
+  FolderOpen,
+  Save,
+  FileDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -68,11 +92,15 @@ import {
   customerPalette,
 } from "@/lib/customers-demo";
 import { AirportCombobox } from "@/components/airport-combobox";
+import { Lookup } from "@/components/lookup";
+import { getLookupItemsByIds } from "@/lib/lookups.functions";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { PackagingRecommendationService, type PackageModel, type PackageMatch } from "@/lib/packaging-recommendation";
 
 const STEPS = [
   { n: 1, label: "לקוח" },
   { n: 2, label: "פרטי המשלוח" },
-  { n: 3, label: "אופיי המשלוח" },
+  { n: 3, label: "אופי המשלוח" },
   { n: 4, label: "אופיי לוגיסטי" },
   { n: 5, label: "תמחור" },
   { n: 6, label: "סיכום" },
@@ -113,13 +141,47 @@ const INCOTERMS = [
 type CargoRow = { id: string; sku: string; description: string; packaging: string; weight: string; notes: string };
 type ContainerRow = { id: string; type: string; sku: string; destination: string; weight: string };
 type GoodsRow = { id: string; item: string; sku: string; origin: string; weight: string; dims: string; qty: number };
+type ContactRow = { id: string; name: string; phone: string; email: string };
+function makeContactRow(): ContactRow {
+  return { id: uid(), name: "", phone: "", email: "" };
+}
 
 // -------- Step 3: אופי המשלוח --------
-type CargoType = "general" | "temperature" | "nfo" | "live" | "dangerous" | "other";
-type AttrKey = "gps" | "valuable" | "coldchain" | "dangerous";
-type TempSeriesKey = "s20m" | "s22" | "s4";
+export type CargoType = "general" | "temperature" | "nfo" | "live" | "dangerous" | "other";
+export type AttrKey =
+  | "coldchain"
+  | "valuable"
+  | "gps"
+  | "dangerous"
+  | "fragile"
+  | "timeCritical"
+  | "dataLogger"
+  | "shockIndicator"
+  | "tiltIndicator"
+  | "humidityLogger"
+  | "chainOfCustody"
+  | "dryIce"
+  | "cryogenic"
+  | "signatureRequired"
+  | "clinical"
+  | "biological"
+  | "bloodProducts"
+  | "cellsAndTissues"
+  | "dedicatedVehicle"
+  | "whiteGlove"
+  | "obc"
+  | "nfo"
+  | "charter"
+  | "noFlip"
+  | "noStack"
+  | "keepUpright"
+  | "moistureSensitive"
+  | "lightSensitive"
+  | "shockSensitive"
+  | "dryIceRefill";
+export type TempSeriesKey = "cryogenic" | "deepFrozen" | "frozen" | "chilled" | "ambient";
 
-const CARGO_TYPES: { id: CargoType; label: string; en: string; icon: typeof Package; tint: string }[] = [
+export const CARGO_TYPES: { id: CargoType; label: string; en: string; icon: typeof Package; tint: string }[] = [
   { id: "general", label: "מטען כללי", en: "General Cargo", icon: Package, tint: "from-slate-500 to-slate-700" },
   { id: "temperature", label: "מטען מבוקר טמפ'", en: "Temperature Controlled", icon: Thermometer, tint: "from-sky-500 to-cyan-600" },
   { id: "nfo", label: "Next Flight Out", en: "NFO", icon: Zap, tint: "from-amber-500 to-orange-600" },
@@ -128,20 +190,48 @@ const CARGO_TYPES: { id: CargoType; label: string; en: string; icon: typeof Pack
   { id: "other", label: "אחר", en: "Other", icon: MoreHorizontal, tint: "from-violet-500 to-purple-600" },
 ];
 
-const ATTR_OPTIONS: { id: AttrKey; label: string; icon: typeof MapPin }[] = [
+export const ATTR_OPTIONS: { id: AttrKey; label: string; icon: typeof MapPin }[] = [
+  { id: "coldchain", label: "שרשרת קירור", icon: Snowflake },
+  { id: "valuable", label: "מטען יקר ערך", icon: Gem },
   { id: "gps", label: "GPS מטען", icon: MapPin },
-  { id: "valuable", label: "מטען יקר", icon: Gem },
-  { id: "coldchain", label: "שרשרת קור", icon: Snowflake },
   { id: "dangerous", label: "מטען מסוכן", icon: AlertTriangle },
+  { id: "fragile", label: "מטען שביר", icon: PackageX },
+  { id: "timeCritical", label: "מטען קריטי (Time Critical)", icon: Timer },
+  { id: "dataLogger", label: "דורש Data Logger", icon: Activity },
+  { id: "shockIndicator", label: "דורש Shock Indicator", icon: Vibrate },
+  { id: "tiltIndicator", label: "דורש Tilt Indicator", icon: Gauge },
+  { id: "humidityLogger", label: "דורש Humidity Logger", icon: Droplets },
+  { id: "chainOfCustody", label: "דורש שרשרת אחזקה (Chain of Custody)", icon: Link },
+  { id: "dryIce", label: "Dry Ice", icon: CloudSnow },
+  { id: "cryogenic", label: "Cryogenic", icon: ThermometerSnowflake },
+  { id: "signatureRequired", label: "דורש חתימה במסירה", icon: FileSignature },
+  { id: "clinical", label: "משלוח קליני", icon: Stethoscope },
+  { id: "biological", label: "חומר ביולוגי", icon: FlaskConical },
+  { id: "bloodProducts", label: "דם ומוצרי דם", icon: Droplet },
+  { id: "cellsAndTissues", label: "תאים ורקמות", icon: Dna },
+  { id: "dedicatedVehicle", label: "דורש רכב ייעודי", icon: Truck },
+  { id: "whiteGlove", label: "White Glove", icon: Hand },
+  { id: "obc", label: "OBC", icon: Briefcase },
+  { id: "nfo", label: "NFO", icon: Zap },
+  { id: "charter", label: "Charter", icon: Plane },
+  { id: "noFlip", label: "לא להפוך", icon: RotateCcw },
+  { id: "noStack", label: "לא לערום", icon: PackageOpen },
+  { id: "keepUpright", label: "להחזיק זקוף", icon: ArrowUp },
+  { id: "moistureSensitive", label: "רגיש ללחות", icon: Droplets },
+  { id: "lightSensitive", label: "רגיש לאור", icon: Sun },
+  { id: "shockSensitive", label: "רגיש לזעזועים", icon: Waves },
+  { id: "dryIceRefill", label: "נדרש מילוי קרח יבש", icon: CloudSnow },
 ];
 
-const TEMP_SERIES: { key: TempSeriesKey; label: string; range: string }[] = [
-  { key: "s20m", label: "סדרה 20M", range: "-20°C / -18°C" },
-  { key: "s22", label: "סדרה 22", range: "+15°C עד +25°C" },
-  { key: "s4", label: "סדרה 4", range: "+2°C עד +8°C" },
+export const TEMP_SERIES: { key: TempSeriesKey; label: string; range: string; icon: string }[] = [
+  { key: "cryogenic", label: "Cryogenic", range: "≤ -150°C", icon: "❄️" },
+  { key: "deepFrozen", label: "Deep Frozen", range: "≤ -80°C", icon: "🧊" },
+  { key: "frozen", label: "Frozen", range: "-25°C עד -15°C", icon: "❄️" },
+  { key: "chilled", label: "Chilled", range: "+2°C עד +8°C", icon: "🌡️" },
+  { key: "ambient", label: "Ambient (CRT)", range: "+15°C עד +25°C", icon: "🏥" },
 ];
 
-const COOLGUARD_MODELS = [
+export const COOLGUARD_MODELS = [
   { model: "CoolGuard Advance 96L", payload: "96L", inner: "636×630×630", outer: "457×457×457", tare: "38 kg" },
   { model: "CoolGuard Advance 56L", payload: "56L", inner: "558×552×552", outer: "381×381×381", tare: "27 kg" },
   { model: "CoolGuard Advance 28L", payload: "28L", inner: "470×460×460", outer: "305×297×297", tare: "18 kg" },
@@ -149,14 +239,129 @@ const COOLGUARD_MODELS = [
   { model: "CoolGuard Advance 4L", payload: "4L", inner: "312×310×310", outer: "152×152×152", tare: "6 kg" },
 ];
 
-const PALLETS = [
-  { id: "eur", label: "משטח יורו (EUR/EPAL)", size: "1200 × 800 × 144 מ״מ" },
-  { id: "std", label: "משטח סטנדרטי", size: "1200 × 1000 × 150 מ״מ" },
-  { id: "half", label: "חצי משטח", size: "800 × 600 × 144 מ״מ" },
-  { id: "quarter", label: "רבע משטח", size: "600 × 400 × 144 מ״מ" },
+// Dry-ice sample-transport packaging for Deep Frozen shipments (Intelsius BioTherm range).
+export const BIOTHERM_MODELS = [
+  { model: "BioTherm 7", category: "Category A / B", duration: "72 שעות" },
+  { model: "BioTherm 14", category: "Category A / B", duration: "96 שעות" },
+  { model: "BioTherm 15", category: "Category A", duration: "96+ שעות" },
+  { model: "BioTherm 30", category: "Category A / B", duration: "96+ שעות" },
 ];
 
+// A checked packaging model from the catalog above, with a quantity attached
+// so it can contribute to the weight/volumetric summary like a regular package.
+export type PackSelection = { key: string; qty: number };
+
+// key format is "<tempSeries>:<model name>" (see the catalog tables below).
+// deepFrozen always maps to the BioTherm catalog, every other series to CoolGuard.
+export function getPackModelCalc(sel: PackSelection) {
+  const modelName = sel.key.slice(sel.key.indexOf(":") + 1);
+  const isBio = sel.key.startsWith("deepFrozen:");
+  if (isBio) {
+    const m = BIOTHERM_MODELS.find((x) => x.model === modelName);
+    // Intelsius doesn't publish weight/dimensions for the BioTherm range —
+    // no fabricated numbers, so this contributes qty only, not weight.
+    return { label: m?.model ?? modelName, qty: sel.qty, grossWeight: 0, volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
+  }
+  const m = COOLGUARD_MODELS.find((x) => x.model === modelName);
+  if (!m) return { label: modelName, qty: sel.qty, grossWeight: 0, volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
+  const tare = parseFloat(m.tare) || 0;
+  const [outerL, outerW, outerH] = m.outer.split("×").map((v) => parseFloat(v) || 0);
+  const hasDims = !!(outerL && outerW && outerH);
+  const volumetricWeight = hasDims ? (sel.qty * outerL * outerW * outerH) / 6_000_000 : 0;
+  const dims = hasDims ? { length: outerL / 10, width: outerW / 10, height: outerH / 10 } : null;
+  return { label: m.model, qty: sel.qty, grossWeight: sel.qty * tare, volumetricWeight, dims };
+}
+
+export const PALLETS = [
+  { id: "eur", label: "משטח יורו (EUR/EPAL)", size: "120 × 80 × 14.4 ס״מ", length: 120, width: 80, height: 14.4 },
+  { id: "std", label: "משטח סטנדרטי", size: "120 × 100 × 15 ס״מ", length: 120, width: 100, height: 15 },
+  { id: "half", label: "חצי משטח", size: "80 × 60 × 14.4 ס״מ", length: 80, width: 60, height: 14.4 },
+  { id: "quarter", label: "רבע משטח", size: "60 × 40 × 14.4 ס״מ", length: 60, width: 40, height: 14.4 },
+  { id: "custom", label: "מידה ידנית", size: "הזנה חופשית", length: null, width: null, height: null },
+];
+
+// IATA volumetric divisor for air freight, applied to cm³ → kg.
+const VOLUMETRIC_DIVISOR_CM3_PER_KG = 6000;
+
+export type PackageRow = {
+  id: string;
+  pallet: string | null;
+  customLength: string;
+  customWidth: string;
+  customHeight: string;
+  unitWeight: string;
+  unitQty: string;
+};
+
+export function makePackageRow(): PackageRow {
+  return { id: uid(), pallet: null, customLength: "", customWidth: "", customHeight: "", unitWeight: "1", unitQty: "" };
+}
+
+// Resolves a package's L×W×H in cm, whether it came from a preset pallet or manual entry.
+export function getPackageDimsCm(pkg: PackageRow): { length: number; width: number; height: number } | null {
+  if (pkg.pallet === "custom") {
+    const length = parseFloat(pkg.customLength);
+    const width = parseFloat(pkg.customWidth);
+    const height = parseFloat(pkg.customHeight);
+    if (!length || !width || !height) return null;
+    return { length, width, height };
+  }
+  const preset = PALLETS.find((p) => p.id === pkg.pallet);
+  if (!preset || preset.length == null || preset.width == null || preset.height == null) return null;
+  return { length: preset.length, width: preset.width, height: preset.height };
+}
+
+export function getPackageCalc(pkg: PackageRow) {
+  const qty = parseFloat(pkg.unitQty) || 0;
+  const unitWeight = parseFloat(pkg.unitWeight) || 0;
+  const grossWeight = qty * unitWeight;
+  const dims = getPackageDimsCm(pkg);
+  const volumetricWeight = dims
+    ? (qty * dims.length * dims.width * dims.height) / VOLUMETRIC_DIVISOR_CM3_PER_KG
+    : 0;
+  return { qty, unitWeight, grossWeight, volumetricWeight, dims };
+}
+
 function uid() { return Math.random().toString(36).slice(2, 9); }
+
+// -------- Packaging Recommendation Engine wiring --------
+// Matches a package row's dimensions against the CoolGuard catalog (internal
+// dims + a standard packing clearance) and ranks the fitting options.
+// BioTherm isn't included here: Intelsius doesn't publish internal
+// dimensions for that range, so there's nothing for the engine to fit against.
+const PACKAGING_CLEARANCE_MM = 15;
+
+const COOLGUARD_CATALOG: PackageModel[] = COOLGUARD_MODELS.map((m, idx) => {
+  const [internalLength, internalWidth, internalHeight] = m.inner.split("×").map((v) => parseFloat(v) || 0);
+  return {
+    id: m.model.toLowerCase().replace(/\s+/g, "-"),
+    manufacturer: "CoolGuard",
+    model: m.model,
+    internalLength,
+    internalWidth,
+    internalHeight,
+    clearance: PACKAGING_CLEARANCE_MM,
+    priority: idx + 1,
+    active: true,
+  };
+});
+
+const packagingRecommendationService = new PackagingRecommendationService();
+
+// The UI stores package dims in cm; the catalog above is in mm (matches the
+// CoolGuard inner/outer figures as published), so convert before matching.
+export function getPackagingRecommendations(pkg: PackageRow, temperatureProfile?: string): PackageMatch[] {
+  const dims = getPackageDimsCm(pkg);
+  if (!dims) return [];
+  const cargo = {
+    length: dims.length * 10,
+    width: dims.width * 10,
+    height: dims.height * 10,
+    weight: parseFloat(pkg.unitWeight) || undefined,
+    temperatureProfile,
+  };
+  return packagingRecommendationService.recommend(cargo, COOLGUARD_CATALOG);
+}
 
 export function NewQuoteDialog({
   open,
@@ -168,25 +373,111 @@ export function NewQuoteDialog({
   onSaved?: () => void;
 }) {
   const [step, setStep] = useState(1);
+  const stepScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    stepScrollRef.current?.scrollTo({ top: 0 });
+  }, [step]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
   // Step 2 state
-  const [kind, setKind] = useState<ShipKind>("export");
-  const [incoterm, setIncoterm] = useState<string>("CIP");
+  const [kind, setKind] = useState<ShipKind | null>(null);
+  const [incoterm, setIncoterm] = useState<string | null>(null);
   const [cargo, setCargo] = useState<CargoRow[]>([{ id: uid(), sku: "", description: "", packaging: "", weight: "", notes: "" }]);
   const [containers, setContainers] = useState<ContainerRow[]>([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
   const [goods, setGoods] = useState<GoodsRow[]>([{ id: uid(), item: "", sku: "", origin: "", weight: "", dims: "", qty: 1 }]);
   const [notes, setNotes] = useState("");
+  const [pickupAddress, setPickupAddress] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [pickupContacts, setPickupContacts] = useState<ContactRow[]>([makeContactRow()]);
+  const [deliveryContacts, setDeliveryContacts] = useState<ContactRow[]>([makeContactRow()]);
+  const addPickupContact = () => setPickupContacts((arr) => [...arr, makeContactRow()]);
+  const removePickupContact = (id: string) => setPickupContacts((arr) => (arr.length > 1 ? arr.filter((c) => c.id !== id) : arr));
+  const updatePickupContact = (id: string, patch: Partial<ContactRow>) =>
+    setPickupContacts((arr) => arr.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  const addDeliveryContact = () => setDeliveryContacts((arr) => [...arr, makeContactRow()]);
+  const removeDeliveryContact = (id: string) => setDeliveryContacts((arr) => (arr.length > 1 ? arr.filter((c) => c.id !== id) : arr));
+  const updateDeliveryContact = (id: string, patch: Partial<ContactRow>) =>
+    setDeliveryContacts((arr) => arr.map((c) => (c.id === id ? { ...c, ...patch } : c)));
 
   // Step 3 state — אופי המשלוח
-  const [cargoType, setCargoType] = useState<CargoType>("temperature");
-  const [attrs, setAttrs] = useState<Record<AttrKey, boolean>>({ gps: false, valuable: false, coldchain: true, dangerous: false });
-  const [tempSeries, setTempSeries] = useState<TempSeriesKey | "none">("s4");
-  const [selectedPackModel, setSelectedPackModel] = useState<string | null>(null);
-  const [pallet, setPallet] = useState<string | null>("eur");
-  const [unitWeight, setUnitWeight] = useState<string>("1");
-  const [unitQty, setUnitQty] = useState<string>("");
+  const [cargoType, setCargoType] = useState<CargoType | null>(null);
+  const [attrs, setAttrs] = useState<Record<AttrKey, boolean>>({
+    coldchain: true,
+    valuable: false,
+    gps: false,
+    dangerous: false,
+    fragile: false,
+    timeCritical: false,
+    dataLogger: false,
+    shockIndicator: false,
+    tiltIndicator: false,
+    humidityLogger: false,
+    chainOfCustody: false,
+    dryIce: false,
+    cryogenic: false,
+    signatureRequired: false,
+    clinical: false,
+    biological: false,
+    bloodProducts: false,
+    cellsAndTissues: false,
+    dedicatedVehicle: false,
+    whiteGlove: false,
+    obc: false,
+    nfo: false,
+    charter: false,
+    noFlip: false,
+    noStack: false,
+    keepUpright: false,
+    moistureSensitive: false,
+    lightSensitive: false,
+    shockSensitive: false,
+    dryIceRefill: false,
+  });
+  const [packSelections, setPackSelections] = useState<PackSelection[]>([]);
+  // Multiple temperature series can apply to one shipment (e.g. some cartons
+  // Chilled, some Frozen) — "none" is mutually exclusive with the rest.
+  const [tempSeriesList, setTempSeriesList] = useState<TempSeriesKey[]>([]);
+  const [tempSeriesNone, setTempSeriesNone] = useState(false);
+  const tempSeriesChosen = tempSeriesNone || tempSeriesList.length > 0;
+  const toggleTempSeriesNone = () => {
+    setTempSeriesNone(true);
+    setTempSeriesList([]);
+    setPackSelections([]);
+  };
+  const toggleTempSeries = (key: TempSeriesKey) => {
+    setTempSeriesNone(false);
+    setTempSeriesList((arr) => {
+      const next = arr.includes(key) ? arr.filter((k) => k !== key) : [...arr, key];
+      // Drop packaging picks tied to a series that just got deselected.
+      setPackSelections((sels) => sels.filter((s) => next.some((k) => s.key.startsWith(`${k}:`))));
+      return next;
+    });
+  };
+  const getPackQty = (key: string) => packSelections.find((s) => s.key === key)?.qty ?? 0;
+  const setPackQty = (key: string, qty: number) =>
+    setPackSelections((arr) => {
+      if (qty <= 0) return arr.filter((s) => s.key !== key);
+      return arr.some((s) => s.key === key)
+        ? arr.map((s) => (s.key === key ? { ...s, qty } : s))
+        : [...arr, { key, qty }];
+    });
+  const packModelCalcs = useMemo(() => packSelections.map((sel) => getPackModelCalc(sel)), [packSelections]);
+  const [packages, setPackages] = useState<PackageRow[]>([makePackageRow()]);
+  const updatePackage = (id: string, patch: Partial<PackageRow>) =>
+    setPackages((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  const addPackage = () => setPackages((rows) => [...rows, makePackageRow()]);
+  const removePackage = (id: string) => setPackages((rows) => (rows.length > 1 ? rows.filter((r) => r.id !== id) : rows));
+  const packageCalcs = useMemo(() => packages.map((pkg) => ({ id: pkg.id, ...getPackageCalc(pkg) })), [packages]);
+  const packageTotals = useMemo(() => {
+    const grossWeight =
+      packageCalcs.reduce((sum, c) => sum + c.grossWeight, 0) +
+      packModelCalcs.reduce((sum, c) => sum + c.grossWeight, 0);
+    const volumetricWeight =
+      packageCalcs.reduce((sum, c) => sum + c.volumetricWeight, 0) +
+      packModelCalcs.reduce((sum, c) => sum + c.volumetricWeight, 0);
+    return { grossWeight, volumetricWeight, chargeableWeight: Math.max(grossWeight, volumetricWeight) };
+  }, [packageCalcs, packModelCalcs]);
   const [specialReq, setSpecialReq] = useState("");
   const [extraNotes, setExtraNotes] = useState("");
 
@@ -202,7 +493,8 @@ export function NewQuoteDialog({
     clearance: true, land: true, delivery: true, insurance: true,
   });
   const [compare, setCompare] = useState<Record<string, boolean>>({});
-  const [agent, setAgent] = useState("QuickSTAT Global");
+  const [agent, setAgent] = useState("QUICKSTAT");
+  const [agents, setAgents] = useState<string[]>([]);
   const [airline, setAirline] = useState("Lufthansa Cargo");
   const [logisticsNotes, setLogisticsNotes] = useState("");
   const [dropType, setDropType] = useState<DropTypeId | null>(null);
@@ -211,8 +503,11 @@ export function NewQuoteDialog({
     if (!dropType) { setStops([]); return; }
     setStops(seedStopsForDropType(dropType));
   }, [dropType]);
+  useEffect(() => {
+    if (kind !== "distribution" && dropType) setDropType(null);
+  }, [kind, dropType]);
   const [routeApproved, setRouteApproved] = useState(false);
-  const [shipmentMode, setShipmentMode] = useState<ShipmentMode>("direct");
+  const [shipmentMode, setShipmentMode] = useState<ShipmentMode | null>(null);
   // Step 5 state — תמחור
   const [currency, setCurrency] = useState<"USD" | "EUR" | "ILS">("USD");
   const [margin, setMargin] = useState<string>("15");
@@ -223,6 +518,8 @@ export function NewQuoteDialog({
   const [discount, setDiscount] = useState<string>("0");
   const [internalNotes, setInternalNotes] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
+  const [showFinishOptions, setShowFinishOptions] = useState(false);
+  const navigate = useNavigate();
   const quoteCode = useMemo(
     () => `Q-${new Date().getFullYear().toString().slice(2)}${String(new Date().getMonth() + 1).padStart(2, "0")}-${Math.floor(Math.random() * 9000 + 1000)}`,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,6 +528,7 @@ export function NewQuoteDialog({
 
   const createQuoteFn = useServerFn(createQuote);
   const listCustomersFn = useServerFn(listCustomers);
+  const { user: currentUser } = useCurrentUser();
   const { data: customersList = [] } = useQuery({
     queryKey: ["customers", "quote-picker"],
     queryFn: () => listCustomersFn(),
@@ -255,19 +553,137 @@ export function NewQuoteDialog({
     );
   }, [query, customersList]);
 
-  const canContinue = step === 1 ? selectedId !== null : true;
+  const canContinue = useMemo(() => {
+    if (step === 1) return selectedId !== null;
+    if (step === 2) {
+      if (kind === null) return false;
+      if (kind !== "domestic" && incoterm === null) return false;
+      if (kind === "distribution" && dropType === null) return false;
+      return true;
+    }
+    if (step === 3) {
+      if (cargoType === null) return false;
+      if (cargoType === "temperature") {
+        if (!tempSeriesChosen) return false;
+        if (tempSeriesList.length > 0 && packSelections.length === 0) return false;
+      }
+      if (packages.some((pkg) => pkg.pallet === null)) return false;
+      return true;
+    }
+    if (step === 4) return shipmentMode !== null;
+    return true;
+  }, [step, selectedId, kind, incoterm, dropType, cargoType, tempSeriesChosen, tempSeriesList, packSelections, packages, shipmentMode]);
 
   const reset = () => {
     setStep(1);
     setSelectedId(null);
     setQuery("");
-    setKind("export");
-    setIncoterm("CIP");
+    setKind(null);
+    setIncoterm(null);
+    setDropType(null);
     setCargo([{ id: uid(), sku: "", description: "", packaging: "", weight: "", notes: "" }]);
     setContainers([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
     setGoods([{ id: uid(), item: "", sku: "", origin: "", weight: "", dims: "", qty: 1 }]);
     setNotes("");
+    setPickupAddress("");
+    setDeliveryAddress("");
+    setPickupContacts([makeContactRow()]);
+    setDeliveryContacts([makeContactRow()]);
+    setCargoType(null);
+    setTempSeriesList([]);
+    setTempSeriesNone(false);
+    setPackSelections([]);
+    setPackages([makePackageRow()]);
+    setShipmentMode(null);
+    setShowFinishOptions(false);
   };
+
+  async function handleFinish(action: "case" | "save" | "pdf") {
+    try {
+      setSubmitting(true);
+      const customer = customersList.find((c) => c.id === selectedId);
+      const totalCost = pricingItems.reduce((s, i) => s + (Number(i.price) || 0), 0);
+      const marginPct = Number(margin) || 0;
+      const discountAmt = Number(discount) || 0;
+      const total = totalCost * (1 + marginPct / 100) - discountAmt;
+      const res = await createQuoteFn({
+        data: {
+          quoteCode,
+          customerId: customer?.id ?? null,
+          customerRef: customer?.customer_code ?? null,
+          customerName: customer?.company_name ?? null,
+          shipmentKind: kind,
+          shipmentMode: shipmentMode ?? "direct",
+          incoterm,
+          originPort,
+          destPort,
+          transitPorts: transit,
+          departDate,
+          arriveDate,
+          agent: kind === "distribution" ? (agents[0] ?? null) : agent,
+          airline,
+          currency,
+          marginPct,
+          total,
+          payload: {
+            accountManager: currentUser
+              ? { name: currentUser.fullName || currentUser.email, email: currentUser.email }
+              : null,
+            pickupAddress: pickupAddress.trim() || null,
+            deliveryAddress: deliveryAddress.trim() || null,
+            pickupContacts: pickupContacts.filter((c) => c.name || c.phone || c.email),
+            deliveryContacts: deliveryContacts.filter((c) => c.name || c.phone || c.email),
+            cargoType,
+            attrs,
+            tempSeriesList,
+            tempSeriesNone,
+            packSelections,
+            agents: kind === "distribution" ? agents : [],
+            packages: packages.map((pkg) => ({
+              pallet: pkg.pallet,
+              customDims: pkg.pallet === "custom"
+                ? { length: pkg.customLength, width: pkg.customWidth, height: pkg.customHeight }
+                : null,
+              unitWeight: pkg.unitWeight,
+              unitQty: pkg.unitQty,
+            })),
+            weightSummary: {
+              grossWeight: packageTotals.grossWeight,
+              volumetricWeight: packageTotals.volumetricWeight,
+              chargeableWeight: packageTotals.chargeableWeight,
+            },
+            specialReq,
+            extraNotes,
+            services,
+            compare,
+            logisticsNotes,
+            routeApproved,
+            pricingItems,
+            pricingNotes,
+            discount: discountAmt,
+            internalNotes,
+            dropType,
+            stops: normalizeStopsForPersist(stops),
+          },
+        },
+      });
+      toast.success(`הצעה ${res?.quote_code ?? quoteCode} נשמרה`);
+      onSaved?.();
+      setShowFinishOptions(false);
+      onOpenChange(false);
+      if (action === "pdf" && res?.id) {
+        sessionStorage.setItem("autoprint-quote", res.id);
+      }
+      if ((action === "case" || action === "pdf") && res?.id) {
+        navigate({ to: "/dashboard/quotes/$id", params: { id: res.id } });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "שגיאה בשמירת ההצעה";
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <Dialog
@@ -324,7 +740,7 @@ export function NewQuoteDialog({
           </div>
         </div>
 
-        <div className="max-h-[60vh] overflow-y-auto p-6">
+        <div ref={stepScrollRef} className="max-h-[60vh] overflow-y-auto p-6">
           {step === 1 && (
             <>
               <div className="relative mb-4">
@@ -352,22 +768,9 @@ export function NewQuoteDialog({
                       )}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <span className={cn("h-2 w-2 rounded-full", STATUS_DOT_DB[c.status])} />
-                          {STATUS_LABEL_DB[c.status]}
-                        </span>
-                        <span className="font-mono text-xs text-muted-foreground">{c.customer_code}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="text-sm font-semibold">{c.company_name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {c.trade_name || c.industry || "—"}
-                          </div>
-                        </div>
                         <span
                           className={cn(
-                            "flex h-9 w-9 items-center justify-center overflow-hidden rounded-lg text-xs font-semibold",
+                            "flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg text-xs font-semibold",
                             active ? "bg-primary text-primary-foreground" : cn(palette.bg, palette.text),
                           )}
                         >
@@ -377,6 +780,28 @@ export function NewQuoteDialog({
                             customerInitials(c.company_name)
                           )}
                         </span>
+                        <div className="text-right">
+                          <div className="text-sm font-semibold">{c.company_name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {c.trade_name || c.industry || "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className={cn("h-2 w-2 rounded-full", STATUS_DOT_DB[c.status])} />
+                            {STATUS_LABEL_DB[c.status]}
+                          </span>
+                          <span className="font-mono text-xs text-muted-foreground">{c.customer_code}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                          {c.company_id && <span>ח.פ. {c.company_id}</span>}
+                          {c.company_type && <span>· {c.company_type}</span>}
+                        </div>
+                        {c.website && (
+                          <span className="max-w-[200px] truncate text-[11px] text-muted-foreground">{c.website}</span>
+                        )}
                       </div>
                     </button>
                   );
@@ -422,8 +847,8 @@ export function NewQuoteDialog({
                 </div>
               </Section>
 
-              {/* ב. תנאי מכר — לא רלוונטי לפנים ארצי */}
-              {kind !== "domestic" && (
+              {/* ב. תנאי מכר — לא רלוונטי לפנים ארצי, ולא מוצג לפני שנבחר סוג משלוח */}
+              {kind && kind !== "domestic" && (
                 <Section title="ב. תנאי מכר (Incoterms 2020)">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {INCOTERMS.map((t) => {
@@ -458,7 +883,8 @@ export function NewQuoteDialog({
                 </Section>
               )}
 
-              {/* ג. סוגי משלוחי דרופ — בחירה */}
+              {/* ג. סוגי משלוחי דרופ — בחירה, רק כשנבחר סוג משלוח "דרופ" */}
+              {kind === "distribution" && (
               <Section title="ג. סוגי משלוחי דרופ (Drop Types)">
                 {(() => {
                   const dropTypeIds = Object.keys(DROP_TYPE_SPECS) as DropTypeId[];
@@ -501,8 +927,7 @@ export function NewQuoteDialog({
                   );
                 })()}
               </Section>
-
-
+              )}
 
 
 
@@ -517,8 +942,8 @@ export function NewQuoteDialog({
                 </div>
               </Section>
 
-              {/* ה. פרטי קשר / מסע */}
-              {kind === "import" ? (
+              {/* ה. פרטי מסע — ייבוא בלבד */}
+              {kind === "import" && (
                 <Section title="ה. פרטי מסע">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                     <Field label="סוג מסע" placeholder="ימי / אווירי / יבשתי" />
@@ -529,18 +954,78 @@ export function NewQuoteDialog({
                     <Field label="קוד מסע" />
                   </div>
                 </Section>
-              ) : (
-                <Section title="ה. פרטי קשר">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    <Field label="שם איש קשר" />
-                    <Field label="טלפון" type="tel" />
-                    <Field label='דוא"ל' type="email" />
-                    <Field label="שם חברה" />
-                    <Field label="כתובת + קוד" />
-                    <Field label="שם איש קשר יעד" />
-                  </div>
-                </Section>
               )}
+
+              {/* ו. אנשי קשר — איסוף ומסירה, כל אחד תומך בכמה אנשי קשר */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Section title="איש קשר באיסוף">
+                  <Field label="כתובת איסוף" value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} placeholder="רחוב, עיר, מדינה" />
+                  <div className="mt-3 space-y-3">
+                    {pickupContacts.map((c, idx) => (
+                      <div key={c.id} className={cn("space-y-2", idx > 0 && "border-t pt-3")}>
+                        {pickupContacts.length > 1 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground">איש קשר {idx + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => removePickupContact(c.id)}
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" /> הסר
+                            </button>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          <Field label="שם" value={c.name} onChange={(e) => updatePickupContact(c.id, { name: e.target.value })} />
+                          <Field label="טלפון" type="tel" value={c.phone} onChange={(e) => updatePickupContact(c.id, { phone: e.target.value })} />
+                          <Field label='דוא"ל' type="email" value={c.email} onChange={(e) => updatePickupContact(c.id, { email: e.target.value })} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addPickupContact}
+                    className="mt-3 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+                  >
+                    <Plus className="h-4 w-4" /> הוסף איש קשר
+                  </button>
+                </Section>
+
+                <Section title="איש קשר במסירה">
+                  <Field label="כתובת מסירה" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} placeholder="רחוב, עיר, מדינה" />
+                  <div className="mt-3 space-y-3">
+                    {deliveryContacts.map((c, idx) => (
+                      <div key={c.id} className={cn("space-y-2", idx > 0 && "border-t pt-3")}>
+                        {deliveryContacts.length > 1 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-muted-foreground">איש קשר {idx + 1}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeDeliveryContact(c.id)}
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" /> הסר
+                            </button>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          <Field label="שם" value={c.name} onChange={(e) => updateDeliveryContact(c.id, { name: e.target.value })} />
+                          <Field label="טלפון" type="tel" value={c.phone} onChange={(e) => updateDeliveryContact(c.id, { phone: e.target.value })} />
+                          <Field label='דוא"ל' type="email" value={c.email} onChange={(e) => updateDeliveryContact(c.id, { email: e.target.value })} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addDeliveryContact}
+                    className="mt-3 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+                  >
+                    <Plus className="h-4 w-4" /> הוסף איש קשר
+                  </button>
+                </Section>
+              </div>
 
               <Section title="הערות">
                 <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="הערות כלליות למשלוח…" rows={3} />
@@ -610,98 +1095,289 @@ export function NewQuoteDialog({
               </Section>
 
               {cargoType === "temperature" && (
-                <Section title="בחר אריזה" action={<span className="text-xs text-muted-foreground">בחר סדרת טמפרטורה ואריזה אחת</span>}>
+                <Section title="בחר אריזה" action={<span className="text-xs text-muted-foreground">אפשר לבחור כמה סדרות טמפרטורה במקביל</span>}>
                   <div className="mb-3 flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => { setTempSeries("none"); setSelectedPackModel(null); }}
-                      className={cn("rounded-full border px-3 py-1 text-xs", tempSeries === "none" ? "border-primary bg-primary/5" : "hover:bg-muted/40")}
+                      onClick={toggleTempSeriesNone}
+                      className={cn("rounded-full border px-3 py-1 text-xs", tempSeriesNone ? "border-primary bg-primary/5" : "hover:bg-muted/40")}
                     >
                       ללא אריזה מוגדרת
                     </button>
-                    {TEMP_SERIES.map((s) => (
-                      <button
-                        key={s.key}
-                        type="button"
-                        onClick={() => setTempSeries(s.key)}
-                        className={cn(
-                          "rounded-full border px-3 py-1 text-xs transition",
-                          tempSeries === s.key ? "border-primary bg-primary/5 text-foreground" : "hover:bg-muted/40 text-muted-foreground",
-                        )}
-                      >
-                        <span className="font-medium text-foreground">{s.label}</span>
-                        <span className="mr-2 text-muted-foreground">{s.range}</span>
-                      </button>
-                    ))}
+                    {TEMP_SERIES.map((s) => {
+                      const active = tempSeriesList.includes(s.key);
+                      return (
+                        <button
+                          key={s.key}
+                          type="button"
+                          onClick={() => toggleTempSeries(s.key)}
+                          className={cn(
+                            "rounded-full border px-3 py-1 text-xs transition",
+                            active ? "border-primary bg-primary/5 text-foreground" : "hover:bg-muted/40 text-muted-foreground",
+                          )}
+                        >
+                          {active && <Check className="ml-1 inline h-3 w-3" />}
+                          <span className="ml-1">{s.icon}</span>
+                          <span className="font-medium text-foreground">{s.label}</span>
+                          <span className="mr-2 text-muted-foreground">{s.range}</span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {tempSeries !== "none" && (
-                    <div className="overflow-x-auto rounded-lg border">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/40 text-xs text-muted-foreground">
-                          <tr>
-                            <th className="w-8 px-2 py-2"></th>
-                            <th className="px-3 py-2 text-right font-medium">דגם</th>
-                            <th className="px-3 py-2 text-right font-medium">Payload</th>
-                            <th className="px-3 py-2 text-right font-medium">מידות פנימיות</th>
-                            <th className="px-3 py-2 text-right font-medium">מידות חיצוניות</th>
-                            <th className="px-3 py-2 text-right font-medium">Tare</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {COOLGUARD_MODELS.map((m) => {
-                            const key = `${tempSeries}:${m.model}`;
-                            const active = selectedPackModel === key;
-                            return (
-                              <tr
-                                key={m.model}
-                                onClick={() => setSelectedPackModel(key)}
-                                className={cn("cursor-pointer border-t transition", active ? "bg-primary/5" : "hover:bg-muted/30")}
-                              >
-                                <td className="px-2 py-2 text-center">
-                                  <div className={cn("mx-auto h-4 w-4 rounded-full border", active ? "border-primary bg-primary" : "border-muted-foreground/40")}>
-                                    {active && <Check className="h-3 w-3 text-primary-foreground" />}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-2 font-medium">{m.model}</td>
-                                <td className="px-3 py-2">{m.payload}</td>
-                                <td className="px-3 py-2 text-muted-foreground">{m.inner}</td>
-                                <td className="px-3 py-2 text-muted-foreground">{m.outer}</td>
-                                <td className="px-3 py-2">{m.tare}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                  {tempSeriesList.length > 0 && (
+                    <div className="space-y-4">
+                      {tempSeriesList.map((series) => {
+                        const seriesInfo = TEMP_SERIES.find((s) => s.key === series);
+                        return (
+                          <div key={series} className="overflow-x-auto rounded-lg border">
+                            <div className="flex items-center justify-between border-b bg-muted/20 px-3 py-1.5">
+                              <span className="text-xs font-medium">
+                                {seriesInfo?.icon} {seriesInfo?.label} <span className="text-muted-foreground">({seriesInfo?.range})</span>
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">אפשר לבחור כמה סוגי אריזה שונים, כל אחד בכמות משלו</span>
+                            </div>
+                            {series === "deepFrozen" ? (
+                              <table className="w-full text-sm">
+                                <thead className="bg-muted/40 text-xs text-muted-foreground">
+                                  <tr>
+                                    <th className="w-28 px-2 py-2 text-center font-medium">כמות</th>
+                                    <th className="px-3 py-2 text-right font-medium">דגם</th>
+                                    <th className="px-3 py-2 text-right font-medium">קטגוריה</th>
+                                    <th className="px-3 py-2 text-right font-medium">משך</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {BIOTHERM_MODELS.map((m) => {
+                                    const key = `${series}:${m.model}`;
+                                    const qty = getPackQty(key);
+                                    return (
+                                      <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
+                                        <td className="px-2 py-2">
+                                          <PackQtyStepper value={qty} onChange={(v) => setPackQty(key, v)} />
+                                        </td>
+                                        <td className="px-3 py-2 font-medium">{m.model}</td>
+                                        <td className="px-3 py-2 text-muted-foreground">{m.category}</td>
+                                        <td className="px-3 py-2">{m.duration}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <table className="w-full text-sm">
+                                <thead className="bg-muted/40 text-xs text-muted-foreground">
+                                  <tr>
+                                    <th className="w-28 px-2 py-2 text-center font-medium">כמות</th>
+                                    <th className="px-3 py-2 text-right font-medium">דגם</th>
+                                    <th className="px-3 py-2 text-right font-medium">Payload</th>
+                                    <th className="px-3 py-2 text-right font-medium">מידות חיצוניות</th>
+                                    <th className="px-3 py-2 text-right font-medium">Tare</th>
+                                    <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {COOLGUARD_MODELS.map((m) => {
+                                    const key = `${series}:${m.model}`;
+                                    const qty = getPackQty(key);
+                                    const calc = qty > 0 ? getPackModelCalc({ key, qty }) : null;
+                                    return (
+                                      <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
+                                        <td className="px-2 py-2">
+                                          <PackQtyStepper value={qty} onChange={(v) => setPackQty(key, v)} />
+                                        </td>
+                                        <td className="px-3 py-2 font-medium">{m.model}</td>
+                                        <td className="px-3 py-2">{m.payload}</td>
+                                        <td className="px-3 py-2 text-muted-foreground">{m.outer}</td>
+                                        <td className="px-3 py-2">{m.tare}</td>
+                                        <td className="px-3 py-2 text-muted-foreground">
+                                          {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {packSelections.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {packModelCalcs.map((c, idx) => (
+                        <span key={packSelections[idx].key} className="rounded-full border bg-muted/40 px-2.5 py-1 text-xs">
+                          <span className="font-medium">{c.qty}×</span> {c.label}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </Section>
               )}
 
               <Section title="מידות ידניות מארז / משטח">
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {PALLETS.map((p) => {
-                    const active = pallet === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setPallet(p.id)}
-                        className={cn(
-                          "rounded-lg border p-3 text-right transition",
-                          active ? "border-primary bg-primary/5" : "hover:bg-muted/40",
-                        )}
-                      >
-                        <div className="text-sm font-medium">{p.label}</div>
-                        <div className="mt-1 text-[11px] text-muted-foreground">{p.size}</div>
-                      </button>
-                    );
-                  })}
+                <div className="space-y-4">
+                  {packages.map((pkg, idx) => (
+                    <div key={pkg.id} className={cn("relative", idx > 0 && "border-t pt-4")}>
+                      {packages.length > 1 && (
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-medium text-muted-foreground">חבילה {idx + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => removePackage(pkg.id)}
+                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" /> הסר חבילה
+                          </button>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                        {PALLETS.map((p) => {
+                          const active = pkg.pallet === p.id;
+                          const size = p.id === "custom" && pkg.customLength && pkg.customWidth && pkg.customHeight
+                            ? `${pkg.customLength} × ${pkg.customWidth} × ${pkg.customHeight} ס״מ`
+                            : p.size;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => updatePackage(pkg.id, { pallet: p.id })}
+                              className={cn(
+                                "rounded-lg border p-3 text-right transition",
+                                active ? "border-primary bg-primary/5" : "hover:bg-muted/40",
+                              )}
+                            >
+                              <div className="text-sm font-medium">{p.label}</div>
+                              <div className="mt-1 text-[11px] text-muted-foreground">{size}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {pkg.pallet === "custom" && (
+                        <div className="mt-3 grid grid-cols-3 gap-3 rounded-lg border bg-muted/20 p-3">
+                          <Field label='אורך (ס"מ)' type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} placeholder="120" />
+                          <Field label='רוחב (ס"מ)' type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} placeholder="80" />
+                          <Field label='גובה (ס"מ)' type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} placeholder="14.4" />
+                        </div>
+                      )}
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <Field label='משקל ליחידה (ק"ג)' type="number" value={pkg.unitWeight} onChange={(e) => updatePackage(pkg.id, { unitWeight: e.target.value })} />
+                        <Field label="כמות (יח')" type="number" value={pkg.unitQty} onChange={(e) => updatePackage(pkg.id, { unitQty: e.target.value })} placeholder="0" />
+                      </div>
+                      {cargoType === "temperature" && (() => {
+                        const dims = getPackageDimsCm(pkg);
+                        if (!dims) return null;
+                        const matches = getPackagingRecommendations(pkg, tempSeriesList[0]);
+                        const palletLabel = pkg.pallet === "custom"
+                          ? `מידה ידנית ${dims.length}×${dims.width}×${dims.height} ס״מ`
+                          : PALLETS.find((p) => p.id === pkg.pallet)?.label ?? "—";
+                        const tempLabel = tempSeriesList.length > 0
+                          ? tempSeriesList.map((k) => TEMP_SERIES.find((t) => t.key === k)?.label).filter(Boolean).join(" + ")
+                          : "לא נבחרה סדרת טמפרטורה";
+                        return (
+                          <div className="mt-3 rounded-lg border bg-muted/20 p-3">
+                            <div className="mb-2 space-y-0.5">
+                              <div className="text-xs font-medium text-muted-foreground">המלצת אריזה</div>
+                              <div className="text-xs text-muted-foreground">
+                                סוג מארז: <span className="font-medium text-foreground">{palletLabel}</span>
+                                <span className="mx-1.5">·</span>
+                                טמפרטורה: <span className="font-medium text-foreground">{tempLabel}</span>
+                              </div>
+                            </div>
+                            {matches.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">לא נמצאה אריזה מהקטלוג שמתאימה למידות אלו.</p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {matches.slice(0, 3).map((m, rank) => (
+                                  <div key={m.package.id} className="flex items-center justify-between gap-2 rounded-md border bg-card px-2.5 py-1.5 text-xs">
+                                    <span className="flex items-center gap-2">
+                                      <span className={cn(
+                                        "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                                        rank === 0 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                                      )}>
+                                        {rank + 1}
+                                      </span>
+                                      <span className="font-medium">{m.package.model}</span>
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      סבב {m.rotation} · ניצול {(m.utilization * 100).toLocaleString("he-IL", { maximumFractionDigits: 0 })}%
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  ))}
                 </div>
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <Field label='משקל ליחידה (ק"ג)' type="number" value={unitWeight} onChange={(e) => setUnitWeight(e.target.value)} />
-                  <Field label="כמות (יח')" type="number" value={unitQty} onChange={(e) => setUnitQty(e.target.value)} placeholder="0" />
+                <button
+                  type="button"
+                  onClick={addPackage}
+                  className="mt-4 flex items-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5"
+                >
+                  <Plus className="h-4 w-4" /> הוסף חבילה
+                </button>
+              </Section>
+
+              <Section title="סיכום משקלי ונפחי">
+                <div className="overflow-hidden rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 text-xs text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2 text-right font-medium">חבילה</th>
+                        <th className="px-3 py-2 text-right font-medium">מידות (ס״מ)</th>
+                        <th className="px-3 py-2 text-right font-medium">כמות</th>
+                        <th className="px-3 py-2 text-right font-medium">משקל ברוטו</th>
+                        <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {packageCalcs.map((c, idx) => (
+                        <tr key={c.id}>
+                          <td className="px-3 py-2">חבילה {idx + 1}</td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {c.dims ? `${c.dims.length} × ${c.dims.width} × ${c.dims.height}` : ""}
+                          </td>
+                          <td className="px-3 py-2">{c.qty ? c.qty : ""}</td>
+                          <td className="px-3 py-2">{c.grossWeight ? `${c.grossWeight.toLocaleString("he-IL")} ק"ג` : ""}</td>
+                          <td className="px-3 py-2">{c.volumetricWeight ? `${c.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}</td>
+                        </tr>
+                      ))}
+                      {packModelCalcs.map((c, idx) => (
+                        <tr key={packSelections[idx].key}>
+                          <td className="px-3 py-2">{c.label}</td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {c.dims ? `${c.dims.length} × ${c.dims.width} × ${c.dims.height}` : ""}
+                          </td>
+                          <td className="px-3 py-2">{c.qty ? c.qty : ""}</td>
+                          <td className="px-3 py-2">{c.grossWeight ? `${c.grossWeight.toLocaleString("he-IL")} ק"ג` : ""}</td>
+                          <td className="px-3 py-2">{c.volumetricWeight ? `${c.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border bg-muted/20 p-3 text-center">
+                    <div className="text-[11px] text-muted-foreground">סה״כ משקל ברוטו</div>
+                    <div className="mt-1 text-lg font-semibold">{packageTotals.grossWeight.toLocaleString("he-IL")} ק"ג</div>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3 text-center">
+                    <div className="text-[11px] text-muted-foreground">סה״כ משקל נפחי</div>
+                    <div className="mt-1 text-lg font-semibold">{packageTotals.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג</div>
+                  </div>
+                  <div className="rounded-lg border border-primary bg-primary/5 p-3 text-center">
+                    <div className="text-[11px] text-muted-foreground">משקל חייב (הגבוה מבין השניים)</div>
+                    <div className="mt-1 text-lg font-semibold text-primary">{packageTotals.chargeableWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג</div>
+                  </div>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  חישוב המשקל הנפחי מבוסס על מקדם IATA לתובלה אווירית: (אורך × רוחב × גובה בס״מ) ÷ 6000.
+                </p>
               </Section>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -716,6 +1392,7 @@ export function NewQuoteDialog({
           )}
 
           {step === 4 && <Step4Logistics
+            kind={kind}
             originPort={originPort} setOriginPort={setOriginPort}
             destPort={destPort} setDestPort={setDestPort}
             transit={transit} setTransit={setTransit}
@@ -725,6 +1402,7 @@ export function NewQuoteDialog({
             services={services} setServices={setServices}
             compare={compare} setCompare={setCompare}
             agent={agent} setAgent={setAgent}
+            agents={agents} setAgents={setAgents}
             airline={airline} setAirline={setAirline}
             logisticsNotes={logisticsNotes} setLogisticsNotes={setLogisticsNotes}
             routeApproved={routeApproved} setRouteApproved={setRouteApproved}
@@ -764,7 +1442,7 @@ export function NewQuoteDialog({
               agent={agent}
               airline={airline}
               cargoType={cargoType}
-              tempSeries={tempSeries}
+              tempSeriesList={tempSeriesList}
               pricingItems={pricingItems}
               currency={currency}
               margin={margin}
@@ -800,72 +1478,76 @@ export function NewQuoteDialog({
               className="gap-1"
               data-testid={step < 6 ? "wizard-next" : "wizard-finish"}
               disabled={!canContinue || submitting}
-              onClick={async () => {
-                if (step < 6) { setStep(step + 1); return; }
-                try {
-                  setSubmitting(true);
-                  const customer = customersList.find((c) => c.id === selectedId);
-                  const totalCost = pricingItems.reduce((s, i) => s + (Number(i.price) || 0), 0);
-                  const marginPct = Number(margin) || 0;
-                  const discountAmt = Number(discount) || 0;
-                  const total = totalCost * (1 + marginPct / 100) - discountAmt;
-                  const res = await createQuoteFn({
-                    data: {
-                      quoteCode,
-                      customerId: customer?.id ?? null,
-                      customerRef: customer?.customer_code ?? null,
-                      customerName: customer?.company_name ?? null,
-                      shipmentKind: kind,
-                      shipmentMode,
-                      incoterm,
-                      originPort,
-                      destPort,
-                      transitPorts: transit,
-                      departDate,
-                      arriveDate,
-                      agent,
-                      airline,
-                      currency,
-                      marginPct,
-                      total,
-                      payload: {
-                        cargoType,
-                        attrs,
-                        tempSeries,
-                        selectedPackModel,
-                        pallet,
-                        unitWeight,
-                        unitQty,
-                        specialReq,
-                        extraNotes,
-                        services,
-                        compare,
-                        logisticsNotes,
-                        routeApproved,
-                        pricingItems,
-                        pricingNotes,
-                        discount: discountAmt,
-                        internalNotes,
-                        dropType,
-                        stops: normalizeStopsForPersist(stops),
-                      },
-                    },
-                  });
-                  toast.success(`הצעה ${res?.quote_code ?? quoteCode} נשמרה`);
-                  onSaved?.();
-                  onOpenChange(false);
-                } catch (e) {
-                  const msg = e instanceof Error ? e.message : "שגיאה בשמירת ההצעה";
-                  toast.error(msg);
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
+              onClick={() => (step < 6 ? setStep(step + 1) : setShowFinishOptions(true))}
             >
-              {step < 6 ? "המשך" : submitting ? "שומר..." : "סיום"} <ArrowLeft className="h-4 w-4" />
+              {step < 6 ? "המשך" : "סיום"} <ArrowLeft className="h-4 w-4" />
             </Button>
           </div>
         </div>
+
+        {showFinishOptions && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
+            <div className="w-full max-w-sm rounded-2xl border bg-card p-5 shadow-xl">
+              <div className="mb-1 text-base font-semibold">מה תרצה לעשות?</div>
+              <div className="mb-4 text-sm text-muted-foreground">ההצעה תישמר, ולאחר מכן:</div>
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  data-testid="finish-open-case"
+                  disabled={submitting}
+                  onClick={() => handleFinish("case")}
+                  className="flex w-full items-center gap-3 rounded-xl border p-3 text-right transition hover:border-primary/40 hover:bg-muted/40 disabled:opacity-50"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FolderOpen className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-medium">פתח תיק ייצוא</span>
+                    <span className="block text-xs text-muted-foreground">שמור ועבור לדף ההצעה</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="finish-save"
+                  disabled={submitting}
+                  onClick={() => handleFinish("save")}
+                  className="flex w-full items-center gap-3 rounded-xl border p-3 text-right transition hover:border-primary/40 hover:bg-muted/40 disabled:opacity-50"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Save className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-medium">שמור שינויים</span>
+                    <span className="block text-xs text-muted-foreground">שמור וסגור</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  data-testid="finish-pdf"
+                  disabled={submitting}
+                  onClick={() => handleFinish("pdf")}
+                  className="flex w-full items-center gap-3 rounded-xl border p-3 text-right transition hover:border-primary/40 hover:bg-muted/40 disabled:opacity-50"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FileDown className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-sm font-medium">ייצוא ל-PDF</span>
+                    <span className="block text-xs text-muted-foreground">שמור וייצא כ-PDF</span>
+                  </span>
+                </button>
+              </div>
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setShowFinishOptions(false)}
+                className="mt-4 w-full rounded-lg py-2 text-center text-sm text-muted-foreground hover:bg-muted/50 disabled:opacity-50"
+              >
+                {submitting ? "שומר..." : "ביטול"}
+              </button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -1061,6 +1743,33 @@ function Field({ label, ...rest }: { label: string } & React.InputHTMLAttributes
   );
 }
 
+// Compact +/- quantity control used to pick "how many of this packaging type",
+// letting several different types be added side by side (each with its own count).
+// (Named distinctly from the pre-existing QtyStepper below, which clamps to a minimum of 1 —
+// here 0 is a valid state meaning "not selected".)
+export function PackQtyStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(0, value - 1))}
+        disabled={value === 0}
+        className="flex h-6 w-6 items-center justify-center rounded border text-sm hover:bg-muted disabled:opacity-30"
+      >
+        −
+      </button>
+      <span className={cn("w-5 text-center text-sm font-medium", value === 0 && "text-muted-foreground")}>{value}</span>
+      <button
+        type="button"
+        onClick={() => onChange(value + 1)}
+        className="flex h-6 w-6 items-center justify-center rounded border text-sm hover:bg-muted"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 function RowTable({ headers, rows }: { headers: React.ReactNode[]; rows: { id: string; cells: React.ReactNode[] }[] }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
@@ -1106,7 +1815,7 @@ function QtyStepper({ value, onChange }: { value: number; onChange: (v: number) 
 
 // ============ Step 4 — אופי לוגיסטי ============
 
-const SERVICE_LIST: { id: string; label: string }[] = [
+export const SERVICE_LIST: { id: string; label: string }[] = [
   { id: "pickup", label: "איסוף מהמשלוח" },
   { id: "air", label: "הובלה אווירית" },
   { id: "exportCustoms", label: "מכס יצוא" },
@@ -1124,6 +1833,7 @@ const ALTERNATIVES = [
 ];
 
 type Step4Props = {
+  kind: ShipKind | null;
   originPort: string; setOriginPort: (v: string) => void;
   destPort: string; setDestPort: (v: string) => void;
   transit: string[]; setTransit: React.Dispatch<React.SetStateAction<string[]>>;
@@ -1133,10 +1843,11 @@ type Step4Props = {
   services: Record<string, boolean>; setServices: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   compare: Record<string, boolean>; setCompare: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   agent: string; setAgent: (v: string) => void;
+  agents: string[]; setAgents: React.Dispatch<React.SetStateAction<string[]>>;
   airline: string; setAirline: (v: string) => void;
   logisticsNotes: string; setLogisticsNotes: (v: string) => void;
   routeApproved: boolean; setRouteApproved: (v: boolean) => void;
-  shipmentMode: ShipmentMode; setShipmentMode: (v: ShipmentMode) => void;
+  shipmentMode: ShipmentMode | null; setShipmentMode: (v: ShipmentMode) => void;
 };
 
 function Step4Logistics(p: Step4Props) {
@@ -1145,6 +1856,15 @@ function Step4Logistics(p: Step4Props) {
     const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
     return isNaN(diff) ? 0 : Math.max(0, diff);
   }, [p.departDate, p.arriveDate]);
+
+  const isDropShipment = p.kind === "distribution";
+  const getAgentsByIdsFn = useServerFn(getLookupItemsByIds);
+  const selectedAgentsQuery = useQuery({
+    queryKey: ["lookup-selected-agents", p.agents],
+    queryFn: () => getAgentsByIdsFn({ data: { type: "agents", ids: p.agents, by: "code" } }),
+    enabled: isDropShipment && p.agents.length > 0,
+  });
+  const selectedAgentItems = selectedAgentsQuery.data ?? [];
 
   const routeCode = (s: string) => {
     const m = s.match(/\(([A-Z]{3})\)/);
@@ -1289,15 +2009,60 @@ function Step4Logistics(p: Step4Props) {
       </Section>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Section title="סוכן מתווכן" action={<Button type="button" variant="ghost" size="sm" className="h-7 text-xs">פרטי סוכן מלאים</Button>}>
-          <Field label="שם הסוכן" value={p.agent} onChange={(e) => p.setAgent(e.target.value)} />
-          <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-            <li>סוג שירות: <span className="font-medium text-foreground">Premium</span></li>
-            <li>סניף מטפל: <span className="font-medium text-foreground">TLV Office</span></li>
-            <li>איש קשר: <span className="font-medium text-foreground">John Doe</span></li>
-            <li>טלפון: <span className="font-medium text-foreground">+972-3-1234567</span></li>
-            <li>דוא״ל: <span className="font-medium text-foreground">tlv@quickstat.com</span></li>
-          </ul>
+        <Section
+          title={isDropShipment ? "סוכנים מתווכים" : "סוכן מתווכן"}
+          action={!isDropShipment && <Button type="button" variant="ghost" size="sm" className="h-7 text-xs">פרטי סוכן מלאים</Button>}
+        >
+          {isDropShipment ? (
+            <>
+              <Lookup
+                type="agents"
+                matchBy="code"
+                value={null}
+                placeholder="הוסף סוכן..."
+                onChange={(item) => {
+                  if (!item) return;
+                  p.setAgents((arr) => (arr.includes(item.code) ? arr : [...arr, item.code]));
+                }}
+              />
+              {selectedAgentItems.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {selectedAgentItems.map((item) => (
+                    <span key={item.id} className="flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pr-1 pl-2.5 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => p.setAgents((arr) => arr.filter((c) => c !== item.code))}
+                        className="flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-destructive"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                      <span className="font-medium">{item.name}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {p.agents.length === 0 && (
+                <p className="mt-2 text-[11px] text-muted-foreground">ניתן לבחור יותר מסוכן אחד למשלוחי דרופ (איסוף מסוכן אחד, מסירה לסוכן אחר וכו׳).</p>
+              )}
+            </>
+          ) : (
+            <>
+              <Lookup
+                type="agents"
+                matchBy="code"
+                value={p.agent || null}
+                placeholder="בחר סוכן..."
+                onChange={(item) => p.setAgent(item?.code ?? "")}
+              />
+              <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
+                <li>סוג שירות: <span className="font-medium text-foreground">Premium</span></li>
+                <li>סניף מטפל: <span className="font-medium text-foreground">TLV Office</span></li>
+                <li>איש קשר: <span className="font-medium text-foreground">John Doe</span></li>
+                <li>טלפון: <span className="font-medium text-foreground">+972-3-1234567</span></li>
+                <li>דוא״ל: <span className="font-medium text-foreground">tlv@quickstat.com</span></li>
+              </ul>
+            </>
+          )}
         </Section>
 
         <Section title="חברת תעופה מתוכננת">
@@ -1703,16 +2468,16 @@ const CARGO_LABEL: Record<CargoType, string> = {
 type Step6Props = {
   quoteCode: string;
   customer: { id: string; company_name: string; customer_code: string } | null;
-  kind: ShipKind;
-  shipmentMode: ShipmentMode;
+  kind: ShipKind | null;
+  shipmentMode: ShipmentMode | null;
   originPort: string;
   destPort: string;
   departDate: string;
   arriveDate: string;
   agent: string;
   airline: string;
-  cargoType: CargoType;
-  tempSeries: TempSeriesKey | "none";
+  cargoType: CargoType | null;
+  tempSeriesList: TempSeriesKey[];
   pricingItems: PricingItem[];
   currency: "USD" | "EUR" | "ILS";
   margin: string;
@@ -1744,7 +2509,9 @@ function Step6Summary(p: Step6Props) {
   const money = (n: number) =>
     `${p.currency} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const tempLabel = p.tempSeries !== "none" ? TEMP_SERIES.find((t) => t.key === p.tempSeries)?.label : null;
+  const tempLabel = p.tempSeriesList.length > 0
+    ? p.tempSeriesList.map((k) => TEMP_SERIES.find((t) => t.key === k)?.label).filter(Boolean).join(" + ")
+    : null;
 
   return (
     <div className="space-y-4" data-testid="wizard-step-6">
@@ -1811,7 +2578,7 @@ function Step6Summary(p: Step6Props) {
                 <td className="px-3 py-2">{p.departDate || "—"}</td>
                 <td className="px-3 py-2">{p.arriveDate || "—"}</td>
                 <td className="px-3 py-2">
-                  {CARGO_LABEL[p.cargoType] ?? p.cargoType}
+                  {p.cargoType ? (CARGO_LABEL[p.cargoType] ?? p.cargoType) : "—"}
                   {tempLabel ? ` · ${tempLabel}` : ""}
                 </td>
               </tr>
@@ -1819,8 +2586,8 @@ function Step6Summary(p: Step6Props) {
           </table>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <Chip>{KIND_LABEL[p.kind]}</Chip>
-          <Chip>{MODE_LABEL[p.shipmentMode]}</Chip>
+          {p.kind && <Chip>{KIND_LABEL[p.kind]}</Chip>}
+          {p.shipmentMode && <Chip>{MODE_LABEL[p.shipmentMode]}</Chip>}
           {p.agent ? <Chip>סוכן: {p.agent}</Chip> : null}
           {p.airline ? <Chip>מוביל: {p.airline}</Chip> : null}
         </div>

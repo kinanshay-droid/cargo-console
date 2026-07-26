@@ -33,7 +33,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 export const Route = createFileRoute("/dashboard/users")({
   head: () => ({
     meta: [
-      { title: "Users — Cargo Console" },
+      { title: "Users — AFIK Logistics Platform" },
       { name: "description", content: "Manage members of your organization." },
     ],
   }),

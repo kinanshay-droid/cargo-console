@@ -48,7 +48,17 @@ async def create_quote_with_mode(page, mode: str):
     # Step 1: pick the first customer
     await page.locator('[role="dialog"] button:has-text("אחראי:")').first.click()
     await page.get_by_test_id("wizard-next").click()  # -> step 2
+
+    # Step 2: no card is pre-selected anymore — explicitly pick shipment kind
+    # and incoterm (required whenever kind != domestic) before continuing.
+    await page.locator('[role="dialog"] button:has-text("ייצוא")').first.click()
+    await page.locator('[role="dialog"] button:has-text("CIP")').first.click()
     await page.get_by_test_id("wizard-next").click()  # -> step 3
+
+    # Step 3: cargo type and the default package's pallet type are both
+    # required (no default selection) before continuing.
+    await page.locator('[role="dialog"] button:has-text("מטען כללי")').first.click()
+    await page.locator('[role="dialog"] button:has-text("משטח יורו")').first.click()
     await page.get_by_test_id("wizard-next").click()  # -> step 4
 
     # Step 4: pick shipment mode
@@ -58,7 +68,8 @@ async def create_quote_with_mode(page, mode: str):
 
     await page.get_by_test_id("wizard-next").click()  # -> step 5
     await page.get_by_test_id("wizard-next").click()  # -> step 6
-    await page.get_by_test_id("wizard-finish").click()
+    await page.get_by_test_id("wizard-finish").click()  # opens the finish-options panel
+    await page.get_by_test_id("finish-save").click()  # "שמור שינויים" — save and close, stay put
 
     # Wait for success toast (Sonner)
     await expect(page.locator('[data-sonner-toast]').first).to_be_visible(timeout=15000)

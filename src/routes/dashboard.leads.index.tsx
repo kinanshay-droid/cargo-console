@@ -17,7 +17,7 @@ import { customerInitials, customerPalette } from "@/lib/customers-demo";
 export const Route = createFileRoute("/dashboard/leads/")({
   head: () => ({
     meta: [
-      { title: "ניהול לקוחות פוטנציאליים — Cargo Console" },
+      { title: "ניהול לקוחות פוטנציאליים — AFIK Logistics Platform" },
       { name: "description", content: "מעקב אחר לידים ומשימות המשך לכל לקוח פוטנציאלי." },
       { property: "og:title", content: "ניהול לקוחות פוטנציאליים" },
       { property: "og:description", content: "מעקב אחר לידים ומשימות המשך." },

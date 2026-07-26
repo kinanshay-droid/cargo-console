@@ -24,7 +24,7 @@ import {
 export const Route = createFileRoute("/dashboard/roles")({
   head: () => ({
     meta: [
-      { title: "Roles — Cargo Console" },
+      { title: "Roles — AFIK Logistics Platform" },
       { name: "description", content: "Define roles and what they can do." },
     ],
   }),

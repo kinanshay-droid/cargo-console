@@ -9,50 +9,38 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SignupRouteImport } from './routes/signup'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
-import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
-import { Route as DashboardShipmentsRouteImport } from './routes/dashboard.shipments'
-import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
-import { Route as DashboardPricelistsRouteImport } from './routes/dashboard.pricelists'
-import { Route as DashboardOverviewRouteImport } from './routes/dashboard.overview'
-import { Route as DashboardOrganizationRouteImport } from './routes/dashboard.organization'
-import { Route as DashboardOperationsRouteImport } from './routes/dashboard.operations'
-import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
-import { Route as DashboardCommercialRouteImport } from './routes/dashboard.commercial'
-import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SignupRouteImport } from './routes/signup'
 import { Route as DashboardAccountRouteImport } from './routes/dashboard.account'
-import { Route as DashboardQuotesIndexRouteImport } from './routes/dashboard.quotes.index'
-import { Route as DashboardLeadsIndexRouteImport } from './routes/dashboard.leads.index'
+import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
+import { Route as DashboardCommercialRouteImport } from './routes/dashboard.commercial'
+import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
+import { Route as DashboardOperationsRouteImport } from './routes/dashboard.operations'
+import { Route as DashboardOrganizationRouteImport } from './routes/dashboard.organization'
+import { Route as DashboardOverviewRouteImport } from './routes/dashboard.overview'
+import { Route as DashboardPricelistsRouteImport } from './routes/dashboard.pricelists'
+import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
+import { Route as DashboardShipmentsRouteImport } from './routes/dashboard.shipments'
+import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
 import { Route as DashboardCustomersIndexRouteImport } from './routes/dashboard.customers.index'
-import { Route as DashboardRolesIdRouteImport } from './routes/dashboard.roles.$id'
-import { Route as DashboardLeadsNewRouteImport } from './routes/dashboard.leads.new'
 import { Route as DashboardCustomersIdRouteImport } from './routes/dashboard.customers.$id'
+import { Route as DashboardLeadsIndexRouteImport } from './routes/dashboard.leads.index'
+import { Route as DashboardLeadsNewRouteImport } from './routes/dashboard.leads.new'
+import { Route as DashboardOperationsIdRouteImport } from './routes/dashboard.operations.$id'
+import { Route as DashboardQuotesIndexRouteImport } from './routes/dashboard.quotes.index'
+import { Route as DashboardRolesIdRouteImport } from './routes/dashboard.roles.$id'
+import { Route as DashboardShipmentsIdRouteImport } from './routes/dashboard.shipments_.$id'
 import { Route as DashboardQuotesIdIndexRouteImport } from './routes/dashboard.quotes.$id.index'
+import { Route as DashboardQuotesIdCustomerViewRouteImport } from './routes/dashboard.quotes.$id.customer-view'
 import { Route as DashboardQuotesIdEditRouteImport } from './routes/dashboard.quotes.$id.edit'
 
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
-  id: '/forgot-password',
-  path: '/forgot-password',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -60,54 +48,29 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardUsersRoute = DashboardUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => DashboardRoute,
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardShipmentsRoute = DashboardShipmentsRouteImport.update({
-  id: '/shipments',
-  path: '/shipments',
-  getParentRoute: () => DashboardRoute,
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRolesRoute = DashboardRolesRouteImport.update({
-  id: '/roles',
-  path: '/roles',
-  getParentRoute: () => DashboardRoute,
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardPricelistsRoute = DashboardPricelistsRouteImport.update({
-  id: '/pricelists',
-  path: '/pricelists',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardOverviewRoute = DashboardOverviewRouteImport.update({
-  id: '/overview',
-  path: '/overview',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardOrganizationRoute = DashboardOrganizationRouteImport.update({
-  id: '/organization',
-  path: '/organization',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardOperationsRoute = DashboardOperationsRouteImport.update({
-  id: '/operations',
-  path: '/operations',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
-  id: '/customers',
-  path: '/customers',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardCommercialRoute = DashboardCommercialRouteImport.update({
-  id: '/commercial',
-  path: '/commercial',
+const DashboardAccountRoute = DashboardAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardAuditLogRoute = DashboardAuditLogRouteImport.update({
@@ -115,19 +78,49 @@ const DashboardAuditLogRoute = DashboardAuditLogRouteImport.update({
   path: '/audit-log',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardAccountRoute = DashboardAccountRouteImport.update({
-  id: '/account',
-  path: '/account',
+const DashboardCommercialRoute = DashboardCommercialRouteImport.update({
+  id: '/commercial',
+  path: '/commercial',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardQuotesIndexRoute = DashboardQuotesIndexRouteImport.update({
-  id: '/quotes/',
-  path: '/quotes/',
+const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardLeadsIndexRoute = DashboardLeadsIndexRouteImport.update({
-  id: '/leads/',
-  path: '/leads/',
+const DashboardOperationsRoute = DashboardOperationsRouteImport.update({
+  id: '/operations',
+  path: '/operations',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardOrganizationRoute = DashboardOrganizationRouteImport.update({
+  id: '/organization',
+  path: '/organization',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardOverviewRoute = DashboardOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardPricelistsRoute = DashboardPricelistsRouteImport.update({
+  id: '/pricelists',
+  path: '/pricelists',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardRolesRoute = DashboardRolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardShipmentsRoute = DashboardShipmentsRouteImport.update({
+  id: '/shipments',
+  path: '/shipments',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardUsersRoute = DashboardUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardCustomersIndexRoute = DashboardCustomersIndexRouteImport.update({
@@ -135,26 +128,52 @@ const DashboardCustomersIndexRoute = DashboardCustomersIndexRouteImport.update({
   path: '/',
   getParentRoute: () => DashboardCustomersRoute,
 } as any)
-const DashboardRolesIdRoute = DashboardRolesIdRouteImport.update({
+const DashboardCustomersIdRoute = DashboardCustomersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => DashboardRolesRoute,
+  getParentRoute: () => DashboardCustomersRoute,
+} as any)
+const DashboardLeadsIndexRoute = DashboardLeadsIndexRouteImport.update({
+  id: '/leads/',
+  path: '/leads/',
+  getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardLeadsNewRoute = DashboardLeadsNewRouteImport.update({
   id: '/leads/new',
   path: '/leads/new',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardCustomersIdRoute = DashboardCustomersIdRouteImport.update({
+const DashboardOperationsIdRoute = DashboardOperationsIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => DashboardCustomersRoute,
+  getParentRoute: () => DashboardOperationsRoute,
+} as any)
+const DashboardQuotesIndexRoute = DashboardQuotesIndexRouteImport.update({
+  id: '/quotes/',
+  path: '/quotes/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardRolesIdRoute = DashboardRolesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DashboardRolesRoute,
+} as any)
+const DashboardShipmentsIdRoute = DashboardShipmentsIdRouteImport.update({
+  id: '/shipments_/$id',
+  path: '/shipments/$id',
+  getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardQuotesIdIndexRoute = DashboardQuotesIdIndexRouteImport.update({
   id: '/quotes/$id/',
   path: '/quotes/$id/',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardQuotesIdCustomerViewRoute =
+  DashboardQuotesIdCustomerViewRouteImport.update({
+    id: '/quotes/$id/customer-view',
+    path: '/quotes/$id/customer-view',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardQuotesIdEditRoute = DashboardQuotesIdEditRouteImport.update({
   id: '/quotes/$id/edit',
   path: '/quotes/$id/edit',
@@ -172,7 +191,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
   '/dashboard/customers': typeof DashboardCustomersRouteWithChildren
-  '/dashboard/operations': typeof DashboardOperationsRoute
+  '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
@@ -181,10 +200,13 @@ export interface FileRoutesByFullPath {
   '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard/customers/$id': typeof DashboardCustomersIdRoute
   '/dashboard/leads/new': typeof DashboardLeadsNewRoute
+  '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
+  '/dashboard/shipments/$id': typeof DashboardShipmentsIdRoute
   '/dashboard/customers/': typeof DashboardCustomersIndexRoute
   '/dashboard/leads/': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
+  '/dashboard/quotes/$id/customer-view': typeof DashboardQuotesIdCustomerViewRoute
   '/dashboard/quotes/$id/edit': typeof DashboardQuotesIdEditRoute
   '/dashboard/quotes/$id/': typeof DashboardQuotesIdIndexRoute
 }
@@ -198,7 +220,7 @@ export interface FileRoutesByTo {
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
-  '/dashboard/operations': typeof DashboardOperationsRoute
+  '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
@@ -207,10 +229,13 @@ export interface FileRoutesByTo {
   '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard/customers/$id': typeof DashboardCustomersIdRoute
   '/dashboard/leads/new': typeof DashboardLeadsNewRoute
+  '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
+  '/dashboard/shipments/$id': typeof DashboardShipmentsIdRoute
   '/dashboard/customers': typeof DashboardCustomersIndexRoute
   '/dashboard/leads': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes': typeof DashboardQuotesIndexRoute
+  '/dashboard/quotes/$id/customer-view': typeof DashboardQuotesIdCustomerViewRoute
   '/dashboard/quotes/$id/edit': typeof DashboardQuotesIdEditRoute
   '/dashboard/quotes/$id': typeof DashboardQuotesIdIndexRoute
 }
@@ -226,7 +251,7 @@ export interface FileRoutesById {
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
   '/dashboard/customers': typeof DashboardCustomersRouteWithChildren
-  '/dashboard/operations': typeof DashboardOperationsRoute
+  '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
@@ -235,10 +260,13 @@ export interface FileRoutesById {
   '/dashboard/users': typeof DashboardUsersRoute
   '/dashboard/customers/$id': typeof DashboardCustomersIdRoute
   '/dashboard/leads/new': typeof DashboardLeadsNewRoute
+  '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
+  '/dashboard/shipments_/$id': typeof DashboardShipmentsIdRoute
   '/dashboard/customers/': typeof DashboardCustomersIndexRoute
   '/dashboard/leads/': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
+  '/dashboard/quotes/$id/customer-view': typeof DashboardQuotesIdCustomerViewRoute
   '/dashboard/quotes/$id/edit': typeof DashboardQuotesIdEditRoute
   '/dashboard/quotes/$id/': typeof DashboardQuotesIdIndexRoute
 }
@@ -264,10 +292,13 @@ export interface FileRouteTypes {
     | '/dashboard/users'
     | '/dashboard/customers/$id'
     | '/dashboard/leads/new'
+    | '/dashboard/operations/$id'
     | '/dashboard/roles/$id'
+    | '/dashboard/shipments/$id'
     | '/dashboard/customers/'
     | '/dashboard/leads/'
     | '/dashboard/quotes/'
+    | '/dashboard/quotes/$id/customer-view'
     | '/dashboard/quotes/$id/edit'
     | '/dashboard/quotes/$id/'
   fileRoutesByTo: FileRoutesByTo
@@ -290,10 +321,13 @@ export interface FileRouteTypes {
     | '/dashboard/users'
     | '/dashboard/customers/$id'
     | '/dashboard/leads/new'
+    | '/dashboard/operations/$id'
     | '/dashboard/roles/$id'
+    | '/dashboard/shipments/$id'
     | '/dashboard/customers'
     | '/dashboard/leads'
     | '/dashboard/quotes'
+    | '/dashboard/quotes/$id/customer-view'
     | '/dashboard/quotes/$id/edit'
     | '/dashboard/quotes/$id'
   id:
@@ -317,10 +351,13 @@ export interface FileRouteTypes {
     | '/dashboard/users'
     | '/dashboard/customers/$id'
     | '/dashboard/leads/new'
+    | '/dashboard/operations/$id'
     | '/dashboard/roles/$id'
+    | '/dashboard/shipments_/$id'
     | '/dashboard/customers/'
     | '/dashboard/leads/'
     | '/dashboard/quotes/'
+    | '/dashboard/quotes/$id/customer-view'
     | '/dashboard/quotes/$id/edit'
     | '/dashboard/quotes/$id/'
   fileRoutesById: FileRoutesById
@@ -336,32 +373,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/forgot-password': {
-      id: '/forgot-password'
-      path: '/forgot-password'
-      fullPath: '/forgot-password'
-      preLoaderRoute: typeof ForgotPasswordRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -371,74 +387,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard/users': {
-      id: '/dashboard/users'
-      path: '/users'
-      fullPath: '/dashboard/users'
-      preLoaderRoute: typeof DashboardUsersRouteImport
-      parentRoute: typeof DashboardRoute
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/dashboard/shipments': {
-      id: '/dashboard/shipments'
-      path: '/shipments'
-      fullPath: '/dashboard/shipments'
-      preLoaderRoute: typeof DashboardShipmentsRouteImport
-      parentRoute: typeof DashboardRoute
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/dashboard/roles': {
-      id: '/dashboard/roles'
-      path: '/roles'
-      fullPath: '/dashboard/roles'
-      preLoaderRoute: typeof DashboardRolesRouteImport
-      parentRoute: typeof DashboardRoute
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/dashboard/pricelists': {
-      id: '/dashboard/pricelists'
-      path: '/pricelists'
-      fullPath: '/dashboard/pricelists'
-      preLoaderRoute: typeof DashboardPricelistsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/overview': {
-      id: '/dashboard/overview'
-      path: '/overview'
-      fullPath: '/dashboard/overview'
-      preLoaderRoute: typeof DashboardOverviewRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/organization': {
-      id: '/dashboard/organization'
-      path: '/organization'
-      fullPath: '/dashboard/organization'
-      preLoaderRoute: typeof DashboardOrganizationRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/operations': {
-      id: '/dashboard/operations'
-      path: '/operations'
-      fullPath: '/dashboard/operations'
-      preLoaderRoute: typeof DashboardOperationsRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/customers': {
-      id: '/dashboard/customers'
-      path: '/customers'
-      fullPath: '/dashboard/customers'
-      preLoaderRoute: typeof DashboardCustomersRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/commercial': {
-      id: '/dashboard/commercial'
-      path: '/commercial'
-      fullPath: '/dashboard/commercial'
-      preLoaderRoute: typeof DashboardCommercialRouteImport
+    '/dashboard/account': {
+      id: '/dashboard/account'
+      path: '/account'
+      fullPath: '/dashboard/account'
+      preLoaderRoute: typeof DashboardAccountRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/audit-log': {
@@ -448,25 +429,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAuditLogRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/account': {
-      id: '/dashboard/account'
-      path: '/account'
-      fullPath: '/dashboard/account'
-      preLoaderRoute: typeof DashboardAccountRouteImport
+    '/dashboard/commercial': {
+      id: '/dashboard/commercial'
+      path: '/commercial'
+      fullPath: '/dashboard/commercial'
+      preLoaderRoute: typeof DashboardCommercialRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/quotes/': {
-      id: '/dashboard/quotes/'
-      path: '/quotes'
-      fullPath: '/dashboard/quotes/'
-      preLoaderRoute: typeof DashboardQuotesIndexRouteImport
+    '/dashboard/customers': {
+      id: '/dashboard/customers'
+      path: '/customers'
+      fullPath: '/dashboard/customers'
+      preLoaderRoute: typeof DashboardCustomersRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/leads/': {
-      id: '/dashboard/leads/'
-      path: '/leads'
-      fullPath: '/dashboard/leads/'
-      preLoaderRoute: typeof DashboardLeadsIndexRouteImport
+    '/dashboard/operations': {
+      id: '/dashboard/operations'
+      path: '/operations'
+      fullPath: '/dashboard/operations'
+      preLoaderRoute: typeof DashboardOperationsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/organization': {
+      id: '/dashboard/organization'
+      path: '/organization'
+      fullPath: '/dashboard/organization'
+      preLoaderRoute: typeof DashboardOrganizationRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/overview': {
+      id: '/dashboard/overview'
+      path: '/overview'
+      fullPath: '/dashboard/overview'
+      preLoaderRoute: typeof DashboardOverviewRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/pricelists': {
+      id: '/dashboard/pricelists'
+      path: '/pricelists'
+      fullPath: '/dashboard/pricelists'
+      preLoaderRoute: typeof DashboardPricelistsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/roles': {
+      id: '/dashboard/roles'
+      path: '/roles'
+      fullPath: '/dashboard/roles'
+      preLoaderRoute: typeof DashboardRolesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/shipments': {
+      id: '/dashboard/shipments'
+      path: '/shipments'
+      fullPath: '/dashboard/shipments'
+      preLoaderRoute: typeof DashboardShipmentsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/users': {
+      id: '/dashboard/users'
+      path: '/users'
+      fullPath: '/dashboard/users'
+      preLoaderRoute: typeof DashboardUsersRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/customers/': {
@@ -476,12 +499,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCustomersIndexRouteImport
       parentRoute: typeof DashboardCustomersRoute
     }
-    '/dashboard/roles/$id': {
-      id: '/dashboard/roles/$id'
+    '/dashboard/customers/$id': {
+      id: '/dashboard/customers/$id'
       path: '/$id'
-      fullPath: '/dashboard/roles/$id'
-      preLoaderRoute: typeof DashboardRolesIdRouteImport
-      parentRoute: typeof DashboardRolesRoute
+      fullPath: '/dashboard/customers/$id'
+      preLoaderRoute: typeof DashboardCustomersIdRouteImport
+      parentRoute: typeof DashboardCustomersRoute
+    }
+    '/dashboard/leads/': {
+      id: '/dashboard/leads/'
+      path: '/leads'
+      fullPath: '/dashboard/leads/'
+      preLoaderRoute: typeof DashboardLeadsIndexRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/leads/new': {
       id: '/dashboard/leads/new'
@@ -490,18 +520,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardLeadsNewRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/customers/$id': {
-      id: '/dashboard/customers/$id'
+    '/dashboard/operations/$id': {
+      id: '/dashboard/operations/$id'
       path: '/$id'
-      fullPath: '/dashboard/customers/$id'
-      preLoaderRoute: typeof DashboardCustomersIdRouteImport
-      parentRoute: typeof DashboardCustomersRoute
+      fullPath: '/dashboard/operations/$id'
+      preLoaderRoute: typeof DashboardOperationsIdRouteImport
+      parentRoute: typeof DashboardOperationsRoute
+    }
+    '/dashboard/quotes/': {
+      id: '/dashboard/quotes/'
+      path: '/quotes'
+      fullPath: '/dashboard/quotes/'
+      preLoaderRoute: typeof DashboardQuotesIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/roles/$id': {
+      id: '/dashboard/roles/$id'
+      path: '/$id'
+      fullPath: '/dashboard/roles/$id'
+      preLoaderRoute: typeof DashboardRolesIdRouteImport
+      parentRoute: typeof DashboardRolesRoute
+    }
+    '/dashboard/shipments_/$id': {
+      id: '/dashboard/shipments_/$id'
+      path: '/shipments/$id'
+      fullPath: '/dashboard/shipments/$id'
+      preLoaderRoute: typeof DashboardShipmentsIdRouteImport
+      parentRoute: typeof DashboardRoute
     }
     '/dashboard/quotes/$id/': {
       id: '/dashboard/quotes/$id/'
       path: '/quotes/$id'
       fullPath: '/dashboard/quotes/$id/'
       preLoaderRoute: typeof DashboardQuotesIdIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/quotes/$id/customer-view': {
+      id: '/dashboard/quotes/$id/customer-view'
+      path: '/quotes/$id/customer-view'
+      fullPath: '/dashboard/quotes/$id/customer-view'
+      preLoaderRoute: typeof DashboardQuotesIdCustomerViewRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/quotes/$id/edit': {
@@ -527,6 +585,17 @@ const DashboardCustomersRouteChildren: DashboardCustomersRouteChildren = {
 const DashboardCustomersRouteWithChildren =
   DashboardCustomersRoute._addFileChildren(DashboardCustomersRouteChildren)
 
+interface DashboardOperationsRouteChildren {
+  DashboardOperationsIdRoute: typeof DashboardOperationsIdRoute
+}
+
+const DashboardOperationsRouteChildren: DashboardOperationsRouteChildren = {
+  DashboardOperationsIdRoute: DashboardOperationsIdRoute,
+}
+
+const DashboardOperationsRouteWithChildren =
+  DashboardOperationsRoute._addFileChildren(DashboardOperationsRouteChildren)
+
 interface DashboardRolesRouteChildren {
   DashboardRolesIdRoute: typeof DashboardRolesIdRoute
 }
@@ -544,7 +613,7 @@ interface DashboardRouteChildren {
   DashboardAuditLogRoute: typeof DashboardAuditLogRoute
   DashboardCommercialRoute: typeof DashboardCommercialRoute
   DashboardCustomersRoute: typeof DashboardCustomersRouteWithChildren
-  DashboardOperationsRoute: typeof DashboardOperationsRoute
+  DashboardOperationsRoute: typeof DashboardOperationsRouteWithChildren
   DashboardOrganizationRoute: typeof DashboardOrganizationRoute
   DashboardOverviewRoute: typeof DashboardOverviewRoute
   DashboardPricelistsRoute: typeof DashboardPricelistsRoute
@@ -552,8 +621,10 @@ interface DashboardRouteChildren {
   DashboardShipmentsRoute: typeof DashboardShipmentsRoute
   DashboardUsersRoute: typeof DashboardUsersRoute
   DashboardLeadsNewRoute: typeof DashboardLeadsNewRoute
+  DashboardShipmentsIdRoute: typeof DashboardShipmentsIdRoute
   DashboardLeadsIndexRoute: typeof DashboardLeadsIndexRoute
   DashboardQuotesIndexRoute: typeof DashboardQuotesIndexRoute
+  DashboardQuotesIdCustomerViewRoute: typeof DashboardQuotesIdCustomerViewRoute
   DashboardQuotesIdEditRoute: typeof DashboardQuotesIdEditRoute
   DashboardQuotesIdIndexRoute: typeof DashboardQuotesIdIndexRoute
 }
@@ -563,7 +634,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAuditLogRoute: DashboardAuditLogRoute,
   DashboardCommercialRoute: DashboardCommercialRoute,
   DashboardCustomersRoute: DashboardCustomersRouteWithChildren,
-  DashboardOperationsRoute: DashboardOperationsRoute,
+  DashboardOperationsRoute: DashboardOperationsRouteWithChildren,
   DashboardOrganizationRoute: DashboardOrganizationRoute,
   DashboardOverviewRoute: DashboardOverviewRoute,
   DashboardPricelistsRoute: DashboardPricelistsRoute,
@@ -571,8 +642,10 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardShipmentsRoute: DashboardShipmentsRoute,
   DashboardUsersRoute: DashboardUsersRoute,
   DashboardLeadsNewRoute: DashboardLeadsNewRoute,
+  DashboardShipmentsIdRoute: DashboardShipmentsIdRoute,
   DashboardLeadsIndexRoute: DashboardLeadsIndexRoute,
   DashboardQuotesIndexRoute: DashboardQuotesIndexRoute,
+  DashboardQuotesIdCustomerViewRoute: DashboardQuotesIdCustomerViewRoute,
   DashboardQuotesIdEditRoute: DashboardQuotesIdEditRoute,
   DashboardQuotesIdIndexRoute: DashboardQuotesIdIndexRoute,
 }

@@ -90,7 +90,7 @@ export const listMyQuotes = createServerFn({ method: "GET" })
     const { data, error } = await supabase
       .from("quotes")
       .select(
-        "id, quote_code, shipment_mode, customer_name, customer_ref, shipment_kind, incoterm, origin_port, dest_port, depart_date, arrive_date, agent, airline, currency, total, margin_pct, created_at",
+        "id, quote_code, shipment_mode, customer_name, customer_ref, shipment_kind, incoterm, origin_port, dest_port, depart_date, arrive_date, agent, airline, currency, total, margin_pct, created_at, payload",
       )
       .order("created_at", { ascending: false })
       .limit(20);
@@ -113,6 +113,57 @@ export const getQuote = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new Error("Quote not found");
+    return row;
+  });
+
+export type QuoteOpsStatus = "transferred" | "pending_update" | "cancelled" | "suspended";
+
+export const QUOTE_OPS_STATUSES: QuoteOpsStatus[] = ["transferred", "pending_update", "cancelled", "suspended"];
+
+// This 4-way handoff status (הועבר / ממתין לעדכון / מבוטלת / מושהת) lives
+// inside payload.opsStatus rather than the quotes.status DB column: the
+// native `quote_status` enum only has draft/sent/approved/rejected/expired,
+// and extending it needs a migration applied to the live database, which we
+// can't guarantee happens before this needs to work. payload is already a
+// live, writable JSONB column, so reading/writing through it works immediately.
+// Setting opsStatus to "transferred" also seeds payload.caseStatus = "new"
+// the first time, which is what makes the quote show up as a case in the
+// Operations module (see src/lib/operations.functions.ts).
+export const updateQuoteOpsStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string; opsStatus: QuoteOpsStatus }) => {
+    if (!input?.id || typeof input.id !== "string") throw new Error("id is required");
+    if (!QUOTE_OPS_STATUSES.includes(input.opsStatus)) {
+      throw new Error("opsStatus must be one of " + QUOTE_OPS_STATUSES.join(", "));
+    }
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: existing, error: getErr } = await supabase
+      .from("quotes")
+      .select("payload")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (getErr) throw getErr;
+    if (!existing) throw new Error("Quote not found");
+
+    const payload =
+      existing.payload && typeof existing.payload === "object" && !Array.isArray(existing.payload)
+        ? (existing.payload as Record<string, unknown>)
+        : {};
+    const nextPayload: Record<string, unknown> = { ...payload, opsStatus: data.opsStatus };
+    if (data.opsStatus === "transferred" && !nextPayload.caseStatus) {
+      nextPayload.caseStatus = "new";
+    }
+
+    const { data: row, error } = await supabase
+      .from("quotes")
+      .update({ payload: nextPayload as never })
+      .eq("id", data.id)
+      .select("id, payload")
+      .single();
+    if (error) throw error;
     return row;
   });
 

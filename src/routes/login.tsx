@@ -63,9 +63,9 @@ const DEMO_ROLES: {
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — Cargo Console" },
+      { title: "Sign in — AFIK Logistics Platform" },
       { name: "description", content: "Sign in to your organization's console." },
-      { property: "og:title", content: "Sign in — Cargo Console" },
+      { property: "og:title", content: "Sign in — AFIK Logistics Platform" },
       {
         property: "og:description",
         content: "Sign in to your organization's console.",

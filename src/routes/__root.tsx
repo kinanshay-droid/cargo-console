@@ -18,6 +18,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { I18nProvider } from "@/lib/i18n";
 
 function NotFoundComponent() {
   return (
@@ -84,14 +85,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Cargo Console — Shipment & Org Management" },
+      { title: "AFIK Logistics Platform — Shipment & Org Management" },
       {
         name: "description",
         content:
           "A logistics operations console for managing shipments, users, roles, and organization settings.",
       },
-      { name: "author", content: "Cargo Console" },
-      { property: "og:title", content: "Cargo Console" },
+      { name: "author", content: "AFIK Logistics Platform" },
+      { property: "og:title", content: "AFIK Logistics Platform" },
       {
         property: "og:description",
         content: "Manage shipments, users, and organization settings in one place.",
@@ -131,9 +132,11 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster richColors position="top-right" />
-      <SupabaseAuthListener />
+      <I18nProvider>
+        <Outlet />
+        <Toaster richColors position="top-right" />
+        <SupabaseAuthListener />
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

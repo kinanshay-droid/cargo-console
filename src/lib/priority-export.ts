@@ -244,7 +244,7 @@ export function exportCustomerToPriorityPdf(input: {
   <header>
     <div>
       <h1>טופס פתיחת לקוח — Priority <small>${esc(customer.customer_code ?? "")}</small></h1>
-      <div class="brand">Cargo Console · יצוא לצורך הזנה למערכת Priority</div>
+      <div class="brand">AFIK Logistics Platform · יצוא לצורך הזנה למערכת Priority</div>
     </div>
     <div style="text-align:left">
       <div style="font-size:11px;color:#64748b">תאריך הפקה</div>

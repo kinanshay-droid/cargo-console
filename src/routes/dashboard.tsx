@@ -8,23 +8,23 @@ import {
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Package,
   Truck,
   Users,
   ShieldCheck,
   Building2,
   ScrollText,
-  UserCog,
-  LayoutDashboard,
+  User,
+  LayoutGrid,
   TrendingUp,
   Bell,
-  ChevronsLeft,
   ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useI18n, LanguageToggle } from "@/lib/i18n";
+import type { TranslationKey } from "@/lib/i18n-dictionary";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
@@ -32,22 +32,22 @@ export const Route = createFileRoute("/dashboard")({
 
 const NAV_SECTIONS = [
   {
-    label: null as string | null,
+    labelKey: null as TranslationKey | null,
     items: [
-      { to: "/dashboard/overview", label: "Our customers", icon: LayoutDashboard, adminOnly: false },
-      { to: "/dashboard/commercial", label: "Commercial", icon: TrendingUp, adminOnly: false },
-      { to: "/dashboard/operations", label: "Operations", icon: Bell, adminOnly: false },
-      { to: "/dashboard/shipments", label: "Shipments", icon: Truck, adminOnly: false },
-      { to: "/dashboard/account", label: "Account", icon: UserCog, adminOnly: false },
+      { to: "/dashboard/overview", labelKey: "nav.overview" as TranslationKey, icon: Building2, adminOnly: false },
+      { to: "/dashboard/commercial", labelKey: "nav.commercial" as TranslationKey, icon: TrendingUp, adminOnly: false },
+      { to: "/dashboard/operations", labelKey: "nav.operations" as TranslationKey, icon: Bell, adminOnly: false },
+      { to: "/dashboard/shipments", labelKey: "nav.shipments" as TranslationKey, icon: Truck, adminOnly: false },
+      { to: "/dashboard/account", labelKey: "nav.account" as TranslationKey, icon: User, adminOnly: false },
     ],
   },
   {
-    label: "ADMIN" as string | null,
+    labelKey: "nav.adminSection" as TranslationKey | null,
     items: [
-      { to: "/dashboard/users", label: "Users", icon: Users, adminOnly: true },
-      { to: "/dashboard/roles", label: "Roles", icon: ShieldCheck, adminOnly: true },
-      { to: "/dashboard/organization", label: "Organization", icon: Building2, adminOnly: true },
-      { to: "/dashboard/audit-log", label: "Audit Log", icon: ScrollText, adminOnly: true },
+      { to: "/dashboard/users", labelKey: "nav.users" as TranslationKey, icon: Users, adminOnly: true },
+      { to: "/dashboard/roles", labelKey: "nav.roles" as TranslationKey, icon: ShieldCheck, adminOnly: true },
+      { to: "/dashboard/organization", labelKey: "nav.organization" as TranslationKey, icon: Building2, adminOnly: true },
+      { to: "/dashboard/audit-log", labelKey: "nav.auditLog" as TranslationKey, icon: ScrollText, adminOnly: true },
     ],
   },
 ];
@@ -58,6 +58,7 @@ function DashboardLayout() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isAdmin, user } = useCurrentUser();
+  const { t } = useI18n();
   const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
@@ -83,7 +84,7 @@ function DashboardLayout() {
 
   const email = user?.email ?? null;
   const navSections = NAV_SECTIONS.map((s) => ({
-    label: s.label,
+    labelKey: s.labelKey,
     items: s.items.filter((n) => !n.adminOnly || isAdmin),
   })).filter((s) => s.items.length > 0);
   const flatNavItems = navSections.flatMap((s) => s.items);
@@ -98,7 +99,7 @@ function DashboardLayout() {
   if (!sessionChecked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-sm text-muted-foreground">{t("common.loading")}</div>
       </div>
     );
   }
@@ -113,36 +114,24 @@ function DashboardLayout() {
     .join("")
     .toUpperCase();
   const displayName = user?.fullName || (email ? email.split("@")[0] : "User");
-  const roleLabel = isAdmin ? "Admin" : "Member";
+  const roleLabel = isAdmin ? t("common.admin") : t("common.member");
 
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="hidden w-72 shrink-0 flex-col p-3 md:flex">
+      <aside className="hidden w-72 shrink-0 flex-col p-3 md:flex print:hidden">
         <div className="flex flex-1 flex-col rounded-2xl bg-sidebar text-sidebar-foreground shadow-xl ring-1 ring-sidebar-border/50">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-4">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <Package className="h-4.5 w-4.5" />
-              </div>
-              <span className="text-[15px] font-semibold tracking-tight">Cargo Console</span>
-            </div>
-            <button
-              type="button"
-              className="rounded-md p-1 text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
-              aria-label="Collapse sidebar"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </button>
+          <div className="flex items-center justify-center px-3 py-4">
+            <img src="/afik-logo-white.png" alt={t("app.name")} className="h-auto w-full rounded-xl" />
           </div>
 
           {/* Nav */}
           <nav className="flex-1 space-y-4 px-3 pt-2">
             {navSections.map((section, idx) => (
-              <div key={section.label ?? `sec-${idx}`} className="space-y-1.5">
-                {section.label && (
+              <div key={section.labelKey ?? `sec-${idx}`} className="space-y-1.5">
+                {section.labelKey && (
                   <div className="px-2 pt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/50">
-                    {section.label}
+                    {t(section.labelKey)}
                   </div>
                 )}
                 {section.items.map((item) => {
@@ -170,11 +159,11 @@ function DashboardLayout() {
                         >
                           <Icon className="h-4 w-4" />
                         </span>
-                        {item.label}
+                        {t(item.labelKey)}
                       </span>
                       {active && (
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-                          <LayoutDashboard className="h-3.5 w-3.5" />
+                          <LayoutGrid className="h-3.5 w-3.5" />
                         </span>
                       )}
                     </Link>
@@ -184,13 +173,17 @@ function DashboardLayout() {
             ))}
           </nav>
 
+          {/* Language toggle */}
+          <div className="border-t border-sidebar-border/50 px-3 py-2">
+            <LanguageToggle variant="row" />
+          </div>
 
           {/* Profile footer */}
           <div className="p-3">
             <ConfirmDialog
-              title="Log out?"
-              description="You'll need to sign in again to access your organization."
-              confirmLabel="Log out"
+              title={t("logout.title")}
+              description={t("logout.description")}
+              confirmLabel={t("logout.confirm")}
               onConfirm={onLogout}
               trigger={
                 <button className="flex w-full items-center gap-3 rounded-xl bg-sidebar-accent/50 px-3 py-2.5 text-start transition-colors hover:bg-sidebar-accent">
@@ -216,26 +209,26 @@ function DashboardLayout() {
 
       {/* Mobile top bar */}
       <div className="flex flex-1 flex-col">
-        <div className="flex items-center justify-between border-b bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden">
+        <div className="flex items-center justify-between border-b bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden print:hidden">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-              <Package className="h-4 w-4" />
-            </div>
-            <span className="text-sm font-semibold">Cargo Console</span>
+            <img src="/afik-logo-white.png" alt={t("app.name")} className="h-9 w-auto rounded-md" />
           </div>
-          <ConfirmDialog
-            title="Log out?"
-            description="You'll need to sign in again to access your organization."
-            confirmLabel="Log out"
-            onConfirm={onLogout}
-            trigger={
-              <button className="text-sm underline-offset-4 hover:underline">
-                Log out
-              </button>
-            }
-          />
+          <div className="flex items-center gap-2">
+            <LanguageToggle />
+            <ConfirmDialog
+              title={t("logout.title")}
+              description={t("logout.description")}
+              confirmLabel={t("logout.confirm")}
+              onConfirm={onLogout}
+              trigger={
+                <button className="text-sm underline-offset-4 hover:underline">
+                  {t("logout.button")}
+                </button>
+              }
+            />
+          </div>
         </div>
-        <div className="md:hidden overflow-x-auto border-b bg-card">
+        <div className="md:hidden overflow-x-auto border-b bg-card print:hidden">
           <div className="flex gap-1 px-2 py-2">
             {flatNavItems.map((item) => {
               const active = pathname.startsWith(item.to);
@@ -250,7 +243,7 @@ function DashboardLayout() {
                       : "text-muted-foreground hover:bg-muted",
                   )}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               );
             })}

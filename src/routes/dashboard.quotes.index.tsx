@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { listMyQuotes } from "@/lib/quotes.functions";
+import { TONE_BADGE, TONE_GRADIENT } from "@/lib/theme";
 
 type SortKey = "activity" | "name" | "recent" | "total_desc";
 
@@ -35,17 +36,17 @@ const SHIPMENT_MODE_LABEL: Record<string, string> = {
 };
 
 const MODE_BADGE: Record<string, string> = {
-  direct: "bg-slate-50 text-slate-600 border-slate-200",
-  console: "bg-[#f0f7ff] text-[#004080] border-[#004080]/10",
-  transship: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  direct: TONE_BADGE.muted,
+  console: TONE_BADGE.accent,
+  transship: TONE_BADGE.success,
 };
 
 export const Route = createFileRoute("/dashboard/quotes/")({
   head: () => ({
     meta: [
-      { title: "ניהול הצעות מחיר — Cargo Console" },
+      { title: "ניהול הצעות מחיר — AFIK Logistics Platform" },
       { name: "description", content: "רשימת כל הצעות המחיר של הארגון, מקובצת לפי לקוח." },
-      { property: "og:title", content: "ניהול הצעות מחיר — Cargo Console" },
+      { property: "og:title", content: "ניהול הצעות מחיר — AFIK Logistics Platform" },
       { property: "og:description", content: "רשימת כל הצעות המחיר של הארגון, מקובצת לפי לקוח." },
     ],
   }),
@@ -175,46 +176,46 @@ function QuotesManagement() {
 
       {/* Summary strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <SummaryTile label="לקוחות" value={groups.length} tone="from-sky-500 to-blue-600" />
-        <SummaryTile label='סה"כ הצעות' value={filteredQuotes.length} tone="from-fuchsia-500 to-pink-600" />
+        <SummaryTile label="לקוחות" value={groups.length} tone={TONE_GRADIENT.primary} />
+        <SummaryTile label='סה"כ הצעות' value={filteredQuotes.length} tone={TONE_GRADIENT.accent} />
         <SummaryTile
           label="משלוח ישיר"
           value={filteredQuotes.filter((q) => q.shipment_mode === "direct").length}
-          tone="from-slate-500 to-slate-700"
+          tone={TONE_GRADIENT.muted}
         />
         <SummaryTile
           label="קונסול / שטעון"
           value={filteredQuotes.filter((q) => q.shipment_mode !== "direct").length}
-          tone="from-emerald-500 to-emerald-600"
+          tone={TONE_GRADIENT.success}
         />
       </div>
 
       {/* Card */}
-      <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+      <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
         {/* Filter bar */}
-        <div className="flex flex-col gap-4 border-b border-slate-50 bg-white/50 px-6 py-6 md:px-8">
+        <div className="flex flex-col gap-4 border-b border-border bg-card/50 px-6 py-6 md:px-8">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
-              <h2 className="text-2xl font-extrabold text-[#001F3F]">לקוחות והצעות</h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <h2 className="text-2xl font-extrabold text-primary">לקוחות והצעות</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 {groups.length} לקוחות · {filteredQuotes.length} הצעות
                 {activeFilterCount > 0 ? ` · ${activeFilterCount} פילטרים פעילים` : ""}
               </p>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative w-full md:w-80">
-                <Search className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="חיפוש לפי לקוח, מס' הצעה, מסלול..."
-                  className="w-full rounded-2xl border-none bg-slate-50 py-2.5 pr-10 pl-9 text-sm text-[#001F3F] placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-[#003366]/20"
+                  className="w-full rounded-2xl border-none bg-muted py-2.5 pr-10 pl-9 text-sm text-primary placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/20"
                 />
                 {search && (
                   <button
                     type="button"
                     onClick={() => setSearch("")}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted"
                     aria-label="נקה חיפוש"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -226,7 +227,7 @@ function QuotesManagement() {
                   variant="ghost"
                   size="sm"
                   onClick={resetFilters}
-                  className="gap-1.5 rounded-xl text-slate-500 hover:text-[#001F3F]"
+                  className="gap-1.5 rounded-xl text-muted-foreground hover:text-primary"
                 >
                   <RotateCcw className="h-3.5 w-3.5" /> נקה
                 </Button>
@@ -235,11 +236,11 @@ function QuotesManagement() {
           </div>
 
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <div className="col-span-2 flex items-center gap-1.5 text-xs font-semibold text-slate-500 md:col-span-1">
+            <div className="col-span-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground md:col-span-1">
               <Filter className="h-3.5 w-3.5" /> סינון ומיון
             </div>
             <Select value={mode} onValueChange={setMode}>
-              <SelectTrigger className="h-9 rounded-xl border-slate-200 bg-white text-xs">
+              <SelectTrigger className="h-9 rounded-xl border-border bg-card text-xs">
                 <SelectValue placeholder="אופי משלוח" />
               </SelectTrigger>
               <SelectContent>
@@ -250,7 +251,7 @@ function QuotesManagement() {
               </SelectContent>
             </Select>
             <Select value={incoterm} onValueChange={setIncoterm}>
-              <SelectTrigger className="h-9 rounded-xl border-slate-200 bg-white text-xs">
+              <SelectTrigger className="h-9 rounded-xl border-border bg-card text-xs">
                 <SelectValue placeholder="Incoterm" />
               </SelectTrigger>
               <SelectContent>
@@ -263,7 +264,7 @@ function QuotesManagement() {
               </SelectContent>
             </Select>
             <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="h-9 rounded-xl border-slate-200 bg-white text-xs">
+              <SelectTrigger className="h-9 rounded-xl border-border bg-card text-xs">
                 <SelectValue placeholder="מיון" />
               </SelectTrigger>
               <SelectContent>
@@ -278,9 +279,9 @@ function QuotesManagement() {
 
         {/* Groups */}
         {isLoading ? (
-          <div className="px-6 py-16 text-center text-sm text-slate-400">טוען...</div>
+          <div className="px-6 py-16 text-center text-sm text-muted-foreground">טוען...</div>
         ) : groups.length === 0 ? (
-          <div className="px-6 py-16 text-center text-sm text-slate-400">
+          <div className="px-6 py-16 text-center text-sm text-muted-foreground">
             <FileText className="mx-auto mb-2 h-8 w-8 opacity-40" />
             אין הצעות שתואמות את הסינון
           </div>
@@ -292,7 +293,7 @@ function QuotesManagement() {
               return (
                 <li
                   key={g.name}
-                  className="overflow-hidden rounded-2xl border border-slate-100 bg-white transition-all hover:border-[#004080]/20 hover:shadow-[0_10px_30px_rgb(0,31,63,0.06)]"
+                  className="overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-accent/30 hover:shadow-lg"
                 >
                   <button
                     type="button"
@@ -300,41 +301,41 @@ function QuotesManagement() {
                     className="flex w-full items-center justify-between gap-4 px-5 py-4 text-right"
                   >
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#001F3F] to-[#004080] text-xs font-bold text-white">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-xs font-bold text-white">
                         {idx + 1}
                       </span>
-                      <Users className="h-4 w-4 shrink-0 text-slate-400" />
-                      <span className="truncate text-base font-semibold text-[#001F3F]">
+                      <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate text-base font-semibold text-primary">
                         {g.name}
                       </span>
-                      <span className="shrink-0 rounded-full bg-[#f0f7ff] px-2 py-0.5 text-[11px] font-medium text-[#004080]">
+                      <span className="shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">
                         {g.items.length} הצעות
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-xs">
                       {g.total > 0 && (
-                        <span className="hidden text-slate-500 md:inline">
-                          <span className="text-slate-400">היקף: </span>
-                          <span className="font-bold text-[#001F3F] tabular-nums">
+                        <span className="hidden text-muted-foreground md:inline">
+                          <span className="text-muted-foreground">היקף: </span>
+                          <span className="font-bold text-primary tabular-nums">
                             {fmt(g.total, g.currency)}
                           </span>
                         </span>
                       )}
                       {lastDate && (
-                        <span className="hidden text-slate-400 md:inline">
+                        <span className="hidden text-muted-foreground md:inline">
                           עודכן {new Date(lastDate).toLocaleDateString("he-IL")}
                         </span>
                       )}
                       {isOpen ? (
-                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
                       ) : (
-                        <ChevronLeft className="h-4 w-4 text-slate-400" />
+                        <ChevronLeft className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
                   </button>
 
                   {isOpen && (
-                    <div className="grid grid-cols-1 gap-3 border-t border-slate-50 bg-slate-50/30 p-4 md:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-3 border-t border-border bg-muted/30 p-4 md:grid-cols-2">
                       {g.items.map((q) => {
                         const route = [q.origin_port, q.dest_port].filter(Boolean).join(" → ");
                         const totalNum = Number(q.total ?? 0);
@@ -344,34 +345,34 @@ function QuotesManagement() {
                             key={q.id}
                             to="/dashboard/quotes/$id"
                             params={{ id: q.id }}
-                            className="group flex flex-col gap-2.5 rounded-2xl border border-slate-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-[#004080]/20 hover:shadow-[0_10px_30px_rgb(0,31,63,0.08)]"
+                            className="group flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-lg"
                           >
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-mono text-xs font-semibold text-[#001F3F]">
+                              <span className="font-mono text-xs font-semibold text-primary">
                                 {q.quote_code}
                               </span>
                               <span
                                 className={cn(
                                   "rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                                  MODE_BADGE[q.shipment_mode] ?? "bg-slate-50 text-slate-600 border-slate-200",
+                                  MODE_BADGE[q.shipment_mode] ?? TONE_BADGE.muted,
                                 )}
                               >
                                 {SHIPMENT_MODE_LABEL[q.shipment_mode] ?? q.shipment_mode}
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 text-xs text-slate-500">
+                            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                               <span className="truncate">
-                                {route || <span className="text-slate-300">— ללא מסלול —</span>}
+                                {route || <span className="text-muted-foreground/50">— ללא מסלול —</span>}
                               </span>
                               {q.incoterm && (
-                                <span className="shrink-0 rounded-md bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">
+                                <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                                   {q.incoterm}
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                               <span>
                                 {q.depart_date
                                   ? `יציאה ${new Date(q.depart_date).toLocaleDateString("he-IL")}`
@@ -382,22 +383,22 @@ function QuotesManagement() {
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 border-t border-slate-50 pt-2">
+                            <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
                               <div className="flex items-baseline gap-2">
                                 {hasTotal ? (
-                                  <span className="text-sm font-bold tabular-nums text-[#001F3F]">
+                                  <span className="text-sm font-bold tabular-nums text-primary">
                                     {fmt(totalNum, q.currency)}
                                   </span>
                                 ) : (
-                                  <span className="text-xs text-slate-300">ללא סכום</span>
+                                  <span className="text-xs text-muted-foreground/50">ללא סכום</span>
                                 )}
                                 {q.margin_pct != null && (
-                                  <span className="text-[11px] font-medium text-emerald-600">
+                                  <span className="text-[11px] font-medium text-success">
                                     רווח {Number(q.margin_pct)}%
                                   </span>
                                 )}
                               </div>
-                              <span className="inline-flex items-center gap-1 rounded-lg bg-[#001F3F] px-2.5 py-1 text-[11px] font-medium text-white opacity-90 transition-opacity group-hover:opacity-100">
+                              <span className="inline-flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 text-[11px] font-medium text-primary-foreground opacity-90 transition-opacity group-hover:opacity-100">
                                 <Eye className="h-3 w-3" /> הצג
                               </span>
                             </div>

@@ -25,7 +25,7 @@ const STATUS_DOT: Record<string, string> = {
 export const Route = createFileRoute("/dashboard/customers/")({
   head: () => ({
     meta: [
-      { title: "ניהול תיקי לקוחות — Cargo Console" },
+      { title: "ניהול תיקי לקוחות — AFIK Logistics Platform" },
       { name: "description", content: "רשימת כל תיקי הלקוחות של הארגון." },
       { property: "og:title", content: "ניהול תיקי לקוחות" },
       { property: "og:description", content: "רשימת כל תיקי הלקוחות של הארגון." },
