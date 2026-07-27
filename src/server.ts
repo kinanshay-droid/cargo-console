@@ -44,9 +44,40 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+// Nitro's own Cloudflare `_module-handler.mjs` (the entry we would get for
+// free if we didn't override `tanstackStart.server.entry`) does two things
+// with the Worker's `env` binding before ever touching the request:
+//   1. `globalThis.__env__ = env` — this is what unenv's `process.env`
+//      polyfill (node_modules/unenv/.../process/env.mjs) reads from on every
+//      property access. Without it, `process.env.ANYTHING` is always
+//      undefined on Cloudflare Workers, no matter what's configured in the
+//      dashboard.
+//   2. Augments the incoming request with `req.runtime.cloudflare = { env,
+//      context }`, which is how h3's `event.context.cloudflare.env` gets
+//      populated for code that prefers the explicit binding over process.env.
+// Because this file replaces nitro's default entry, neither of those ever
+// ran — every server-side `process.env.SUPABASE_URL` read (client.server.ts,
+// auth-middleware.ts, client.ts) silently saw `undefined` in production even
+// though the variables were correctly set in Cloudflare. Replicating both
+// steps here restores the standard nitro/Cloudflare env-loading contract.
+function bindCloudflareEnv(request: Request, env: unknown, ctx: unknown): void {
+  (globalThis as { __env__?: unknown }).__env__ = env;
+
+  const req = request as Request & {
+    runtime?: { name?: string; cloudflare?: Record<string, unknown> };
+  };
+  req.runtime ??= { name: "cloudflare" };
+  req.runtime.cloudflare = {
+    ...req.runtime.cloudflare,
+    env,
+    context: ctx,
+  };
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      bindCloudflareEnv(request, env, ctx);
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
