@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { listLeadTasks, addLeadTask, completeLeadTask, type LeadWithTasks, type LeadTaskRow } from "@/lib/lead-tasks.functions";
 import { createActivity } from "@/lib/customer-activities.functions";
 import { customerInitials, customerPalette } from "@/lib/customers-demo";
+import { TONE_GRADIENT, type Tone } from "@/lib/theme";
 
 export const Route = createFileRoute("/dashboard/leads/")({
   head: () => ({
@@ -92,7 +93,7 @@ function LeadsManagementPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button asChild className="gap-2 bg-gradient-to-l from-sky-500 to-sky-600 text-white">
+          <Button asChild className="gap-2 bg-gradient-to-l from-accent to-accent/80 text-accent-foreground">
             <Link to="/dashboard/leads/new">
               <Sparkles className="h-4 w-4" />
               ליד חדש
@@ -102,10 +103,10 @@ function LeadsManagementPage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <StatTile label="לידים במערכת" value={stats.leads} tone="sky" />
-        <StatTile label="משימות פתוחות" value={stats.openTasks} tone="indigo" />
-        <StatTile label="באיחור" value={stats.overdue} tone="rose" />
-        <StatTile label="ללא משימות" value={stats.withoutTasks} tone="amber" />
+        <StatTile label="לידים במערכת" value={stats.leads} tone="accent" />
+        <StatTile label="משימות פתוחות" value={stats.openTasks} tone="primary" />
+        <StatTile label="באיחור" value={stats.overdue} tone="destructive" />
+        <StatTile label="ללא משימות" value={stats.withoutTasks} tone="warning" />
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border bg-card p-3">
@@ -154,15 +155,9 @@ function LeadsManagementPage() {
   );
 }
 
-function StatTile({ label, value, tone }: { label: string; value: number; tone: "sky" | "indigo" | "rose" | "amber" }) {
-  const tones: Record<string, string> = {
-    sky: "from-sky-500 to-sky-600",
-    indigo: "from-indigo-500 to-indigo-600",
-    rose: "from-rose-500 to-rose-600",
-    amber: "from-amber-500 to-amber-600",
-  };
+function StatTile({ label, value, tone }: { label: string; value: number; tone: Tone }) {
   return (
-    <div className={`rounded-2xl bg-gradient-to-bl ${tones[tone]} p-4 text-white shadow-sm`}>
+    <div className={`rounded-2xl bg-gradient-to-bl ${TONE_GRADIENT[tone]} p-4 text-white shadow-sm`}>
       <div className="text-xs opacity-90">{label}</div>
       <div className="mt-1 text-3xl font-bold">{value}</div>
     </div>
@@ -402,11 +397,11 @@ function TaskRow({ task }: { task: LeadTaskRow }) {
   });
   const overdue = task.due_at && new Date(task.due_at).getTime() < Date.now();
   return (
-    <div className={`flex items-start gap-2 rounded-lg border p-2.5 ${overdue ? "border-rose-300 bg-rose-50/50 dark:bg-rose-950/20" : "bg-muted/30"}`}>
+    <div className={`flex items-start gap-2 rounded-lg border p-2.5 ${overdue ? "border-destructive/30 bg-destructive/5" : "bg-muted/30"}`}>
       <button
         onClick={() => mut.mutate(true)}
         disabled={mut.isPending}
-        className="mt-0.5 text-muted-foreground hover:text-emerald-600"
+        className="mt-0.5 text-muted-foreground hover:text-success"
         aria-label="סמן כהושלם"
       >
         {mut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Circle className="h-4 w-4" />}
@@ -415,7 +410,7 @@ function TaskRow({ task }: { task: LeadTaskRow }) {
         <div className="text-sm font-medium text-foreground">{task.next_task}</div>
         {task.notes && <div className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{task.notes}</div>}
         {task.due_at && (
-          <div className={`mt-1 flex items-center gap-1 text-xs ${overdue ? "text-rose-600 font-medium" : "text-muted-foreground"}`}>
+          <div className={`mt-1 flex items-center gap-1 text-xs ${overdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
             <CalendarClock className="h-3 w-3" />
             {new Date(task.due_at).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" })}
             {overdue && " · באיחור"}

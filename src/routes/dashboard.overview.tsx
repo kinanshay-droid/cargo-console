@@ -9,6 +9,8 @@ import { Users, UserPlus, Settings2, FileText, Sparkles } from "lucide-react";
 import { listCustomers } from "@/lib/customers.functions";
 import { listMyQuotes } from "@/lib/quotes.functions";
 import { useI18n } from "@/lib/i18n";
+import { TONE_OUTLINE_BUTTON, TONE_GRADIENT } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/overview")({
   head: () => ({
@@ -25,9 +27,9 @@ export const Route = createFileRoute("/dashboard/overview")({
 type StatusKey = "active" | "inactive" | "frozen";
 
 const STATUS_COLOR: Record<StatusKey, string> = {
-  active: "bg-emerald-500",
-  inactive: "bg-slate-400",
-  frozen: "bg-sky-500",
+  active: "bg-success",
+  inactive: "bg-muted-foreground",
+  frozen: "bg-accent",
 };
 
 function CustomersDashboard() {
@@ -83,9 +85,9 @@ function CustomersDashboard() {
   const statusSegments = useMemo(() => {
     const total = stats.total || 1;
     const segs: { key: StatusKey; value: number; pct: number; color: string }[] = [
-      { key: "active", value: stats.active, pct: (stats.active / total) * 100, color: "#10b981" },
-      { key: "inactive", value: stats.inactive, pct: (stats.inactive / total) * 100, color: "#94a3b8" },
-      { key: "frozen", value: stats.frozen, pct: (stats.frozen / total) * 100, color: "#38bdf8" },
+      { key: "active", value: stats.active, pct: (stats.active / total) * 100, color: "var(--success)" },
+      { key: "inactive", value: stats.inactive, pct: (stats.inactive / total) * 100, color: "var(--muted-foreground)" },
+      { key: "frozen", value: stats.frozen, pct: (stats.frozen / total) * 100, color: "var(--accent)" },
     ];
     return segs.filter((s) => s.value > 0);
   }, [stats]);
@@ -113,7 +115,7 @@ function CustomersDashboard() {
               </Button>
             }
           />
-          <Button asChild variant="outline" className="gap-2 border-sky-300 text-sky-700 hover:bg-sky-50">
+          <Button asChild variant="outline" className={cn("gap-2", TONE_OUTLINE_BUTTON.accent)}>
             <Link to="/dashboard/leads/new">
               <Sparkles className="h-4 w-4" />
               {t("overview.newLead")}
@@ -133,25 +135,25 @@ function CustomersDashboard() {
         <MetricTile
           title={t("overview.statTotalCustomers")}
           value={stats.total}
-          gradient="bg-gradient-to-l from-fuchsia-500 to-pink-500"
+          gradient={cn("bg-gradient-to-l", TONE_GRADIENT.primary)}
           icon={<Users className="h-5 w-5" />}
         />
         <MetricTile
           title={t("overview.statActiveCustomers")}
           value={stats.active}
-          gradient="bg-gradient-to-l from-emerald-500 to-teal-500"
+          gradient={cn("bg-gradient-to-l", TONE_GRADIENT.success)}
           icon={<Users className="h-5 w-5" />}
         />
         <MetricTile
           title={t("overview.statNew30Days")}
           value={stats.newThisMonth}
-          gradient="bg-gradient-to-l from-sky-500 to-cyan-500"
+          gradient={cn("bg-gradient-to-l", TONE_GRADIENT.accent)}
           icon={<UserPlus className="h-5 w-5" />}
         />
         <MetricTile
           title={t("overview.statTotalQuotes")}
           value={quotes.length}
-          gradient="bg-gradient-to-l from-violet-500 to-purple-600"
+          gradient={cn("bg-gradient-to-l", TONE_GRADIENT.warning)}
           icon={<FileText className="h-5 w-5" />}
         />
       </div>
@@ -189,7 +191,7 @@ function CustomersDashboard() {
 
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <Link to="/dashboard/leads/new" className="text-xs text-sky-600 hover:underline">
+            <Link to="/dashboard/leads/new" className="text-xs text-accent hover:underline">
               {t("common.addShort")}
             </Link>
             <h3 className="text-right font-semibold">
@@ -215,7 +217,7 @@ function CustomersDashboard() {
                     {new Date(c.created_at).toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
                   </span>
                   <span className="flex items-center gap-2 font-medium">
-                    <span className="h-2 w-2 rounded-full bg-sky-500" />
+                    <span className="h-2 w-2 rounded-full bg-accent" />
                     {c.company_name}
                   </span>
                 </Link>
@@ -292,7 +294,7 @@ function DonutChart({ segments }: { segments: { pct: number; color: string }[] }
         cy={size / 2}
         r={radius}
         fill="none"
-        stroke="hsl(var(--muted))"
+        stroke="var(--muted)"
         strokeWidth={stroke}
       />
       {segments.map((s, i) => {

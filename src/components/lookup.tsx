@@ -412,10 +412,10 @@ function LookupRow({
       <button
         type="button"
         onClick={(e) => onToggleFavorite(item.id, e)}
-        className="shrink-0 text-muted-foreground hover:text-amber-500"
+        className="shrink-0 text-muted-foreground hover:text-warning"
         aria-label={isFavorite ? "הסר ממועדפים" : "הוסף למועדפים"}
       >
-        <Star className={cn("h-3.5 w-3.5", isFavorite && "fill-amber-400 text-amber-400")} />
+        <Star className={cn("h-3.5 w-3.5", isFavorite && "fill-warning text-warning")} />
       </button>
     </CommandItem>
   );

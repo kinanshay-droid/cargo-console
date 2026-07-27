@@ -8,6 +8,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { listCustomers } from "@/lib/customers.functions";
 import { customerInitials, customerPalette } from "@/lib/customers-demo";
+import { TONE_OUTLINE_BUTTON } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "פעיל",
@@ -16,10 +18,10 @@ const STATUS_LABEL: Record<string, string> = {
   lead: "פוטנציאלי",
 };
 const STATUS_DOT: Record<string, string> = {
-  active: "bg-emerald-500",
-  inactive: "bg-slate-400",
-  frozen: "bg-amber-500",
-  lead: "bg-sky-500",
+  active: "bg-success",
+  inactive: "bg-muted-foreground",
+  frozen: "bg-warning",
+  lead: "bg-accent",
 };
 
 export const Route = createFileRoute("/dashboard/customers/")({
@@ -105,7 +107,7 @@ function CustomersPage() {
               onClick={() => setTab("leads")}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                 tab === "leads"
-                  ? "bg-sky-500 text-white shadow-sm"
+                  ? "bg-accent text-accent-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -131,7 +133,7 @@ function CustomersPage() {
               </Button>
             }
           />
-          <Button asChild variant="outline" className="gap-2 border-sky-500/40 text-sky-600 hover:bg-sky-50 dark:text-sky-400 dark:hover:bg-sky-950">
+          <Button asChild variant="outline" className={cn("gap-2", TONE_OUTLINE_BUTTON.accent)}>
             <Link to="/dashboard/leads/new">
               <Sparkles className="h-4 w-4" />
               לקוח פוטנציאלי
@@ -182,7 +184,7 @@ function CustomersPage() {
 
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
-                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT[c.status] ?? "bg-slate-400"}`} />
+                  <span className={`h-2 w-2 rounded-full ${STATUS_DOT[c.status] ?? "bg-muted-foreground"}`} />
                   <span className="text-sm font-medium">{STATUS_LABEL[c.status] ?? c.status}</span>
                 </div>
                 {c.website && (

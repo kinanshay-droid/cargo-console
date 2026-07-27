@@ -28,6 +28,7 @@ import {
   type CaseRep,
 } from "@/lib/operations.functions";
 import { listMyQuotes } from "@/lib/quotes.functions";
+import { TONE_GRADIENT } from "@/lib/theme";
 import { AIRPORTS } from "@/lib/airports";
 
 export const Route = createFileRoute("/dashboard/operations")({
@@ -294,11 +295,11 @@ function OperationsDashboard() {
         <>
           {/* KPI row */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-            <KpiCard label="הצעות מחיר פתוחות" value={openQuotesCount} gradient="from-violet-500 to-purple-600" />
-            <KpiCard label="תיקים בטיפול" value={inProgressCount} gradient="from-amber-500 to-orange-600" />
-            <KpiCard label="תיקים ממתינים" value={pendingCount} gradient="from-sky-500 to-blue-600" />
-            <KpiCard label="תיקים סגורים" value={closedCount} gradient="from-emerald-500 to-emerald-600" />
-            <KpiCard label="תיקים חריגים / בעיות" value={exceptionsCount} gradient="from-pink-500 to-fuchsia-600" />
+            <KpiCard label="הצעות מחיר פתוחות" value={openQuotesCount} gradient={TONE_GRADIENT.primary} />
+            <KpiCard label="תיקים בטיפול" value={inProgressCount} gradient={TONE_GRADIENT.accent} />
+            <KpiCard label="תיקים ממתינים" value={pendingCount} gradient={TONE_GRADIENT.warning} />
+            <KpiCard label="תיקים סגורים" value={closedCount} gradient={TONE_GRADIENT.success} />
+            <KpiCard label="תיקים חריגים / בעיות" value={exceptionsCount} gradient={TONE_GRADIENT.destructive} />
           </div>
 
           {/* Activity / urgent row */}
@@ -440,10 +441,10 @@ function OperationsDashboard() {
               <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
                 <MapPin className="h-4 w-4 text-muted-foreground" /> מפת משלוחים פעילים
               </div>
-              <div className="relative h-56 overflow-hidden rounded-xl border bg-sky-50 dark:bg-slate-900">
+              <div className="relative h-56 overflow-hidden rounded-xl border bg-accent/5 dark:bg-muted">
                 <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
                   {/* Stylized continent silhouettes — decorative, not a real projection */}
-                  <g className="fill-slate-300/70 dark:fill-slate-700/70">
+                  <g className="fill-muted-foreground/25">
                     <ellipse cx="15" cy="25" rx="10" ry="8" />
                     <ellipse cx="22" cy="33" rx="7" ry="10" />
                     <ellipse cx="23" cy="60" rx="6" ry="13" />

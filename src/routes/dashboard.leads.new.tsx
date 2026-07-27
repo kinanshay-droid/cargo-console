@@ -242,7 +242,7 @@ function NewLeadPage() {
             <ArrowRight className="h-4 w-4" />
           </Link>
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-sky-500/10 p-2 text-sky-600">
+            <div className="rounded-xl bg-accent/10 p-2 text-accent">
               <Sparkles className="h-6 w-6" />
             </div>
             <div>

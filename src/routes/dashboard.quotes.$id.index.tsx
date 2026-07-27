@@ -195,7 +195,7 @@ function QuoteDetail() {
               <div className="mt-4 space-y-2 border-t pt-4">
                 <div className="text-xs text-muted-foreground">סטטוס הצעה</div>
                 {isArchived ? (
-                  <div className="space-y-2 rounded-lg border border-violet-200 bg-violet-50 p-3">
+                  <div className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`rounded-full border px-2.5 py-1 text-xs font-medium ${QUOTE_STATUS_BADGE_LIGHT.archived}`}

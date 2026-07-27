@@ -69,7 +69,7 @@ export function PricingRuleForm({ open, onOpenChange, initial, onSubmit, saving 
             />
           </Field>
 
-          <div className="col-span-2 mt-2 text-sm font-semibold text-slate-500">בסיס תמחור</div>
+          <div className="col-span-2 mt-2 text-sm font-semibold text-muted-foreground">בסיס תמחור</div>
           <Field label="יחידה">
             <Select value={f.unit ?? "shipment"} onValueChange={(v) => set("unit", v as PricingUnit)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -87,7 +87,7 @@ export function PricingRuleForm({ open, onOpenChange, initial, onSubmit, saving 
           <Field label="ביטוח (%)"><Input type="number" step="0.01" value={f.insurance_pct ?? 0} onChange={(e) => set("insurance_pct", num(e.target.value))} /></Field>
           <Field label="מס (%)"><Input type="number" step="0.01" value={f.tax_pct ?? 0} onChange={(e) => set("tax_pct", num(e.target.value))} /></Field>
 
-          <div className="col-span-2 mt-2 text-sm font-semibold text-slate-500">תנאי התאמה (השאר ריק = תואם הכל)</div>
+          <div className="col-span-2 mt-2 text-sm font-semibold text-muted-foreground">תנאי התאמה (השאר ריק = תואם הכל)</div>
           <Field label="שירות">
             <Lookup type="service_types" matchBy="code" value={f.service_type ?? null}
               onChange={(item) => set("service_type", item?.code ?? null)} placeholder="כל שירות..." />

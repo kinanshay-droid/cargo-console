@@ -87,6 +87,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { TONE_GRADIENT } from "@/lib/theme";
 import {
   customerInitials,
   customerPalette,
@@ -122,10 +123,10 @@ const SHIP_TYPES: {
   icon: typeof Plane;
   gradient: string;
 }[] = [
-  { id: "export", label: "ייצוא", desc: "משלוח יוצא מישראל", icon: Plane, gradient: "from-sky-500 to-blue-600" },
-  { id: "import", label: "ייבוא", desc: "משלוח נכנס לישראל", icon: Ship, gradient: "from-indigo-500 to-violet-600" },
-  { id: "distribution", label: "משלוחי דרופ", desc: "דרופ ואיסופים בארץ", icon: PackageOpen, gradient: "from-emerald-500 to-teal-600" },
-  { id: "domestic", label: "פנים ארצי", desc: "משלוח / נסיעה בישראל", icon: Truck, gradient: "from-amber-500 to-orange-600" },
+  { id: "export", label: "ייצוא", desc: "משלוח יוצא מישראל", icon: Plane, gradient: TONE_GRADIENT.primary },
+  { id: "import", label: "ייבוא", desc: "משלוח נכנס לישראל", icon: Ship, gradient: TONE_GRADIENT.accent },
+  { id: "distribution", label: "משלוחי דרופ", desc: "דרופ ואיסופים בארץ", icon: PackageOpen, gradient: TONE_GRADIENT.success },
+  { id: "domestic", label: "פנים ארצי", desc: "משלוח / נסיעה בישראל", icon: Truck, gradient: TONE_GRADIENT.warning },
 ];
 
 const INCOTERMS = [
@@ -182,12 +183,12 @@ export type AttrKey =
 export type TempSeriesKey = "cryogenic" | "deepFrozen" | "frozen" | "chilled" | "ambient";
 
 export const CARGO_TYPES: { id: CargoType; label: string; en: string; icon: typeof Package; tint: string }[] = [
-  { id: "general", label: "מטען כללי", en: "General Cargo", icon: Package, tint: "from-slate-500 to-slate-700" },
-  { id: "temperature", label: "מטען מבוקר טמפ'", en: "Temperature Controlled", icon: Thermometer, tint: "from-sky-500 to-cyan-600" },
-  { id: "nfo", label: "Next Flight Out", en: "NFO", icon: Zap, tint: "from-amber-500 to-orange-600" },
-  { id: "live", label: "חיות חי", en: "Live Animals", icon: Rabbit, tint: "from-emerald-500 to-teal-600" },
-  { id: "dangerous", label: "סחורות מסוכנות", en: "Dangerous Goods", icon: AlertTriangle, tint: "from-rose-500 to-red-600" },
-  { id: "other", label: "אחר", en: "Other", icon: MoreHorizontal, tint: "from-violet-500 to-purple-600" },
+  { id: "general", label: "מטען כללי", en: "General Cargo", icon: Package, tint: TONE_GRADIENT.muted },
+  { id: "temperature", label: "מטען מבוקר טמפ'", en: "Temperature Controlled", icon: Thermometer, tint: TONE_GRADIENT.accent },
+  { id: "nfo", label: "Next Flight Out", en: "NFO", icon: Zap, tint: TONE_GRADIENT.warning },
+  { id: "live", label: "חיות חי", en: "Live Animals", icon: Rabbit, tint: TONE_GRADIENT.success },
+  { id: "dangerous", label: "סחורות מסוכנות", en: "Dangerous Goods", icon: AlertTriangle, tint: TONE_GRADIENT.destructive },
+  { id: "other", label: "אחר", en: "Other", icon: MoreHorizontal, tint: TONE_GRADIENT.primary },
 ];
 
 export const ATTR_OPTIONS: { id: AttrKey; label: string; icon: typeof MapPin }[] = [
@@ -537,9 +538,9 @@ export function NewQuoteDialog({
 
   const STATUS_LABEL_DB: Record<string, string> = { active: "פעיל", inactive: "לא פעיל", frozen: "מוקפא" };
   const STATUS_DOT_DB: Record<string, string> = {
-    active: "bg-emerald-500",
-    inactive: "bg-slate-400",
-    frozen: "bg-sky-500",
+    active: "bg-success",
+    inactive: "bg-muted-foreground",
+    frozen: "bg-accent",
   };
 
   const filtered = useMemo(() => {
@@ -969,7 +970,7 @@ export function NewQuoteDialog({
                             <button
                               type="button"
                               onClick={() => removePickupContact(c.id)}
-                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="h-3.5 w-3.5" /> הסר
                             </button>
@@ -1003,7 +1004,7 @@ export function NewQuoteDialog({
                             <button
                               type="button"
                               onClick={() => removeDeliveryContact(c.id)}
-                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="h-3.5 w-3.5" /> הסר
                             </button>
@@ -1227,7 +1228,7 @@ export function NewQuoteDialog({
                           <button
                             type="button"
                             onClick={() => removePackage(pkg.id)}
-                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 hover:bg-rose-50"
+                            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
                           >
                             <Trash2 className="h-3.5 w-3.5" /> הסר חבילה
                           </button>
@@ -1586,9 +1587,9 @@ export function StopsEditor({
   }
 
   const kindBadge: Record<StopKind, string> = {
-    Pickup: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200",
-    Drop: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200",
-    Hub: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200",
+    Pickup: "bg-success/15 text-success dark:bg-success/20/40 dark:text-success",
+    Drop: "bg-accent/15 text-accent dark:bg-accent/20/40 dark:text-accent",
+    Hub: "bg-warning/15 text-warning dark:bg-warning/20/40 dark:text-warning",
   };
 
   return (
@@ -2124,10 +2125,10 @@ const DEFAULT_PRICING_ITEMS: PricingItem[] = [
 ];
 
 const SOURCE_META: Record<PriceSource, { label: string; dot: string; row: string }> = {
-  pricelist: { label: "Price List", dot: "bg-sky-500", row: "" },
-  rfq: { label: "RFQ", dot: "bg-emerald-500", row: "" },
-  manual: { label: "ידני", dot: "bg-amber-500", row: "" },
-  missing: { label: "חסר מקור", dot: "bg-rose-500", row: "bg-rose-50/60" },
+  pricelist: { label: "Price List", dot: "bg-accent", row: "" },
+  rfq: { label: "RFQ", dot: "bg-success", row: "" },
+  manual: { label: "ידני", dot: "bg-warning", row: "" },
+  missing: { label: "חסר מקור", dot: "bg-destructive", row: "bg-destructive/10/60" },
 };
 
 type Step5Props = {
@@ -2245,25 +2246,25 @@ function Step5Pricing(p: Step5Props) {
                   {p.items.map((it) => {
                     const meta = SOURCE_META[it.source];
                     return (
-                      <tr key={it.id} className={cn("border-t", meta.row, it.stale && "bg-amber-50/60")}>
+                      <tr key={it.id} className={cn("border-t", meta.row, it.stale && "bg-warning/10/60")}>
                         <td className="px-2 py-2 text-muted-foreground"><GripVertical className="h-4 w-4" /></td>
                         <td className="px-2 py-2">
                           <input
                             type="number"
                             value={it.price}
                             onChange={(e) => p.setItems((rows) => rows.map((r) => r.id === it.id ? { ...r, price: Number(e.target.value) } : r))}
-                            className={cn("h-8 w-24 rounded-md border bg-background px-2 text-right text-sm", it.source === "missing" && "border-rose-400 text-rose-600")}
+                            className={cn("h-8 w-24 rounded-md border bg-background px-2 text-right text-sm", it.source === "missing" && "border-destructive/40 text-destructive")}
                           />
                         </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{it.currency}</td>
                         <td className="px-3 py-2 text-xs">
                           <div className="flex items-center justify-end gap-2">
                             {it.sourceDate && <span className="text-[10px] text-muted-foreground">{it.sourceDate}</span>}
-                            <span className={cn(it.source === "missing" && "text-rose-600", it.stale && "text-amber-600")}>
+                            <span className={cn(it.source === "missing" && "text-destructive", it.stale && "text-warning")}>
                               {it.sourceLabel}
                             </span>
-                            {it.source === "missing" && <AlertTriangle className="h-3.5 w-3.5 text-rose-500" />}
-                            {it.stale && <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />}
+                            {it.source === "missing" && <AlertTriangle className="h-3.5 w-3.5 text-destructive" />}
+                            {it.stale && <AlertTriangle className="h-3.5 w-3.5 text-warning" />}
                           </div>
                         </td>
                         <td className="px-3 py-2 text-sm">{it.label}</td>
@@ -2312,9 +2313,9 @@ function Step5Pricing(p: Step5Props) {
                 <input type="number" value={p.margin} onChange={(e) => p.setMargin(e.target.value)} className="h-8 w-16 rounded-md border bg-background px-2 text-right text-sm" />
               </div>
               <SumLine label="סכום רווח" value={fmt(profit)} />
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
-                <div className="text-[11px] text-emerald-700">מחיר מוצע ללקוח</div>
-                <div className="mt-1 text-2xl font-bold text-emerald-700">{fmt(customerPrice)} {p.currency}</div>
+              <div className="rounded-lg border border-success/25 bg-success/10 p-3 text-center">
+                <div className="text-[11px] text-success">מחיר מוצע ללקוח</div>
+                <div className="mt-1 text-2xl font-bold text-success">{fmt(customerPrice)} {p.currency}</div>
               </div>
               <div className="flex items-center justify-between border-t pt-2 text-xs">
                 <span className="text-muted-foreground">שיעור רווח</span>
@@ -2323,12 +2324,12 @@ function Step5Pricing(p: Step5Props) {
             </div>
           </Section>
 
-          <div className="rounded-xl border border-rose-200 bg-rose-50/70 p-3">
+          <div className="rounded-xl border border-destructive/25 bg-destructive/10/70 p-3">
             <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4 text-rose-500" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
               <div className="text-xs">
-                <div className="font-semibold text-rose-700">חסרים תיקונים לפני שליחה</div>
-                <div className="text-rose-700/80">
+                <div className="font-semibold text-destructive">חסרים תיקונים לפני שליחה</div>
+                <div className="text-destructive/80">
                   {alerts.filter((a) => a.tone === "rose").length} קריטי · {alerts.filter((a) => a.tone === "amber").length} אזהרה · {p.items.length} פריטים · שיעור רווח {profitRate.toFixed(1)}%
                 </div>
               </div>
@@ -2337,10 +2338,10 @@ function Step5Pricing(p: Step5Props) {
 
           <Section title="מקור מחיר">
             <ul className="space-y-2 text-sm">
-              <SourceLine dot="bg-sky-500" label="Price List" count={sourceCounts.pricelist} />
-              <SourceLine dot="bg-emerald-500" label="RFQ" count={sourceCounts.rfq} />
-              <SourceLine dot="bg-amber-500" label="ידני" count={sourceCounts.manual} />
-              <SourceLine dot="bg-rose-500" label="חסר מקור" count={sourceCounts.missing} />
+              <SourceLine dot="bg-accent" label="Price List" count={sourceCounts.pricelist} />
+              <SourceLine dot="bg-success" label="RFQ" count={sourceCounts.rfq} />
+              <SourceLine dot="bg-warning" label="ידני" count={sourceCounts.manual} />
+              <SourceLine dot="bg-destructive" label="חסר מקור" count={sourceCounts.missing} />
             </ul>
           </Section>
 
@@ -2354,17 +2355,17 @@ function Step5Pricing(p: Step5Props) {
                   key={a.id}
                   className={cn(
                     "rounded-lg border p-3 text-xs",
-                    a.tone === "rose" && "border-rose-200 bg-rose-50/70",
-                    a.tone === "amber" && "border-amber-200 bg-amber-50/70",
+                    a.tone === "rose" && "border-destructive/25 bg-destructive/10/70",
+                    a.tone === "amber" && "border-warning/25 bg-warning/10/70",
                   )}
                 >
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <div className={cn("flex items-center gap-1.5 font-semibold", a.tone === "rose" ? "text-rose-700" : "text-amber-700")}>
+                    <div className={cn("flex items-center gap-1.5 font-semibold", a.tone === "rose" ? "text-destructive" : "text-warning")}>
                       <AlertTriangle className="h-3.5 w-3.5" />
                       {a.title}
                     </div>
                     {a.badge && (
-                      <span className={cn("rounded-full px-2 py-0.5 text-[10px]", a.tone === "rose" ? "bg-rose-100 text-rose-700" : "bg-amber-100 text-amber-700")}>
+                      <span className={cn("rounded-full px-2 py-0.5 text-[10px]", a.tone === "rose" ? "bg-destructive/15 text-destructive" : "bg-warning/15 text-warning")}>
                         {a.badge}
                       </span>
                     )}
@@ -2395,7 +2396,7 @@ function Step5Pricing(p: Step5Props) {
       </Section>
 
       {alerts.filter((a) => a.tone === "rose").length > 0 && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50/70 px-3 py-2 text-xs text-rose-700">
+        <div className="rounded-lg border border-destructive/25 bg-destructive/10/70 px-3 py-2 text-xs text-destructive">
           <FileText className="mr-1 inline h-3.5 w-3.5" />
           יש לתקן {alerts.filter((a) => a.tone === "rose").length} התראות קריטיות לפני המשך
         </div>
@@ -2521,7 +2522,7 @@ function Step6Summary(p: Step6Props) {
         <SumStat
           label="סטטוס"
           value={
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
               <Check className="h-3 w-3" /> מוכן לאישור
             </span>
           }
@@ -2657,16 +2658,16 @@ function Step6Summary(p: Step6Props) {
 
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-            <TrendingUp className="h-4 w-4 text-emerald-600" /> רמת סיכון
+            <TrendingUp className="h-4 w-4 text-success" /> רמת סיכון
           </div>
-          <div className="inline-flex rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+          <div className="inline-flex rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
             נמוכה
           </div>
           <ul className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" /> כל התנאים מולאו</li>
-            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" /> שיעור רווח תקין</li>
-            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" /> אין חריגות</li>
-            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-emerald-600" /> אישורי סוכן קיימים</li>
+            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-success" /> כל התנאים מולאו</li>
+            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-success" /> שיעור רווח תקין</li>
+            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-success" /> אין חריגות</li>
+            <li className="flex gap-1.5"><Check className="h-3.5 w-3.5 text-success" /> אישורי סוכן קיימים</li>
           </ul>
           <div className="mt-3 rounded-lg bg-muted/40 p-2 text-[11px] text-muted-foreground">
             אין דרישות לאישור מנהל — ניתן לאשר את ההצעה
