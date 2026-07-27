@@ -102,7 +102,12 @@ function LoginPage() {
   async function onDemoRoleSelect(role: (typeof DEMO_ROLES)[number]) {
     setDemoLoading(role.id);
     try {
-      const creds = await ensureDemoUser();
+      // const creds = await ensureDemoUser();
+
+const creds = {
+  email: "demo@demo.local",
+  password: "demo-user-1234",
+};
       const { error } = await supabase.auth.signInWithPassword({
         email: creds.email,
         password: creds.password,

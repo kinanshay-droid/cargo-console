@@ -43,7 +43,8 @@ console.log(
       ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
       ...(!SUPABASE_SERVICE_ROLE_KEY ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Set them in your deployment's environment/secrets configuration.`;
+   const message =
+  `*** TEST 123 *** Missing Supabase environment variable(s): ${missing.join(', ')}`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
