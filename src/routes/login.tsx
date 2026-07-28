@@ -12,6 +12,7 @@ import {
 import {
   Headphones,
   User,
+  Users,
   TrendingUp,
   ShieldCheck,
   Mail,
@@ -21,9 +22,10 @@ import {
   Radar,
   MapPin,
   FileCheck2,
-  Warehouse,
-  Truck,
-  Globe2,
+  Sparkles,
+  ArrowLeftRight,
+  ScrollText,
+  Thermometer,
   Cloud,
   BarChart3,
   BadgeCheck,
@@ -33,14 +35,14 @@ import { ensureDemoUser } from "@/lib/demo.functions";
 import { toast } from "sonner";
 
 const FEATURES: { label: string; icon: typeof Eye }[] = [
-  { label: "ראות מקצה לקצה", icon: Eye },
-  { label: "מגדל בקרת תפעול", icon: Radar },
-  { label: "מעקב משלוחים בזמן אמת", icon: MapPin },
-  { label: "ניהול מכס", icon: FileCheck2 },
-  { label: "תפעול מחסנים", icon: Warehouse },
-  { label: "ניהול מוביל", icon: Truck },
-  { label: "אינטליגנציית משלוחים", icon: BarChart3 },
-  { label: "רשת לוגיסטיקה גלובלית", icon: Globe2 },
+  { label: "ניהול לידים ולקוחות", icon: Users },
+  { label: "הצעות מחיר עם מנוע תמחור חכם", icon: Sparkles },
+  { label: "מעקב משלוחים בזמן אמת על המפה", icon: MapPin },
+  { label: "תפעול לפי נציג ועדיפות", icon: Radar },
+  { label: "איסוף והפצה", icon: ArrowLeftRight },
+  { label: "מחירונים וחוקי תמחור ללקוח", icon: ScrollText },
+  { label: "מטענים רגישי טמפרטורה (שרשרת קור)", icon: Thermometer },
+  { label: "ייצוא הצעת מחיר ל-PDF", icon: FileCheck2 },
 ];
 
 const TRUST_BADGES: { label: string; icon: typeof ShieldCheck }[] = [
