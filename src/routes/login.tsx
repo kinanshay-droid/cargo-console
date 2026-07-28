@@ -31,8 +31,8 @@ const DEMO_ROLES: {
 }[] = [
   {
     id: "service",
-    title: "שירות",
-    description: "התראות שירות — משימות, תיקים דחופים ופעולות מהירות.",
+    title: "תפעול",
+    description: "התראות תפעול — משימות, תיקים דחופים ופעולות מהירות.",
     icon: Headphones,
     route: "/dashboard/operations",
   },
