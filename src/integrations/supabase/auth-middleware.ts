@@ -32,21 +32,13 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
   async ({ next }) => {
-    
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
-
-    // TEMP DIAGNOSTIC — remove once the missing-env-var bug is root-caused.
-    console.log(
-      "[authMiddleware] globalThis.__env__ present=",
-      !!(globalThis as { __env__?: unknown }).__env__,
-      "globalThis.__env__ keys=",
-      (globalThis as { __env__?: unknown }).__env__
-        ? Object.keys((globalThis as { __env__?: object }).__env__ as object)
-        : null,
-      "process.env keys=",
-      Object.keys(process.env ?? {}),
-    );
+    // Prefer the build-time VITE_ constants (statically inlined by Vite, always
+    // present regardless of how the Cloudflare Worker invocation binds `env`)
+    // and only fall back to the runtime process.env binding. These are the
+    // public URL/anon-key values already shipped to every browser, so reading
+    // them from the build-time constant here is not a security downgrade.
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
       const missing = [
