@@ -572,22 +572,24 @@ function CaseDetail() {
             </p>
           </div>
 
-          <Section title="מסמכי משלוח">
-            <Field label="מספר שטר מטען">
-              <Input
-                value={form.blNumber}
-                onChange={(e) => upd("blNumber", e.target.value)}
-                placeholder="MAWB / MBL..."
-              />
-            </Field>
-            <Field label="מספר שטר מטען פנימי">
-              <Input
-                value={form.houseBlNumber}
-                onChange={(e) => upd("houseBlNumber", e.target.value)}
-                placeholder="HAWB / HBL..."
-              />
-            </Field>
-          </Section>
+          {form.shipmentKind !== "domestic" && (
+            <Section title="מסמכי משלוח">
+              <Field label="מספר שטר מטען">
+                <Input
+                  value={form.blNumber}
+                  onChange={(e) => upd("blNumber", e.target.value)}
+                  placeholder="MAWB / MBL..."
+                />
+              </Field>
+              <Field label="מספר שטר מטען פנימי">
+                <Input
+                  value={form.houseBlNumber}
+                  onChange={(e) => upd("houseBlNumber", e.target.value)}
+                  placeholder="HAWB / HBL..."
+                />
+              </Field>
+            </Section>
+          )}
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
@@ -641,18 +643,26 @@ function CaseDetail() {
           </Section>
 
           <Section title="מסלול ותאריכים">
-            <Field label="נמל מוצא"><AirportCombobox value={form.originPort} onChange={(v) => upd("originPort", v)} /></Field>
-            <Field label="נמל יעד"><AirportCombobox value={form.destPort} onChange={(v) => upd("destPort", v)} /></Field>
+            {form.shipmentKind !== "domestic" && (
+              <>
+                <Field label="נמל מוצא"><AirportCombobox value={form.originPort} onChange={(v) => upd("originPort", v)} /></Field>
+                <Field label="נמל יעד"><AirportCombobox value={form.destPort} onChange={(v) => upd("destPort", v)} /></Field>
+              </>
+            )}
             <Field label="תאריך יציאה"><Input type="date" value={form.departDate} onChange={(e) => upd("departDate", e.target.value)} /></Field>
             <Field label="תאריך הגעה"><Input type="date" value={form.arriveDate} onChange={(e) => upd("arriveDate", e.target.value)} /></Field>
-            <Field label="סוכן">
-              <Lookup type="agents" matchBy="code" value={form.agent || null}
-                onChange={(item) => upd("agent", item?.code ?? "")} placeholder="בחר סוכן..." />
-            </Field>
-            <Field label="חברת תעופה">
-              <Lookup type="airlines" matchBy="code" value={form.airline || null}
-                onChange={(item) => upd("airline", item?.code ?? "")} placeholder="בחר חברת תעופה..." />
-            </Field>
+            {form.shipmentKind !== "domestic" && (
+              <>
+                <Field label="סוכן">
+                  <Lookup type="agents" matchBy="code" value={form.agent || null}
+                    onChange={(item) => upd("agent", item?.code ?? "")} placeholder="בחר סוכן..." />
+                </Field>
+                <Field label="חברת תעופה">
+                  <Lookup type="airlines" matchBy="code" value={form.airline || null}
+                    onChange={(item) => upd("airline", item?.code ?? "")} placeholder="בחר חברת תעופה..." />
+                </Field>
+              </>
+            )}
           </Section>
 
           <Section title="פיננסי">
