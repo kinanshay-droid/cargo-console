@@ -2,10 +2,23 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Briefcase, CheckCircle2, Clock, FolderOpen, XCircle } from "lucide-react";
+import {
+  Bell,
+  Briefcase,
+  CheckCircle2,
+  Clock,
+  FolderOpen,
+  XCircle,
+  LayoutGrid,
+  Plane,
+  Ship,
+  PackageOpen,
+  Truck,
+} from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -17,6 +30,22 @@ import {
 } from "@/components/ui/table";
 import { listCases, type CaseStatus } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
+
+// Same four categories as step 1 of the New Quote wizard ("סוג משלוח") — a
+// case inherits its shipment_kind from the quote it was transferred from.
+const SHIP_KIND_ORDER = ["export", "import", "distribution", "domestic"] as const;
+type ShipKindValue = (typeof SHIP_KIND_ORDER)[number];
+
+const SHIP_KIND_CONFIG: Record<ShipKindValue, { label: string; icon: typeof Truck; badgeClass: string }> = {
+  export: { label: "ייצוא", icon: Plane, badgeClass: "bg-primary/10 text-primary" },
+  import: { label: "ייבוא", icon: Ship, badgeClass: "bg-accent/15 text-accent" },
+  distribution: { label: "משלוחי דרופ", icon: PackageOpen, badgeClass: "bg-success/15 text-success" },
+  domestic: { label: "פנים ארצי", icon: Truck, badgeClass: "bg-warning/15 text-warning" },
+};
+
+function isShipKind(v: string | null | undefined): v is ShipKindValue {
+  return !!v && (SHIP_KIND_ORDER as readonly string[]).includes(v);
+}
 
 export const Route = createFileRoute("/dashboard/shipments")({
   head: () => ({
@@ -71,19 +100,32 @@ function ShipmentsDashboard() {
     queryFn: () => listCasesFn(),
   });
 
+  const [kindFilter, setKindFilter] = useState<ShipKindValue | "all">("all");
+
+  const kindCounts = useMemo(() => {
+    const result: Record<ShipKindValue, number> = { export: 0, import: 0, distribution: 0, domestic: 0 };
+    for (const c of cases) if (isShipKind(c.shipment_kind)) result[c.shipment_kind]++;
+    return result;
+  }, [cases]);
+
+  const filteredCases = useMemo(
+    () => (kindFilter === "all" ? cases : cases.filter((c) => c.shipment_kind === kindFilter)),
+    [cases, kindFilter],
+  );
+
   const counts: Record<CaseStatus, number> = { new: 0, in_progress: 0, completed: 0, cancelled: 0 };
-  for (const c of cases) counts[c.status]++;
+  for (const c of filteredCases) counts[c.status]++;
 
   const recentByStatus = useMemo(() => {
-    const result = {} as Record<CaseStatus, typeof cases>;
+    const result = {} as Record<CaseStatus, typeof filteredCases>;
     for (const s of ["new", "in_progress", "completed", "cancelled"] as CaseStatus[]) {
-      result[s] = cases
+      result[s] = filteredCases
         .filter((c) => c.status === s)
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 3);
     }
     return result;
-  }, [cases]);
+  }, [filteredCases]);
 
   const [highlightId, setHighlightId] = useState<string | null>(null);
 
@@ -107,6 +149,30 @@ function ShipmentsDashboard() {
         description="תיקים תפעוליים שנפתחו מהצעות מחיר שהועברו — מעקב סטטוס מקצה לקצה."
       />
 
+      <Tabs value={kindFilter} onValueChange={(v) => setKindFilter(v as ShipKindValue | "all")} dir="rtl">
+        <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
+          <TabsTrigger
+            value="all"
+            className="gap-1.5 rounded-full border bg-card px-3 py-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> הכל ({cases.length})
+          </TabsTrigger>
+          {SHIP_KIND_ORDER.map((k) => {
+            const conf = SHIP_KIND_CONFIG[k];
+            const Icon = conf.icon;
+            return (
+              <TabsTrigger
+                key={k}
+                value={k}
+                className="gap-1.5 rounded-full border bg-card px-3 py-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                <Icon className="h-3.5 w-3.5" /> {conf.label} ({kindCounts[k]})
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </Tabs>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {(["new", "in_progress", "completed", "cancelled"] as CaseStatus[]).map((s) => (
           <StatusHeroCard key={s} status={s} count={counts[s]} items={recentByStatus[s]} />
@@ -121,6 +187,7 @@ function ShipmentsDashboard() {
               <TableHead className="text-right">לקוח</TableHead>
               <TableHead className="text-right">מסלול</TableHead>
               <TableHead className="text-right">סוג משלוח</TableHead>
+              <TableHead className="text-right">שיטת שילוח</TableHead>
               <TableHead className="text-right">סטטוס</TableHead>
               <TableHead className="text-right"> </TableHead>
             </TableRow>
@@ -128,13 +195,13 @@ function ShipmentsDashboard() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   טוען...
                 </TableCell>
               </TableRow>
-            ) : cases.length === 0 ? (
+            ) : filteredCases.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center">
+                <TableCell colSpan={7} className="py-12 text-center">
                   <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
                   <div className="text-base font-medium">אין תיקים עדיין</div>
                   <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
@@ -143,7 +210,7 @@ function ShipmentsDashboard() {
                 </TableCell>
               </TableRow>
             ) : (
-              cases.map((c) => {
+              filteredCases.map((c) => {
                 const meta = CASE_STATUS_META[c.status];
                 const isHighlighted = c.id === highlightId;
                 return (
@@ -173,6 +240,19 @@ function ShipmentsDashboard() {
                     </TableCell>
                     <TableCell className="text-sm">
                       {c.origin_port ?? "—"} <span className="text-muted-foreground">→</span> {c.dest_port ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {isShipKind(c.shipment_kind) ? (
+                        <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", SHIP_KIND_CONFIG[c.shipment_kind].badgeClass)}>
+                          {(() => {
+                            const Icon = SHIP_KIND_CONFIG[c.shipment_kind].icon;
+                            return <Icon className="h-3 w-3" />;
+                          })()}
+                          {SHIP_KIND_CONFIG[c.shipment_kind].label}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-sm">
                       {SHIPMENT_MODE_LABEL[c.shipment_mode] ?? c.shipment_mode ?? "—"}
