@@ -2223,6 +2223,9 @@ function Step5Pricing(p: Step5Props) {
       currency: p.currency, price: 0,
     }]);
 
+  const removeRow = (id: string) =>
+    p.setItems((rows) => rows.filter((r) => r.id !== id));
+
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
@@ -2289,7 +2292,16 @@ function Step5Pricing(p: Step5Props) {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-sm">{it.label}</td>
-                        <td className="px-2 py-2 text-muted-foreground"><MoreHorizontal className="h-4 w-4" /></td>
+                        <td className="px-2 py-2 text-muted-foreground">
+                          <button
+                            type="button"
+                            onClick={() => removeRow(it.id)}
+                            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            aria-label="מחק פריט"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
