@@ -29,6 +29,7 @@ import {
   Cloud,
   BarChart3,
   BadgeCheck,
+  PlaneTakeoff,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ensureDemoUser } from "@/lib/demo.functions";
@@ -186,6 +187,60 @@ const creds = {
           backgroundSize: "18px 18px",
         }}
       />
+
+      {/* Air-freight motif: a great-circle flight route with airport nodes and a plane in transit */}
+      <svg
+        viewBox="0 0 1200 500"
+        preserveAspectRatio="xMidYMid slice"
+        className="pointer-events-none absolute inset-0 hidden h-full w-full opacity-40 lg:block"
+      >
+        <path
+          d="M 90 380 Q 480 60 1110 130"
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="2"
+          strokeDasharray="2 10"
+          strokeLinecap="round"
+        />
+        <g>
+          <circle cx="90" cy="380" r="4" fill="var(--accent)" />
+          <text x="90" y="402" textAnchor="middle" fontSize="12" fill="white" fillOpacity="0.6" fontFamily="monospace">TLV</text>
+        </g>
+        <g>
+          <circle cx="620" cy="150" r="4" fill="var(--accent)" />
+          <text x="620" y="172" textAnchor="middle" fontSize="12" fill="white" fillOpacity="0.6" fontFamily="monospace">FRA</text>
+        </g>
+        <g>
+          <circle cx="1110" cy="130" r="4" fill="var(--accent)" />
+          <text x="1110" y="112" textAnchor="middle" fontSize="12" fill="white" fillOpacity="0.6" fontFamily="monospace">JFK</text>
+        </g>
+        <g transform="translate(420, 100) rotate(140) scale(0.9) translate(-12, -12)">
+          <path
+            d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </g>
+      </svg>
+
+      {/* Floating status card: ties the route above to a live product moment */}
+      <div className="pointer-events-none absolute left-[6%] top-[18%] hidden w-56 rounded-xl border border-white/15 bg-white/10 p-3 shadow-lg backdrop-blur-md lg:block">
+        <div className="flex items-center gap-2 text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/25 text-accent">
+            <PlaneTakeoff className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-xs font-semibold">TLV → JFK</div>
+            <div className="text-[10px] text-white/60">Q-2607-9592 · באוויר</div>
+          </div>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
+          <div className="h-full w-2/3 rounded-full bg-accent" />
+        </div>
+      </div>
 
       <div className="relative z-10 mx-auto w-full max-w-5xl">
         <div className="mb-10 flex justify-center">
