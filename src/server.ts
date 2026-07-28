@@ -72,6 +72,14 @@ function bindCloudflareEnv(request: Request, env: unknown, ctx: unknown): void {
     env,
     context: ctx,
   };
+
+  // TEMP DIAGNOSTIC — remove once the missing-env-var bug is root-caused.
+  console.log(
+    "[bindCloudflareEnv] url=",
+    request.url,
+    "env keys=",
+    env && typeof env === "object" ? Object.keys(env as object) : typeof env,
+  );
 }
 
 export default {
