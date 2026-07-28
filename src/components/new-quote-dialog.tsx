@@ -515,6 +515,15 @@ export function NewQuoteDialog({
   const [pricingNotes, setPricingNotes] = useState("");
   const [pricingItems, setPricingItems] = useState<PricingItem[]>(() => DEFAULT_PRICING_ITEMS.map((r) => ({ ...r })));
   const [dismissedAlerts, setDismissedAlerts] = useState<Record<string, boolean>>({});
+  // Changing the currency needs to stay consistent everywhere it's shown on
+  // this step — the summary panel, the items table's per-row currency, and
+  // any new row added afterward. This only relabels the currency (no FX
+  // conversion, since no exchange-rate source is available); it keeps the
+  // whole page showing one currency instead of a stale mix.
+  const changeCurrency = (next: "USD" | "EUR" | "ILS") => {
+    setCurrency(next);
+    setPricingItems((rows) => rows.map((r) => ({ ...r, currency: next })));
+  };
   // Step 6 state — סיכום
   const [discount, setDiscount] = useState<string>("0");
   const [internalNotes, setInternalNotes] = useState<string>("");
@@ -1421,7 +1430,7 @@ export function NewQuoteDialog({
               cargoTypeLabel={CARGO_TYPES.find((c) => c.id === cargoType)?.en ?? "—"}
               stackable={attrs.valuable ? "Stackable" : "Non-Stackable"}
               shipmentModeLabel={SHIPMENT_MODES.find((m) => m.id === shipmentMode)?.label ?? "—"}
-              currency={currency} setCurrency={setCurrency}
+              currency={currency} setCurrency={changeCurrency}
               margin={margin} setMargin={setMargin}
               items={pricingItems} setItems={setPricingItems}
               notes={pricingNotes} setNotes={setPricingNotes}
