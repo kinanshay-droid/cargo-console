@@ -20,6 +20,7 @@ export const DICTIONARY = {
   "nav.commercial": { he: "מסחרי", en: "Commercial" },
   "nav.operations": { he: "תפעול", en: "Operations" },
   "nav.shipments": { he: "משלוחים", en: "Shipments" },
+  "nav.pickupDistribution": { he: "איסוף/הפצה", en: "Pickup / Distribution" },
   "nav.account": { he: "חשבון", en: "Account" },
   "nav.users": { he: "משתמשים", en: "Users" },
   "nav.roles": { he: "תפקידים", en: "Roles" },

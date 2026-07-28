@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Bell,
   ChevronDown,
+  ArrowLeftRight,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ const NAV_SECTIONS = [
       { to: "/dashboard/commercial", labelKey: "nav.commercial" as TranslationKey, icon: TrendingUp, adminOnly: false },
       { to: "/dashboard/operations", labelKey: "nav.operations" as TranslationKey, icon: Bell, adminOnly: false },
       { to: "/dashboard/shipments", labelKey: "nav.shipments" as TranslationKey, icon: Truck, adminOnly: false },
+      { to: "/dashboard/pickup-distribution", labelKey: "nav.pickupDistribution" as TranslationKey, icon: ArrowLeftRight, adminOnly: false },
       { to: "/dashboard/account", labelKey: "nav.account" as TranslationKey, icon: User, adminOnly: false },
     ],
   },
