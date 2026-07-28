@@ -1470,7 +1470,15 @@ export function NewQuoteDialog({
               variant="ghost"
               size="sm"
               className="gap-1"
-              onClick={() => (step > 1 ? setStep(step - 1) : onOpenChange(false))}
+              onClick={() => {
+                if (step <= 1) {
+                  onOpenChange(false);
+                  return;
+                }
+                // Domestic shipments skip step 4 (logistics mode) — going back
+                // from step 5 should land on step 3, not the skipped step 4.
+                setStep(step === 5 && kind === "domestic" ? 3 : step - 1);
+              }}
             >
               <ArrowRight className="h-4 w-4" /> חזור
             </Button>
@@ -1479,7 +1487,20 @@ export function NewQuoteDialog({
               className="gap-1"
               data-testid={step < 6 ? "wizard-next" : "wizard-finish"}
               disabled={!canContinue || submitting}
-              onClick={() => (step < 6 ? setStep(step + 1) : setShowFinishOptions(true))}
+              onClick={() => {
+                if (step >= 6) {
+                  setShowFinishOptions(true);
+                  return;
+                }
+                // Domestic shipments skip step 4 (logistics mode: direct/console/
+                // transship) — not meaningful for a local pickup/delivery run.
+                if (step === 3 && kind === "domestic") {
+                  setShipmentMode((m) => m ?? "direct");
+                  setStep(5);
+                  return;
+                }
+                setStep(step + 1);
+              }}
             >
               {step < 6 ? "המשך" : "סיום"} <ArrowLeft className="h-4 w-4" />
             </Button>
