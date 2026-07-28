@@ -364,6 +364,7 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
   const pickupContacts = Array.isArray(payload.pickupContacts) ? payload.pickupContacts.filter(isRecord) : [];
   const deliveryContacts = Array.isArray(payload.deliveryContacts) ? payload.deliveryContacts.filter(isRecord) : [];
   const moveType = pickupAddress || deliveryAddress || pickupContacts.length || deliveryContacts.length ? "דלת לדלת" : "נמל לנמל";
+  const isDomestic = str(q.shipment_kind) === "domestic";
 
   const validityDays = payload.validityDays != null ? num(payload.validityDays) : 14;
   const createdAt = str(q.created_at);
@@ -420,7 +421,7 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
             <div className="rounded-xl border p-4">
               <div className="relative">
                 <div className="pointer-events-none absolute inset-x-[12%] top-[54px] h-0.5 bg-border" />
-                <div className="grid grid-cols-4 gap-1">
+                <div className={`grid gap-1 ${isDomestic ? "grid-cols-2" : "grid-cols-4"}`}>
                   <RouteStop
                     icon={originIcon}
                     label="איסוף"
@@ -428,8 +429,12 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
                     sub={pickupContacts[0] ? str(pickupContacts[0].name) : undefined}
                     flag={flagFor(pickupAddress || originPort)}
                   />
-                  <RouteStop icon={gatewayIcon} label="שער יציאה" value={originPort || "—"} />
-                  <RouteStop icon={gatewayIcon} label="נמל יעד" value={destPort || "—"} />
+                  {!isDomestic && (
+                    <>
+                      <RouteStop icon={gatewayIcon} label="שער יציאה" value={originPort || "—"} />
+                      <RouteStop icon={gatewayIcon} label="נמל יעד" value={destPort || "—"} />
+                    </>
+                  )}
                   <RouteStop
                     icon={originIcon}
                     label="מסירה"
@@ -461,13 +466,13 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
 
         {/* Info icon row */}
         {v.info && (
-          <div className="grid grid-cols-2 gap-4 rounded-xl border p-4 sm:grid-cols-3 lg:grid-cols-6" style={{ breakInside: "avoid" }}>
-            <DocField label="Incoterms" value={str(q.incoterm)} />
+          <div className={`grid grid-cols-2 gap-4 rounded-xl border p-4 ${isDomestic ? "sm:grid-cols-2" : "sm:grid-cols-3 lg:grid-cols-6"}`} style={{ breakInside: "avoid" }}>
+            {!isDomestic && <DocField label="Incoterms" value={str(q.incoterm)} />}
             <DocField label="סוג העברה" value={moveType} />
-            <DocField label="שיטת שילוח" value={SHIPMENT_MODE_LABEL[str(q.shipment_mode)] ?? str(q.shipment_mode)} />
+            {!isDomestic && <DocField label="שיטת שילוח" value={SHIPMENT_MODE_LABEL[str(q.shipment_mode)] ?? str(q.shipment_mode)} />}
             <DocField label="זמן מעבר משוער" value={transitDaysLabel} />
-            <DocField label="חברת תעופה" value={str(q.airline)} />
-            <DocField label="דרך" value={transitPorts.length > 0 ? transitPorts.join(" · ") : "ישיר"} />
+            {!isDomestic && <DocField label="חברת תעופה" value={str(q.airline)} />}
+            {!isDomestic && <DocField label="דרך" value={transitPorts.length > 0 ? transitPorts.join(" · ") : "ישיר"} />}
           </div>
         )}
 
