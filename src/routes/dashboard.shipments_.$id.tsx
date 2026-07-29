@@ -84,6 +84,7 @@ type Form = {
   total: string;
   blNumber: string;
   houseBlNumber: string;
+  unifreightNumber: string;
   pricingItems: PricingItemForm[];
   pricingNotes: string;
   dropType: DropTypeId | null;
@@ -326,6 +327,7 @@ function CaseDetail() {
       total: caseRow.total != null ? String(caseRow.total) : "",
       blNumber: toText(payload.blNumber),
       houseBlNumber: toText(payload.houseBlNumber),
+      unifreightNumber: toText(payload.unifreightNumber),
       pricingItems,
       pricingNotes: toText(payload.pricingNotes),
       dropType,
@@ -468,6 +470,7 @@ function CaseDetail() {
               ...originalPayload,
               blNumber: form.blNumber.trim() || null,
               houseBlNumber: form.houseBlNumber.trim() || null,
+              unifreightNumber: form.unifreightNumber.trim() || null,
               pricingItems: normalizedPricingItems(),
               pricingNotes: form.pricingNotes.trim() || null,
               dropType: form.dropType,
@@ -526,6 +529,17 @@ function CaseDetail() {
               </Link>
             </p>
           )}
+          {form ? (
+            <div className="mt-2 flex items-center gap-2">
+              <Label className="whitespace-nowrap text-xs text-muted-foreground">מס' תיק ביוניפרייט</Label>
+              <Input
+                value={form.unifreightNumber}
+                onChange={(e) => upd("unifreightNumber", e.target.value)}
+                placeholder="לדוגמה: UF-12345"
+                className="h-8 w-40 text-sm"
+              />
+            </div>
+          ) : null}
         </div>
         {form && caseRow ? (
           <ActionButtonGroup onSave={handleSave} saving={saving} />
