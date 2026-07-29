@@ -4,8 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
-  ArrowLeft,
-  MapPin,
   PackageCheck,
   RadioTower,
 } from "lucide-react";
@@ -29,7 +27,6 @@ import {
 } from "@/lib/operations.functions";
 import { listMyQuotes } from "@/lib/quotes.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
-import { AIRPORTS } from "@/lib/airports";
 
 export const Route = createFileRoute("/dashboard/operations")({
   head: () => ({
@@ -114,51 +111,6 @@ function initials(name: string | null): string {
   return parts.slice(0, 2).map((p) => p[0]).join("").toUpperCase();
 }
 
-// Rough country centroids (percent of the panel, same 0-100 scheme as the
-// continent silhouettes below) — used to place ANY airport/port code
-// roughly in the right part of the world by looking up its country via
-// src/lib/airports.ts, since we don't have real per-airport coordinates.
-// This is still schematic, not a real map projection.
-const COUNTRY_POS: Record<string, { x: number; y: number }> = {
-  US: { x: 16, y: 36 }, CA: { x: 18, y: 18 }, MX: { x: 13, y: 50 },
-  BR: { x: 28, y: 68 }, AR: { x: 24, y: 80 }, CL: { x: 20, y: 78 },
-  GB: { x: 45, y: 20 }, IE: { x: 42, y: 20 }, FR: { x: 46, y: 28 },
-  DE: { x: 49, y: 23 }, NL: { x: 47, y: 21 }, BE: { x: 47, y: 22 },
-  IT: { x: 50, y: 33 }, ES: { x: 42, y: 35 }, PT: { x: 39, y: 35 },
-  CH: { x: 48, y: 27 }, PL: { x: 51, y: 21 }, RU: { x: 66, y: 14 },
-  IL: { x: 57, y: 44 }, AE: { x: 63, y: 49 }, SA: { x: 59, y: 51 },
-  TR: { x: 54, y: 34 }, EG: { x: 54, y: 49 }, ZA: { x: 52, y: 78 },
-  IN: { x: 68, y: 54 }, CN: { x: 78, y: 34 }, JP: { x: 88, y: 31 },
-  KR: { x: 84, y: 31 }, SG: { x: 77, y: 62 }, HK: { x: 81, y: 47 },
-  TH: { x: 74, y: 57 }, VN: { x: 75, y: 57 }, ID: { x: 77, y: 69 },
-  AU: { x: 85, y: 74 }, NZ: { x: 92, y: 82 },
-};
-
-function hashCode(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h;
-}
-
-// Resolve a port code to a plotting position: known country centroid (with a
-// small deterministic jitter so airports sharing a country don't fully
-// overlap), or a deterministic pseudo-random fallback if the code isn't in
-// the airports table at all.
-function getPortPos(code: string): { x: number; y: number } {
-  const h = hashCode(code);
-  const airport = AIRPORTS.find((a) => a.iata === code);
-  const base = airport ? COUNTRY_POS[airport.iso2] : undefined;
-  if (base) {
-    const jitterX = (h % 7) - 3;
-    const jitterY = ((h >> 3) % 7) - 3;
-    return {
-      x: Math.min(96, Math.max(4, base.x + jitterX)),
-      y: Math.min(90, Math.max(8, base.y + jitterY)),
-    };
-  }
-  return { x: 10 + (h % 80), y: 12 + ((h >> 4) % 70) };
-}
-
 function OperationsDashboard() {
   const listCasesFn = useServerFn(listCases);
   const listMyQuotesFn = useServerFn(listMyQuotes);
@@ -216,47 +168,6 @@ function OperationsDashboard() {
     () => [...filteredCases].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 5),
     [filteredCases],
   );
-
-  // Each active case's real route: origin → transit stops → destination, in
-  // order, exactly as defined on the case. Used both for the node counts and
-  // for drawing one connector per leg per case.
-  const caseRoutes = useMemo(() => {
-    return activeCases
-      .map((c) => {
-        const path = [c.origin_port, ...(c.transit_ports ?? []), c.dest_port]
-          .map((p) => p?.trim().toUpperCase())
-          .filter((p): p is string => Boolean(p));
-        return { id: c.id, path };
-      })
-      .filter((r) => r.path.length >= 2);
-  }, [activeCases]);
-
-  const mapPoints = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of caseRoutes) {
-      for (const code of r.path) counts.set(code, (counts.get(code) ?? 0) + 1);
-    }
-    return Array.from(counts.entries()).map(([code, count]) => ({ code, count, ...getPortPos(code) }));
-  }, [caseRoutes]);
-
-  const posByCode = useMemo(() => {
-    const map = new Map<string, { x: number; y: number }>();
-    for (const p of mapPoints) map.set(p.code, { x: p.x, y: p.y });
-    return map;
-  }, [mapPoints]);
-
-  // One segment per leg per case (capped to keep the SVG light).
-  const routeSegments = useMemo(() => {
-    const segments: { key: string; from: { x: number; y: number }; to: { x: number; y: number } }[] = [];
-    for (const r of caseRoutes.slice(0, 25)) {
-      for (let i = 0; i < r.path.length - 1; i++) {
-        const from = posByCode.get(r.path[i]);
-        const to = posByCode.get(r.path[i + 1]);
-        if (from && to) segments.push({ key: `${r.id}-${i}`, from, to });
-      }
-    }
-    return segments;
-  }, [caseRoutes, posByCode]);
 
   const activeShipments = useMemo(
     () => [...activeCases].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 6),
@@ -380,8 +291,8 @@ function OperationsDashboard() {
             </div>
           </div>
 
-          {/* Active shipments / map row */}
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {/* Active shipments */}
+          <div className="grid grid-cols-1 gap-4">
             <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
               <div className="border-b p-4 text-sm font-semibold">משלוחים פעילים</div>
               <Table>
@@ -435,68 +346,6 @@ function OperationsDashboard() {
                   לכל המשלוחים הפעילים
                 </Link>
               </div>
-            </div>
-
-            <div className="rounded-2xl border bg-card p-4 shadow-sm">
-              <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-                <MapPin className="h-4 w-4 text-muted-foreground" /> מפת משלוחים פעילים
-              </div>
-              <div className="relative h-56 overflow-hidden rounded-xl border bg-accent/5 dark:bg-muted">
-                <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
-                  {/* Stylized continent silhouettes — decorative, not a real projection */}
-                  <g className="fill-muted-foreground/25">
-                    <ellipse cx="15" cy="25" rx="10" ry="8" />
-                    <ellipse cx="22" cy="33" rx="7" ry="10" />
-                    <ellipse cx="23" cy="60" rx="6" ry="13" />
-                    <ellipse cx="48" cy="20" rx="6" ry="5" />
-                    <ellipse cx="50" cy="46" rx="8" ry="15" />
-                    <ellipse cx="68" cy="30" rx="18" ry="12" />
-                    <ellipse cx="76" cy="46" rx="12" ry="10" />
-                    <ellipse cx="85" cy="68" rx="7" ry="5" />
-                  </g>
-                  {routeSegments.map((seg) => {
-                    const mx = (seg.from.x + seg.to.x) / 2;
-                    const my = Math.min(seg.from.y, seg.to.y) - 8;
-                    return (
-                      <path
-                        key={seg.key}
-                        d={`M ${seg.from.x} ${seg.from.y} Q ${mx} ${my} ${seg.to.x} ${seg.to.y}`}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={0.5}
-                        strokeDasharray="1.6 1.6"
-                        className="text-primary/60"
-                      />
-                    );
-                  })}
-                </svg>
-                {mapPoints.length === 0 ? (
-                  <div className="relative flex h-full items-center justify-center text-xs text-muted-foreground">
-                    אין נתוני מסלול להצגה
-                  </div>
-                ) : (
-                  mapPoints.map((p) => (
-                    <div
-                      key={p.code}
-                      className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-1"
-                      style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                    >
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-primary text-xs font-bold text-primary-foreground shadow-md">
-                        {p.count}
-                      </span>
-                      <span className="rounded bg-background/90 px-1.5 text-[10px] font-medium text-foreground shadow-sm">
-                        {p.code}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-              <Link
-                to="/dashboard/shipments"
-                className="mt-2 flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                <ArrowLeft className="h-3 w-3" /> למעקב מפורט
-              </Link>
             </div>
           </div>
         </>
