@@ -80,9 +80,19 @@ function getBlNumber(payload: unknown): string | null {
   return typeof raw === "string" && raw.trim() ? raw.trim() : null;
 }
 
+// The scheduled pickup/distribution date is set on the case detail page's
+// "העבר לאיסוף/הפצה" action (payload.pickupDueDate) — this is what the
+// date filter below should key off, not the shipment's arrive_date (which
+// is the port/destination ETA, a different date entirely).
+function getPickupDueDate(payload: unknown): string | null {
+  const p = isRecord(payload) ? payload : {};
+  const raw = p.pickupDueDate;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
+
 const PICKUP_STAGE: CasePipelineStatus = "ready_for_pickup";
 
-// ETA date-filter options — filters rows by c.arrive_date.
+// Date-filter options — filters rows by payload.pickupDueDate ("מועד לביצוע").
 type DateFilter = "all" | "today" | "tomorrow" | "next_week" | "custom";
 
 const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
@@ -156,8 +166,9 @@ function PickupDistributionPage() {
   const dateFilteredCases = useMemo(() => {
     if (!dateRange) return pickupCases;
     return pickupCases.filter((c) => {
-      if (!c.arrive_date) return false;
-      const d = new Date(c.arrive_date);
+      const dueDate = getPickupDueDate(c.payload);
+      if (!dueDate) return false;
+      const d = new Date(dueDate);
       return d >= dateRange.from && d <= dateRange.to;
     });
   }, [pickupCases, dateRange]);
@@ -260,7 +271,7 @@ function PickupDistributionPage() {
                       <TableHead className="text-right">נציג מטפל</TableHead>
                       <TableHead className="text-right">מס' שטר מטען</TableHead>
                       <TableHead className="text-right">סטטוס</TableHead>
-                      <TableHead className="text-right">ETA</TableHead>
+                      <TableHead className="text-right">מועד לביצוע</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -274,6 +285,7 @@ function PickupDistributionPage() {
                       kindCases.map((c) => {
                         const rep = getAssignedRep(c.payload);
                         const blNumber = getBlNumber(c.payload);
+                        const dueDate = getPickupDueDate(c.payload);
                         return (
                           <TableRow key={c.id}>
                             <TableCell className="text-xs">
@@ -293,7 +305,7 @@ function PickupDistributionPage() {
                               <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
-                              {c.arrive_date ? new Date(c.arrive_date).toLocaleDateString("he-IL") : "—"}
+                              {dueDate ? new Date(dueDate).toLocaleDateString("he-IL") : "—"}
                             </TableCell>
                           </TableRow>
                         );
