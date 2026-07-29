@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, Plus, Save, Trash2, UserRound } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Check, Plus, Save, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -235,7 +235,8 @@ function CaseDetail() {
   });
 
   const statusMutation = useMutation({
-    mutationFn: (status: CasePipelineStatus) => updateCasePipelineStatusFn({ data: { id, status } }),
+    mutationFn: (input: { status: CasePipelineStatus; extra?: Record<string, unknown> }) =>
+      updateCasePipelineStatusFn({ data: { id, status: input.status, extra: input.extra } }),
     onSuccess: () => {
       toast.success("סטטוס התיק עודכן");
       queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
@@ -274,6 +275,21 @@ function CaseDetail() {
   const [form, setForm] = useState<Form | null>(null);
   const [originalPayload, setOriginalPayload] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
+
+  const [pickupDueDate, setPickupDueDate] = useState("");
+  useEffect(() => {
+    if (!caseRow) return;
+    const raw = casePayload.pickupDueDate;
+    setPickupDueDate(typeof raw === "string" ? raw : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseRow]);
+
+  function handleTransferToPickup() {
+    statusMutation.mutate(
+      { status: "ready_for_pickup", extra: { pickupDueDate: pickupDueDate || null } },
+      { onSuccess: () => navigate({ to: "/dashboard/pickup-distribution" }) },
+    );
+  }
 
   useEffect(() => {
     if (!caseRow) return;
@@ -571,7 +587,7 @@ function CaseDetail() {
             <div className="mb-3 text-sm font-semibold">סטטוס תיק</div>
             <Select
               value={currentPipelineStatus}
-              onValueChange={(v) => statusMutation.mutate(v as CasePipelineStatus)}
+              onValueChange={(v) => statusMutation.mutate({ status: v as CasePipelineStatus })}
               disabled={statusMutation.isPending}
             >
               <SelectTrigger className="max-w-md">
@@ -593,6 +609,27 @@ function CaseDetail() {
             <p className="mt-2 text-xs text-muted-foreground">
               {CASE_PIPELINE_STATUS_META[currentPipelineStatus].description}
             </p>
+
+            <div className="mt-4 flex flex-wrap items-end gap-3 border-t pt-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">מועד לביצוע</Label>
+                <Input
+                  type="date"
+                  value={pickupDueDate}
+                  onChange={(e) => setPickupDueDate(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                onClick={handleTransferToPickup}
+                disabled={statusMutation.isPending}
+              >
+                <ArrowLeftRight className="h-4 w-4" /> העבר לאיסוף/הפצה
+              </Button>
+            </div>
           </div>
 
           {form.shipmentKind !== "domestic" && (

@@ -307,7 +307,7 @@ export const CASE_PIPELINE_STATUS_ORDER: CasePipelineStatus[] = [
 
 export const updateCasePipelineStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string; status: CasePipelineStatus }) => {
+  .inputValidator((input: { id: string; status: CasePipelineStatus; extra?: Record<string, unknown> }) => {
     if (!input?.id || typeof input.id !== "string") throw new Error("id is required");
     if (!CASE_PIPELINE_STATUS_ORDER.includes(input.status)) {
       throw new Error("status must be one of " + CASE_PIPELINE_STATUS_ORDER.join(", "));
@@ -328,7 +328,11 @@ export const updateCasePipelineStatus = createServerFn({ method: "POST" })
       existing.payload && typeof existing.payload === "object" && !Array.isArray(existing.payload)
         ? (existing.payload as Record<string, unknown>)
         : {};
-    const nextPayload = { ...payload, pipelineStatus: data.status };
+    // `extra` lets callers piggyback a small payload patch onto the same
+    // read-modify-write (e.g. a scheduled pickup date set together with the
+    // "ready for pickup" transition), avoiding a second round trip that
+    // could race with this one.
+    const nextPayload = { ...payload, pipelineStatus: data.status, ...(data.extra ?? {}) };
     const coarse = CASE_PIPELINE_STATUS_META[data.status].coarse;
 
     const { data: row, error } = await supabase
