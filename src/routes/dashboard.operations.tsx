@@ -6,6 +6,10 @@ import {
   AlertTriangle,
   PackageCheck,
   RadioTower,
+  Plane,
+  Ship,
+  PackageOpen,
+  Truck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -52,6 +56,7 @@ type CaseRow = {
   origin_port: string | null;
   dest_port: string | null;
   transit_ports: string[] | null;
+  shipment_kind: string | null;
   arrive_date: string | null;
   created_at: string;
   updated_at: string;
@@ -70,6 +75,30 @@ function getAssignedRep(c: CaseRow): CaseRep {
   return isRecord(rep) && typeof rep.id === "string" && rep.id
     ? { id: String(rep.id), name: String(rep.name ?? ""), role: String(rep.role ?? "") }
     : null;
+}
+
+// BL number lives in payload.blNumber (JSONB) — same read pattern as the
+// case detail page, since there's no dedicated column.
+function getBlNumber(c: CaseRow): string | null {
+  const payload = isRecord(c.payload) ? c.payload : {};
+  const raw = payload.blNumber;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
+
+// Same four categories as step 1 of the New Quote wizard ("סוג משלוח") — a
+// case inherits its shipment_kind from the quote it was transferred from.
+const SHIP_KIND_ORDER = ["export", "import", "distribution", "domestic"] as const;
+type ShipKindValue = (typeof SHIP_KIND_ORDER)[number];
+
+const SHIP_KIND_CONFIG: Record<ShipKindValue, { label: string; icon: typeof Truck; badgeClass: string }> = {
+  export: { label: "ייצוא", icon: Plane, badgeClass: "bg-primary/10 text-primary" },
+  import: { label: "ייבוא", icon: Ship, badgeClass: "bg-accent/15 text-accent" },
+  distribution: { label: "משלוחי דרופ", icon: PackageOpen, badgeClass: "bg-success/15 text-success" },
+  domestic: { label: "פנים ארצי", icon: Truck, badgeClass: "bg-warning/15 text-warning" },
+};
+
+function isShipKind(v: string | null | undefined): v is ShipKindValue {
+  return !!v && (SHIP_KIND_ORDER as readonly string[]).includes(v);
 }
 
 const REP_FILTER_ALL = "all";
@@ -300,6 +329,9 @@ function OperationsDashboard() {
                   <TableRow>
                     <TableHead className="text-right">לקוח</TableHead>
                     <TableHead className="text-right">מס' תיק</TableHead>
+                    <TableHead className="text-right">סוג משלוח</TableHead>
+                    <TableHead className="text-right">נציג מטפל</TableHead>
+                    <TableHead className="text-right">מס' שטר מטען</TableHead>
                     <TableHead className="text-right">סטטוס</TableHead>
                     <TableHead className="text-right">ETA</TableHead>
                   </TableRow>
@@ -307,13 +339,15 @@ function OperationsDashboard() {
                 <TableBody>
                   {activeShipments.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
                         אין משלוחים פעילים
                       </TableCell>
                     </TableRow>
                   ) : (
                     activeShipments.map((c) => {
                       const meta = CASE_PIPELINE_STATUS_META[getPipelineStatus(c)];
+                      const rep = getAssignedRep(c);
+                      const blNumber = getBlNumber(c);
                       return (
                         <TableRow key={c.id}>
                           <TableCell className="text-xs">
@@ -329,6 +363,26 @@ function OperationsDashboard() {
                               {c.case_code}
                             </Link>
                           </TableCell>
+                          <TableCell className="text-xs">
+                            {isShipKind(c.shipment_kind) ? (
+                              <span
+                                className={cn(
+                                  "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+                                  SHIP_KIND_CONFIG[c.shipment_kind].badgeClass,
+                                )}
+                              >
+                                {(() => {
+                                  const Icon = SHIP_KIND_CONFIG[c.shipment_kind as ShipKindValue].icon;
+                                  return <Icon className="h-3 w-3" />;
+                                })()}
+                                {SHIP_KIND_CONFIG[c.shipment_kind as ShipKindValue].label}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
                           <TableCell>
                             <Badge className={STATUS_BADGE_CLASS[c.status]}>{meta.label}</Badge>
                           </TableCell>
