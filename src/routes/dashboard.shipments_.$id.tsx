@@ -839,40 +839,7 @@ function CaseDetail() {
             )}
           </Section>
 
-          <Section title="מעקב CritiLog">
-            <Field label="מספר מעקב (CritiLog)">
-              <Input value={form.critilog.name} onChange={(e) => updCl("name", e.target.value)} />
-            </Field>
-            <Field label="איש שירות (CritiLog)">
-              <Input value={form.critilog.serviceRep} onChange={(e) => updCl("serviceRep", e.target.value)} />
-            </Field>
-            <Field label="שטר מטען (CritiLog)">
-              <Input value={form.critilog.blNumber} onChange={(e) => updCl("blNumber", e.target.value)} />
-            </Field>
-            <Field label="לקוח (CritiLog)">
-              <Input value={form.critilog.customer} onChange={(e) => updCl("customer", e.target.value)} />
-            </Field>
-            <Field label="REF (CritiLog)">
-              <Input value={form.critilog.ref} onChange={(e) => updCl("ref", e.target.value)} />
-            </Field>
-            <Field label="ניתוב (CritiLog)">
-              <Input value={form.critilog.route} onChange={(e) => updCl("route", e.target.value)} placeholder="לדוגמה: YYZ-TLV" />
-            </Field>
-            <Field label="סוג">
-              <Input value={form.critilog.type} onChange={(e) => updCl("type", e.target.value)} />
-            </Field>
-            <Field label="סטטוס לבדיקה">
-              <Input value={form.critilog.reviewStatus} onChange={(e) => updCl("reviewStatus", e.target.value)} />
-            </Field>
-            <Field label="איסוף/מסירה בישראל">
-              <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => updCl("pickupIsrael", e.target.value)} />
-            </Field>
-            <Field label="איסוף/מסירה בחול">
-              <Input type="date" value={form.critilog.pickupAbroad} onChange={(e) => updCl("pickupAbroad", e.target.value)} />
-            </Field>
-            <Field label="בלדר">
-              <Input value={form.critilog.courier} onChange={(e) => updCl("courier", e.target.value)} />
-            </Field>
+          <Section title="מעקב">
             <Field label="כיסוי">
               <div className="flex h-9 items-center gap-4 text-sm">
                 <label className="flex items-center gap-1.5">
@@ -895,10 +862,43 @@ function CaseDetail() {
                 </label>
               </div>
             </Field>
+            <Field label="מספר מעקב">
+              <Input value={form.critilog.name} onChange={(e) => updCl("name", e.target.value)} />
+            </Field>
+            <Field label="איש שירות">
+              <Input value={form.critilog.serviceRep} onChange={(e) => updCl("serviceRep", e.target.value)} />
+            </Field>
+            <Field label="שטר מטען">
+              <Input value={form.critilog.blNumber} onChange={(e) => updCl("blNumber", e.target.value)} />
+            </Field>
+            <Field label="לקוח">
+              <Input value={form.critilog.customer} onChange={(e) => updCl("customer", e.target.value)} />
+            </Field>
+            <Field label="REF">
+              <Input value={form.critilog.ref} onChange={(e) => updCl("ref", e.target.value)} />
+            </Field>
+            <Field label="ניתוב">
+              <Input value={form.critilog.route} onChange={(e) => updCl("route", e.target.value)} placeholder="לדוגמה: YYZ-TLV" />
+            </Field>
+            <Field label="סוג">
+              <Input value={form.critilog.type} onChange={(e) => updCl("type", e.target.value)} />
+            </Field>
+            <Field label="סטטוס לבדיקה">
+              <Input value={form.critilog.reviewStatus} onChange={(e) => updCl("reviewStatus", e.target.value)} />
+            </Field>
+            <Field label="איסוף/מסירה בישראל">
+              <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => updCl("pickupIsrael", e.target.value)} />
+            </Field>
+            <Field label="איסוף/מסירה בחול">
+              <Input type="date" value={form.critilog.pickupAbroad} onChange={(e) => updCl("pickupAbroad", e.target.value)} />
+            </Field>
+            <Field label="בלדר">
+              <Input value={form.critilog.courier} onChange={(e) => updCl("courier", e.target.value)} />
+            </Field>
           </Section>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-4 text-sm font-semibold">הערות ועדכונים — CritiLog</div>
+            <div className="mb-4 text-sm font-semibold">הערות ועדכונים</div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">לתפעול</Label>
@@ -909,7 +909,7 @@ function CaseDetail() {
                 <Textarea value={form.critilog.dutyUpdates} onChange={(e) => updCl("dutyUpdates", e.target.value)} rows={3} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">הערות (CritiLog)</Label>
+                <Label className="text-xs text-muted-foreground">הערות</Label>
                 <Textarea value={form.critilog.notes} onChange={(e) => updCl("notes", e.target.value)} rows={3} />
               </div>
             </div>
