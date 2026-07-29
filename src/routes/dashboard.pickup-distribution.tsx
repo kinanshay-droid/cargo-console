@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -142,6 +142,7 @@ function resolveDateRange(filter: DateFilter, customFrom: string, customTo: stri
 }
 
 function PickupDistributionPage() {
+  const navigate = useNavigate();
   const listCasesFn = useServerFn(listCases);
 
   const { data: cases = [], isLoading } = useQuery({
@@ -287,7 +288,11 @@ function PickupDistributionPage() {
                         const blNumber = getBlNumber(c.payload);
                         const dueDate = getPickupDueDate(c.payload);
                         return (
-                          <TableRow key={c.id}>
+                          <TableRow
+                            key={c.id}
+                            onClick={() => navigate({ to: "/dashboard/shipments/$id", params: { id: c.id } })}
+                            className="cursor-pointer hover:bg-muted/40"
+                          >
                             <TableCell className="text-xs">
                               <div className="font-medium">{c.customer_name ?? "—"}</div>
                               {c.customer_ref ? (
@@ -295,7 +300,12 @@ function PickupDistributionPage() {
                               ) : null}
                             </TableCell>
                             <TableCell className="font-mono text-xs">
-                              <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
+                              <Link
+                                to="/dashboard/shipments/$id"
+                                params={{ id: c.id }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-primary hover:underline"
+                              >
                                 {getCaseDisplayCode(c.payload, c.case_code)}
                               </Link>
                             </TableCell>
