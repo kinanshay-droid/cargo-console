@@ -1,11 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck, CalendarRange } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -74,6 +82,55 @@ function getBlNumber(payload: unknown): string | null {
 
 const PICKUP_STAGE: CasePipelineStatus = "ready_for_pickup";
 
+// ETA date-filter options — filters rows by c.arrive_date.
+type DateFilter = "all" | "today" | "tomorrow" | "next_week" | "custom";
+
+const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: "all", label: "כל התאריכים" },
+  { value: "today", label: "היום" },
+  { value: "tomorrow", label: "מחר" },
+  { value: "next_week", label: "השבוע הבא" },
+  { value: "custom", label: "טווח מותאם אישית" },
+];
+
+function startOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function endOfDay(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(23, 59, 59, 999);
+  return x;
+}
+
+// Resolves the active quick-filter (or custom from/to inputs) to a concrete
+// [from, to] window. Returns null for "all" (no filtering).
+function resolveDateRange(filter: DateFilter, customFrom: string, customTo: string): { from: Date; to: Date } | null {
+  const today = startOfDay(new Date());
+  if (filter === "today") return { from: today, to: endOfDay(today) };
+  if (filter === "tomorrow") {
+    const t = new Date(today);
+    t.setDate(t.getDate() + 1);
+    return { from: t, to: endOfDay(t) };
+  }
+  if (filter === "next_week") {
+    const from = new Date(today);
+    from.setDate(from.getDate() + 1);
+    const to = new Date(today);
+    to.setDate(to.getDate() + 7);
+    return { from, to: endOfDay(to) };
+  }
+  if (filter === "custom") {
+    if (!customFrom && !customTo) return null;
+    const from = customFrom ? startOfDay(new Date(customFrom)) : new Date(0);
+    const to = customTo ? endOfDay(new Date(customTo)) : endOfDay(new Date(today.getFullYear() + 50, 0, 1));
+    return { from, to };
+  }
+  return null;
+}
+
 function PickupDistributionPage() {
   const listCasesFn = useServerFn(listCases);
 
@@ -87,16 +144,34 @@ function PickupDistributionPage() {
     [cases],
   );
 
+  const [dateFilter, setDateFilter] = useState<DateFilter>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+
+  const dateRange = useMemo(
+    () => resolveDateRange(dateFilter, customFrom, customTo),
+    [dateFilter, customFrom, customTo],
+  );
+
+  const dateFilteredCases = useMemo(() => {
+    if (!dateRange) return pickupCases;
+    return pickupCases.filter((c) => {
+      if (!c.arrive_date) return false;
+      const d = new Date(c.arrive_date);
+      return d >= dateRange.from && d <= dateRange.to;
+    });
+  }, [pickupCases, dateRange]);
+
   // Split the pickup/distribution list into one group per shipment kind, so
   // each kind (ייצוא/ייבוא/משלוחי דרופ/פנים ארצי) is shown separately —
   // same pattern as the Operations dashboard's active-shipments panel.
   const pickupCasesByKind = useMemo(() => {
-    const groups: Record<ShipKindValue, typeof pickupCases> = { export: [], import: [], distribution: [], domestic: [] };
-    for (const c of pickupCases) {
+    const groups: Record<ShipKindValue, typeof dateFilteredCases> = { export: [], import: [], distribution: [], domestic: [] };
+    for (const c of dateFilteredCases) {
       if (isShipKind(c.shipment_kind)) groups[c.shipment_kind].push(c);
     }
     return groups;
-  }, [pickupCases]);
+  }, [dateFilteredCases]);
 
   return (
     <div dir="rtl" className="space-y-6">
@@ -112,9 +187,50 @@ function PickupDistributionPage() {
           </span>
           <div>
             <div className="text-sm/6 opacity-90">מוכנים לאיסוף/הפצה</div>
-            <div className="text-2xl font-bold">{pickupCases.length}</div>
+            <div className="text-2xl font-bold">{dateFilteredCases.length}</div>
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <CalendarRange className="h-4 w-4" />
+          תצוגה לפי תאריך
+        </div>
+        <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {DATE_FILTER_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {dateFilter === "custom" ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              מתאריך
+              <Input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="w-40"
+              />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              עד תאריך
+              <Input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="w-40"
+              />
+            </label>
+          </div>
+        ) : null}
       </div>
 
       {isLoading ? (
