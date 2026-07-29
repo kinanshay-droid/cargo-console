@@ -85,6 +85,9 @@ type Form = {
   blNumber: string;
   houseBlNumber: string;
   unifreightNumber: string;
+  invoiceNumber: string;
+  reference: string;
+  notes: string;
   pricingItems: PricingItemForm[];
   pricingNotes: string;
   dropType: DropTypeId | null;
@@ -328,6 +331,9 @@ function CaseDetail() {
       blNumber: toText(payload.blNumber),
       houseBlNumber: toText(payload.houseBlNumber),
       unifreightNumber: toText(payload.unifreightNumber),
+      invoiceNumber: toText(payload.invoiceNumber),
+      reference: toText(payload.reference),
+      notes: toText(payload.notes),
       pricingItems,
       pricingNotes: toText(payload.pricingNotes),
       dropType,
@@ -471,6 +477,9 @@ function CaseDetail() {
               blNumber: form.blNumber.trim() || null,
               houseBlNumber: form.houseBlNumber.trim() || null,
               unifreightNumber: form.unifreightNumber.trim() || null,
+              invoiceNumber: form.invoiceNumber.trim() || null,
+              reference: form.reference.trim() || null,
+              notes: form.notes.trim() || null,
               pricingItems: normalizedPricingItems(),
               pricingNotes: form.pricingNotes.trim() || null,
               dropType: form.dropType,
@@ -604,6 +613,34 @@ function CaseDetail() {
               </Field>
             </Section>
           )}
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-3 text-sm font-semibold">פרטי חשבונית ורפרנס</div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="מספר חשבונית">
+                <Input
+                  value={form.invoiceNumber}
+                  onChange={(e) => upd("invoiceNumber", e.target.value)}
+                  placeholder="לדוגמה: INV-10234"
+                />
+              </Field>
+              <Field label="רפרנס">
+                <Input
+                  value={form.reference}
+                  onChange={(e) => upd("reference", e.target.value)}
+                  placeholder="רפרנס פנימי..."
+                />
+              </Field>
+            </div>
+            <div className="mt-4 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">הערות</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(e) => setForm((f) => (f ? { ...f, notes: e.target.value } : f))}
+                rows={3}
+              />
+            </div>
+          </div>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
