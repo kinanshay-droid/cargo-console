@@ -199,9 +199,21 @@ function OperationsDashboard() {
   );
 
   const activeShipments = useMemo(
-    () => [...activeCases].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 6),
+    () => [...activeCases].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()),
     [activeCases],
   );
+
+  // Split the active-shipments list into one group per shipment kind, so
+  // each kind (ייצוא/ייבוא/משלוחי דרופ/פנים ארצי) is shown separately.
+  const activeShipmentsByKind = useMemo(() => {
+    const groups: Record<ShipKindValue, CaseRow[]> = { export: [], import: [], distribution: [], domestic: [] };
+    const other: CaseRow[] = [];
+    for (const c of activeShipments) {
+      if (isShipKind(c.shipment_kind)) groups[c.shipment_kind].push(c);
+      else other.push(c);
+    }
+    return { groups, other };
+  }, [activeShipments]);
 
   return (
     <div dir="rtl" className="space-y-6">
@@ -320,87 +332,84 @@ function OperationsDashboard() {
             </div>
           </div>
 
-          {/* Active shipments */}
-          <div className="grid grid-cols-1 gap-4">
-            <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-              <div className="border-b p-4 text-sm font-semibold">משלוחים פעילים</div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-right">לקוח</TableHead>
-                    <TableHead className="text-right">מס' תיק</TableHead>
-                    <TableHead className="text-right">סוג משלוח</TableHead>
-                    <TableHead className="text-right">נציג מטפל</TableHead>
-                    <TableHead className="text-right">מס' שטר מטען</TableHead>
-                    <TableHead className="text-right">סטטוס</TableHead>
-                    <TableHead className="text-right">ETA</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeShipments.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-xs text-muted-foreground">
-                        אין משלוחים פעילים
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    activeShipments.map((c) => {
-                      const meta = CASE_PIPELINE_STATUS_META[getPipelineStatus(c)];
-                      const rep = getAssignedRep(c);
-                      const blNumber = getBlNumber(c);
-                      return (
-                        <TableRow key={c.id}>
-                          <TableCell className="text-xs">
-                            <div className="flex items-center gap-2">
-                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                                {initials(c.customer_name)}
-                              </span>
-                              <span className="truncate font-medium">{c.customer_name ?? "—"}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
-                              {c.case_code}
-                            </Link>
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {isShipKind(c.shipment_kind) ? (
-                              <span
-                                className={cn(
-                                  "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-                                  SHIP_KIND_CONFIG[c.shipment_kind].badgeClass,
-                                )}
-                              >
-                                {(() => {
-                                  const Icon = SHIP_KIND_CONFIG[c.shipment_kind as ShipKindValue].icon;
-                                  return <Icon className="h-3 w-3" />;
-                                })()}
-                                {SHIP_KIND_CONFIG[c.shipment_kind as ShipKindValue].label}
-                              </span>
-                            ) : (
-                              "—"
-                            )}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
-                          <TableCell>
-                            <Badge className={STATUS_BADGE_CLASS[c.status]}>{meta.label}</Badge>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
-                            {c.arrive_date ? new Date(c.arrive_date).toLocaleDateString("he-IL") : "—"}
+          {/* Active shipments, split by shipment kind */}
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {SHIP_KIND_ORDER.map((kind) => {
+              const kindCases = activeShipmentsByKind.groups[kind];
+              const shown = kindCases.slice(0, 6);
+              const conf = SHIP_KIND_CONFIG[kind];
+              const KindIcon = conf.icon;
+              return (
+                <div key={kind} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                  <div className="flex items-center justify-between border-b p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold">
+                      <span className={cn("flex h-7 w-7 items-center justify-center rounded-full", conf.badgeClass)}>
+                        <KindIcon className="h-3.5 w-3.5" />
+                      </span>
+                      {conf.label}
+                    </div>
+                    <Badge className={conf.badgeClass}>{kindCases.length}</Badge>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-right">לקוח</TableHead>
+                        <TableHead className="text-right">מס' תיק</TableHead>
+                        <TableHead className="text-right">נציג מטפל</TableHead>
+                        <TableHead className="text-right">מס' שטר מטען</TableHead>
+                        <TableHead className="text-right">סטטוס</TableHead>
+                        <TableHead className="text-right">ETA</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {shown.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
+                            אין משלוחים פעילים מסוג זה
                           </TableCell>
                         </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-              <div className="border-t p-3 text-center">
-                <Link to="/dashboard/shipments" className="text-xs font-medium text-primary hover:underline">
-                  לכל המשלוחים הפעילים
-                </Link>
-              </div>
-            </div>
+                      ) : (
+                        shown.map((c) => {
+                          const meta = CASE_PIPELINE_STATUS_META[getPipelineStatus(c)];
+                          const rep = getAssignedRep(c);
+                          const blNumber = getBlNumber(c);
+                          return (
+                            <TableRow key={c.id}>
+                              <TableCell className="text-xs">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                                    {initials(c.customer_name)}
+                                  </span>
+                                  <span className="truncate font-medium">{c.customer_name ?? "—"}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
+                                  {c.case_code}
+                                </Link>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
+                              <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
+                              <TableCell>
+                                <Badge className={STATUS_BADGE_CLASS[c.status]}>{meta.label}</Badge>
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {c.arrive_date ? new Date(c.arrive_date).toLocaleDateString("he-IL") : "—"}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                  <div className="border-t p-3 text-center">
+                    <Link to="/dashboard/shipments" className="text-xs font-medium text-primary hover:underline">
+                      לכל המשלוחים הפעילים
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </>
       )}
