@@ -103,6 +103,49 @@ type Form = {
   logisticsNotes: string;
   specialReq: string;
   extraNotes: string;
+  critilog: CritiLogForm;
+};
+
+// Mirrors the columns of the CritiLog tracking sheet operators work from
+// day-to-day, kept as its own nested payload.critilog object (rather than
+// flat top-level keys) so it doesn't collide with the case's own fields —
+// this is a separate, parallel tracking log, not a replacement for them.
+type CritiLogForm = {
+  name: string;
+  serviceRep: string;
+  blNumber: string;
+  customer: string;
+  ref: string;
+  route: string;
+  type: string;
+  reviewStatus: string;
+  opsNotes: string;
+  pickupIsrael: string;
+  dutyUpdates: string;
+  evening: boolean;
+  weekend: boolean;
+  courier: string;
+  notes: string;
+  pickupAbroad: string;
+};
+
+const EMPTY_CRITILOG: CritiLogForm = {
+  name: "",
+  serviceRep: "",
+  blNumber: "",
+  customer: "",
+  ref: "",
+  route: "",
+  type: "",
+  reviewStatus: "",
+  opsNotes: "",
+  pickupIsrael: "",
+  dutyUpdates: "",
+  evening: false,
+  weekend: false,
+  courier: "",
+  notes: "",
+  pickupAbroad: "",
 };
 
 type PricingItemForm = {
@@ -193,6 +236,27 @@ function parseServices(raw: unknown): Record<string, boolean> {
     if (v === true || v === "true") base[s.id] = true;
   }
   return base;
+}
+function parseCritiLog(raw: unknown): CritiLogForm {
+  if (!isRecord(raw)) return { ...EMPTY_CRITILOG };
+  return {
+    name: toText(raw.name),
+    serviceRep: toText(raw.serviceRep),
+    blNumber: toText(raw.blNumber),
+    customer: toText(raw.customer),
+    ref: toText(raw.ref),
+    route: toText(raw.route),
+    type: toText(raw.type),
+    reviewStatus: toText(raw.reviewStatus),
+    opsNotes: toText(raw.opsNotes),
+    pickupIsrael: toText(raw.pickupIsrael),
+    dutyUpdates: toText(raw.dutyUpdates),
+    evening: raw.evening === true,
+    weekend: raw.weekend === true,
+    courier: toText(raw.courier),
+    notes: toText(raw.notes),
+    pickupAbroad: toText(raw.pickupAbroad),
+  };
 }
 function parsePackages(raw: unknown): PackageRow[] {
   if (!Array.isArray(raw) || raw.length === 0) return [makePackageRow()];
@@ -365,11 +429,15 @@ function CaseDetail() {
       logisticsNotes: toText(payload.logisticsNotes),
       specialReq: toText(payload.specialReq),
       extraNotes: toText(payload.extraNotes),
+      critilog: parseCritiLog(payload.critilog),
     });
   }, [caseRow]);
 
   function upd<K extends keyof Form>(k: K, v: string) {
     setForm((f) => (f ? { ...f, [k]: v } : f));
+  }
+  function updCl<K extends keyof CritiLogForm>(k: K, v: CritiLogForm[K]) {
+    setForm((f) => (f ? { ...f, critilog: { ...f.critilog, [k]: v } } : f));
   }
   function updatePricingItem(id: string, key: PricingKey, value: string) {
     setForm((f) =>
@@ -510,6 +578,24 @@ function CaseDetail() {
               logisticsNotes: form.logisticsNotes.trim() || null,
               specialReq: form.specialReq.trim() || null,
               extraNotes: form.extraNotes.trim() || null,
+              critilog: {
+                name: form.critilog.name.trim() || null,
+                serviceRep: form.critilog.serviceRep.trim() || null,
+                blNumber: form.critilog.blNumber.trim() || null,
+                customer: form.critilog.customer.trim() || null,
+                ref: form.critilog.ref.trim() || null,
+                route: form.critilog.route.trim() || null,
+                type: form.critilog.type.trim() || null,
+                reviewStatus: form.critilog.reviewStatus.trim() || null,
+                opsNotes: form.critilog.opsNotes.trim() || null,
+                pickupIsrael: form.critilog.pickupIsrael || null,
+                dutyUpdates: form.critilog.dutyUpdates.trim() || null,
+                evening: form.critilog.evening,
+                weekend: form.critilog.weekend,
+                courier: form.critilog.courier.trim() || null,
+                notes: form.critilog.notes.trim() || null,
+                pickupAbroad: form.critilog.pickupAbroad || null,
+              },
               packages: form.packages.map((pkg) => ({
                 pallet: pkg.pallet,
                 customDims:
@@ -752,6 +838,82 @@ function CaseDetail() {
               </>
             )}
           </Section>
+
+          <Section title="מעקב CritiLog">
+            <Field label="מספר מעקב (CritiLog)">
+              <Input value={form.critilog.name} onChange={(e) => updCl("name", e.target.value)} />
+            </Field>
+            <Field label="איש שירות (CritiLog)">
+              <Input value={form.critilog.serviceRep} onChange={(e) => updCl("serviceRep", e.target.value)} />
+            </Field>
+            <Field label="שטר מטען (CritiLog)">
+              <Input value={form.critilog.blNumber} onChange={(e) => updCl("blNumber", e.target.value)} />
+            </Field>
+            <Field label="לקוח (CritiLog)">
+              <Input value={form.critilog.customer} onChange={(e) => updCl("customer", e.target.value)} />
+            </Field>
+            <Field label="REF (CritiLog)">
+              <Input value={form.critilog.ref} onChange={(e) => updCl("ref", e.target.value)} />
+            </Field>
+            <Field label="ניתוב (CritiLog)">
+              <Input value={form.critilog.route} onChange={(e) => updCl("route", e.target.value)} placeholder="לדוגמה: YYZ-TLV" />
+            </Field>
+            <Field label="סוג">
+              <Input value={form.critilog.type} onChange={(e) => updCl("type", e.target.value)} />
+            </Field>
+            <Field label="סטטוס לבדיקה">
+              <Input value={form.critilog.reviewStatus} onChange={(e) => updCl("reviewStatus", e.target.value)} />
+            </Field>
+            <Field label="איסוף/מסירה בישראל">
+              <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => updCl("pickupIsrael", e.target.value)} />
+            </Field>
+            <Field label="איסוף/מסירה בחול">
+              <Input type="date" value={form.critilog.pickupAbroad} onChange={(e) => updCl("pickupAbroad", e.target.value)} />
+            </Field>
+            <Field label="בלדר">
+              <Input value={form.critilog.courier} onChange={(e) => updCl("courier", e.target.value)} />
+            </Field>
+            <Field label="כיסוי">
+              <div className="flex h-9 items-center gap-4 text-sm">
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={form.critilog.evening}
+                    onChange={(e) => updCl("evening", e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  ערב
+                </label>
+                <label className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={form.critilog.weekend}
+                    onChange={(e) => updCl("weekend", e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                  סופ"ש
+                </label>
+              </div>
+            </Field>
+          </Section>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-4 text-sm font-semibold">הערות ועדכונים — CritiLog</div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">לתפעול</Label>
+                <Textarea value={form.critilog.opsNotes} onChange={(e) => updCl("opsNotes", e.target.value)} rows={3} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">עדכונים תורנות</Label>
+                <Textarea value={form.critilog.dutyUpdates} onChange={(e) => updCl("dutyUpdates", e.target.value)} rows={3} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">הערות (CritiLog)</Label>
+                <Textarea value={form.critilog.notes} onChange={(e) => updCl("notes", e.target.value)} rows={3} />
+              </div>
+            </div>
+          </div>
 
           <Section title="פיננסי">
             <Field label="מטבע">
