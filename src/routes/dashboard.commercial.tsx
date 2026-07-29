@@ -24,7 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { NewQuoteDialog } from "@/components/new-quote-dialog";
 import { listMyQuotes } from "@/lib/quotes.functions";
-import { listCases } from "@/lib/operations.functions";
+import { listCases, getCaseDisplayCode } from "@/lib/operations.functions";
 import { listCustomers } from "@/lib/customers.functions";
 import { TONE_BADGE, TONE_GRADIENT, TONE_OUTLINE_BUTTON } from "@/lib/theme";
 
@@ -243,7 +243,7 @@ function CommercialDashboard() {
           gradient={TONE_GRADIENT.accent}
           items={recentCases
             .slice(0, 3)
-            .map((c) => ({ code: c.case_code, client: c.customer_name, date: c.created_at }))}
+            .map((c) => ({ code: getCaseDisplayCode(c.payload, c.case_code), client: c.customer_name, date: c.created_at }))}
           footer={
             <Link to="/dashboard/shipments" dir="ltr" className={heroFooterCls}>
               <Briefcase className="h-3.5 w-3.5" /> לצפייה במשלוחים

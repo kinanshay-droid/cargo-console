@@ -28,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listCases, type CaseStatus } from "@/lib/operations.functions";
+import { listCases, getCaseDisplayCode, type CaseStatus } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
 
 // Same four categories as step 1 of the New Quote wizard ("סוג משלוח") — a
@@ -226,10 +226,10 @@ function ShipmentsDashboard() {
                           params={{ id: c.quote_id }}
                           className="text-primary underline-offset-2 hover:underline"
                         >
-                          {c.case_code}
+                          {getCaseDisplayCode(c.payload, c.case_code)}
                         </Link>
                       ) : (
-                        c.case_code
+                        getCaseDisplayCode(c.payload, c.case_code)
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
@@ -285,7 +285,7 @@ function StatusHeroCard({
 }: {
   status: CaseStatus;
   count: number;
-  items: { id: string; case_code: string; customer_name: string | null; created_at: string }[];
+  items: { id: string; case_code: string; customer_name: string | null; created_at: string; payload: unknown }[];
 }) {
   const meta = CASE_STATUS_META[status];
   const Icon = meta.icon;
@@ -310,7 +310,7 @@ function StatusHeroCard({
             >
               <span className="text-muted-foreground">{new Date(it.created_at).toLocaleDateString("he-IL")}</span>
               <span className="truncate font-medium">
-                {it.customer_name ? `${it.customer_name} · ` : ""}#{it.case_code}
+                {it.customer_name ? `${it.customer_name} · ` : ""}#{getCaseDisplayCode(it.payload, it.case_code)}
               </span>
             </Link>
           ))

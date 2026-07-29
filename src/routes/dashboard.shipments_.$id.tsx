@@ -503,7 +503,7 @@ function CaseDetail() {
           },
         },
       });
-      toast.success(`התיק ${res.case_code} נשמר`);
+      toast.success(`התיק ${form.unifreightNumber.trim() || res.case_code} נשמר`);
       queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
       queryClient.invalidateQueries({ queryKey: ["operations-cases"] });
     } catch (e) {
@@ -519,7 +519,7 @@ function CaseDetail() {
         <div>
           <div className="text-sm text-muted-foreground">משלוחים · תיק</div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
-            תיק {caseRow?.case_code ?? ""}
+            תיק {(form?.unifreightNumber.trim() || caseRow?.case_code) ?? ""}
           </h1>
           {caseRow?.quote_id && (
             <p className="mt-1 text-sm text-muted-foreground">

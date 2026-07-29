@@ -361,6 +361,19 @@ export const listServiceReps = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => SERVICE_REPS);
 
+// Once an operator records the case's Unifreight number (payload.unifreightNumber,
+// entered on the case detail page), that number becomes the case's displayed
+// identifier everywhere in the UI instead of the internal AFIK case_code.
+// The DB's case_code / id are still the real keys used for routing and
+// lookups — this only changes what's shown as "case number" on screen.
+export function getCaseDisplayCode(payload: unknown, fallbackCode: string): string {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const raw = (payload as Record<string, unknown>).unifreightNumber;
+    if (typeof raw === "string" && raw.trim()) return raw.trim();
+  }
+  return fallbackCode;
+}
+
 export type CaseRep = { id: string; name: string; role: string } | null;
 
 // Migration-free: the assigned rep is stored on the case's payload JSONB

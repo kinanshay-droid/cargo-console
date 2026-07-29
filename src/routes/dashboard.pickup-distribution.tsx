@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listCases, CASE_PIPELINE_STATUS_META, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
+import { listCases, CASE_PIPELINE_STATUS_META, getCaseDisplayCode, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
 
 export const Route = createFileRoute("/dashboard/pickup-distribution")({
@@ -284,7 +284,7 @@ function PickupDistributionPage() {
                             </TableCell>
                             <TableCell className="font-mono text-xs">
                               <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
-                                {c.case_code}
+                                {getCaseDisplayCode(c.payload, c.case_code)}
                               </Link>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>

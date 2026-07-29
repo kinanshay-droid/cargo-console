@@ -25,6 +25,7 @@ import {
   listCases,
   SERVICE_REPS,
   CASE_PIPELINE_STATUS_META,
+  getCaseDisplayCode,
   type CaseStatus,
   type CasePipelineStatus,
   type CaseRep,
@@ -277,7 +278,7 @@ function OperationsDashboard() {
                           <PackageCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                           <div>
                             <div className="text-xs font-medium">
-                              {meta.label} · {c.case_code}
+                              {meta.label} · {getCaseDisplayCode(c.payload, c.case_code)}
                             </div>
                             <div className="text-[11px] text-muted-foreground">
                               {c.customer_name ?? "—"} · {c.origin_port ?? "?"} → {c.dest_port ?? "?"}
@@ -318,7 +319,7 @@ function OperationsDashboard() {
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-xs font-semibold text-destructive">{meta.label}</div>
                           <div className="truncate text-[11px] text-muted-foreground">
-                            {c.case_code} · {c.origin_port ?? "?"} → {c.dest_port ?? "?"}
+                            {getCaseDisplayCode(c.payload, c.case_code)} · {c.origin_port ?? "?"} → {c.dest_port ?? "?"}
                           </div>
                         </div>
                         <span className="shrink-0 text-[11px] text-muted-foreground">
@@ -385,7 +386,7 @@ function OperationsDashboard() {
                               </TableCell>
                               <TableCell className="font-mono text-xs">
                                 <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
-                                  {c.case_code}
+                                  {getCaseDisplayCode(c.payload, c.case_code)}
                                 </Link>
                               </TableCell>
                               <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
