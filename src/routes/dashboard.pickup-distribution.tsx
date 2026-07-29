@@ -2,9 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { ArrowLeftRight, FolderOpen, Plane, Ship, PackageOpen, Truck } from "lucide-react";
+import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
@@ -15,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listCases, CASE_PIPELINE_STATUS_META, type CasePipelineStatus } from "@/lib/operations.functions";
+import { listCases, CASE_PIPELINE_STATUS_META, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
 
 export const Route = createFileRoute("/dashboard/pickup-distribution")({
@@ -57,6 +56,22 @@ function getPipelineStatus(payload: unknown): CasePipelineStatus {
   return typeof raw === "string" && raw in CASE_PIPELINE_STATUS_META ? (raw as CasePipelineStatus) : "new";
 }
 
+function getAssignedRep(payload: unknown): CaseRep {
+  const p = isRecord(payload) ? payload : {};
+  const rep = p.assignedRep;
+  return isRecord(rep) && typeof rep.id === "string" && rep.id
+    ? { id: String(rep.id), name: String(rep.name ?? ""), role: String(rep.role ?? "") }
+    : null;
+}
+
+// BL number lives in payload.blNumber (JSONB) — same read pattern as the
+// case detail page and the Operations dashboard.
+function getBlNumber(payload: unknown): string | null {
+  const p = isRecord(payload) ? payload : {};
+  const raw = p.blNumber;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
+
 const PICKUP_STAGE: CasePipelineStatus = "ready_for_pickup";
 
 function PickupDistributionPage() {
@@ -71,6 +86,17 @@ function PickupDistributionPage() {
     () => cases.filter((c) => getPipelineStatus(c.payload) === PICKUP_STAGE),
     [cases],
   );
+
+  // Split the pickup/distribution list into one group per shipment kind, so
+  // each kind (ייצוא/ייבוא/משלוחי דרופ/פנים ארצי) is shown separately —
+  // same pattern as the Operations dashboard's active-shipments panel.
+  const pickupCasesByKind = useMemo(() => {
+    const groups: Record<ShipKindValue, typeof pickupCases> = { export: [], import: [], distribution: [], domestic: [] };
+    for (const c of pickupCases) {
+      if (isShipKind(c.shipment_kind)) groups[c.shipment_kind].push(c);
+    }
+    return groups;
+  }, [pickupCases]);
 
   return (
     <div dir="rtl" className="space-y-6">
@@ -91,77 +117,84 @@ function PickupDistributionPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-right">מס' תיק</TableHead>
-              <TableHead className="text-right">לקוח</TableHead>
-              <TableHead className="text-right">מסלול</TableHead>
-              <TableHead className="text-right">סוג משלוח</TableHead>
-              <TableHead className="text-right">סטטוס תפעולי</TableHead>
-              <TableHead className="text-right"> </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                  טוען...
-                </TableCell>
-              </TableRow>
-            ) : pickupCases.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center">
-                  <ArrowLeftRight className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                  <div className="text-base font-medium">אין משלוחים מוכנים לאיסוף/הפצה כרגע</div>
-                  <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                    תיק יופיע כאן אוטומטית כשסטטוס התיק בעמוד "משלוחים" יעודכן ל"מוכן לאיסוף".
-                  </p>
-                </TableCell>
-              </TableRow>
-            ) : (
-              pickupCases.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell className="font-mono text-sm">{c.case_code}</TableCell>
-                  <TableCell className="text-sm">
-                    <div className="font-medium">{c.customer_name ?? "—"}</div>
-                    {c.customer_ref ? (
-                      <div className="text-xs text-muted-foreground">{c.customer_ref}</div>
-                    ) : null}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {c.origin_port ?? "—"} <span className="text-muted-foreground">→</span> {c.dest_port ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {isShipKind(c.shipment_kind) ? (
-                      <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium", SHIP_KIND_CONFIG[c.shipment_kind].badgeClass)}>
-                        {(() => {
-                          const Icon = SHIP_KIND_CONFIG[c.shipment_kind].icon;
-                          return <Icon className="h-3 w-3" />;
-                        })()}
-                        {SHIP_KIND_CONFIG[c.shipment_kind].label}
-                      </span>
+      {isLoading ? (
+        <div className="rounded-2xl border bg-card py-10 text-center text-muted-foreground">טוען...</div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {SHIP_KIND_ORDER.map((kind) => {
+            const kindCases = pickupCasesByKind[kind];
+            const conf = SHIP_KIND_CONFIG[kind];
+            const KindIcon = conf.icon;
+            return (
+              <div key={kind} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="flex items-center justify-between border-b p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <span className={cn("flex h-7 w-7 items-center justify-center rounded-full", conf.badgeClass)}>
+                      <KindIcon className="h-3.5 w-3.5" />
+                    </span>
+                    {conf.label}
+                  </div>
+                  <Badge className={conf.badgeClass}>{kindCases.length}</Badge>
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-right">לקוח</TableHead>
+                      <TableHead className="text-right">מס' תיק</TableHead>
+                      <TableHead className="text-right">נציג מטפל</TableHead>
+                      <TableHead className="text-right">מס' שטר מטען</TableHead>
+                      <TableHead className="text-right">סטטוס</TableHead>
+                      <TableHead className="text-right">ETA</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {kindCases.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="py-6 text-center text-xs text-muted-foreground">
+                          אין משלוחים פעילים מסוג זה
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      "—"
+                      kindCases.map((c) => {
+                        const rep = getAssignedRep(c.payload);
+                        const blNumber = getBlNumber(c.payload);
+                        return (
+                          <TableRow key={c.id}>
+                            <TableCell className="text-xs">
+                              <div className="font-medium">{c.customer_name ?? "—"}</div>
+                              {c.customer_ref ? (
+                                <div className="text-[11px] text-muted-foreground">{c.customer_ref}</div>
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
+                                {c.case_code}
+                              </Link>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {c.arrive_date ? new Date(c.arrive_date).toLocaleDateString("he-IL") : "—"}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Button asChild size="sm" variant="outline" className="gap-2">
-                      <Link to="/dashboard/shipments/$id" params={{ id: c.id }}>
-                        <FolderOpen className="h-3.5 w-3.5" /> פתח תיק
-                      </Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                  </TableBody>
+                </Table>
+                <div className="border-t p-3 text-center">
+                  <Link to="/dashboard/shipments" className="text-xs font-medium text-primary hover:underline">
+                    לכל המשלוחים הפעילים
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
