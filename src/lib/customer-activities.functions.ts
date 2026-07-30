@@ -74,3 +74,53 @@ export const listActivities = createServerFn({ method: "GET" })
     if (error) throw error;
     return (rows ?? []) as ActivityRow[];
   });
+
+export type RecentActivityRow = {
+  id: string;
+  customer_id: string;
+  company_name: string;
+  activity_type: string;
+  subject: string | null;
+  next_task: string | null;
+  due_at: string | null;
+  occurred_at: string;
+  task_done_at: string | null;
+};
+
+// Org-wide activity feed (every customer, not just one) — used by the
+// customers dashboard for the "recent activity" panel and to compute
+// open-task stats (overdue / due today / due this week). Unlike
+// listActivities (single customer), this isn't scoped by lead status either,
+// so it also covers activity logged against active/inactive/frozen accounts.
+export const listRecentActivity = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("customer_activities")
+      .select("id, customer_id, activity_type, subject, next_task, due_at, occurred_at, task_done_at, customers:customer_id(company_name)")
+      .order("occurred_at", { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    const rows = (data ?? []) as unknown as Array<{
+      id: string;
+      customer_id: string;
+      activity_type: string;
+      subject: string | null;
+      next_task: string | null;
+      due_at: string | null;
+      occurred_at: string;
+      task_done_at: string | null;
+      customers: { company_name: string } | null;
+    }>;
+    return rows.map<RecentActivityRow>((r) => ({
+      id: r.id,
+      customer_id: r.customer_id,
+      company_name: r.customers?.company_name ?? "—",
+      activity_type: r.activity_type,
+      subject: r.subject,
+      next_task: r.next_task,
+      due_at: r.due_at,
+      occurred_at: r.occurred_at,
+      task_done_at: r.task_done_at,
+    }));
+  });
