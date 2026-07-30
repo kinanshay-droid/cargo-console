@@ -22,6 +22,7 @@ import {
   getCase,
   updateCase,
   updateCasePipelineStatus,
+  createPickupCase,
   listServiceReps,
   assignCaseRep,
   CASE_PIPELINE_STATUS_META,
@@ -285,6 +286,7 @@ function CaseDetail() {
   const getCaseFn = useServerFn(getCase);
   const updateCaseFn = useServerFn(updateCase);
   const updateCasePipelineStatusFn = useServerFn(updateCasePipelineStatus);
+  const createPickupCaseFn = useServerFn(createPickupCase);
   const listServiceRepsFn = useServerFn(listServiceReps);
   const assignCaseRepFn = useServerFn(assignCaseRep);
 
@@ -307,6 +309,21 @@ function CaseDetail() {
       queryClient.invalidateQueries({ queryKey: ["operations-cases"] });
     },
     onError: () => toast.error("עדכון הסטטוס נכשל"),
+  });
+
+  // Creates a genuinely separate, independently-numbered case for the
+  // pickup/distribution leg (linked back to this one by case number),
+  // rather than just relabeling this case's own status.
+  const transferMutation = useMutation({
+    mutationFn: (input: { pickupDueDate: string | null }) =>
+      createPickupCaseFn({ data: { id, pickupDueDate: input.pickupDueDate } }),
+    onSuccess: (child) => {
+      toast.success(`נפתח תיק איסוף/הפצה ${child.case_code}, מקושר לתיק זה`);
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+      queryClient.invalidateQueries({ queryKey: ["operations-cases"] });
+      navigate({ to: "/dashboard/shipments/$id", params: { id: child.id } });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "העברה לאיסוף/הפצה נכשלה"),
   });
 
   const assignRepMutation = useMutation({
@@ -349,10 +366,7 @@ function CaseDetail() {
   }, [caseRow]);
 
   function handleTransferToPickup() {
-    statusMutation.mutate(
-      { status: "ready_for_pickup", extra: { pickupDueDate: pickupDueDate || null } },
-      { onSuccess: () => navigate({ to: "/dashboard/pickup-distribution" }) },
-    );
+    transferMutation.mutate({ pickupDueDate: pickupDueDate || null });
   }
 
   useEffect(() => {
@@ -640,6 +654,30 @@ function CaseDetail() {
               </Link>
             </p>
           )}
+          {typeof casePayload.parentCaseId === "string" && casePayload.parentCaseId && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              תיק איסוף/הפצה, מקושר לתיק הראשי{" "}
+              <Link
+                to="/dashboard/shipments/$id"
+                params={{ id: casePayload.parentCaseId }}
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                {typeof casePayload.parentCaseCode === "string" ? casePayload.parentCaseCode : ""}
+              </Link>
+            </p>
+          )}
+          {typeof casePayload.pickupCaseId === "string" && casePayload.pickupCaseId && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              נפתח ממנו תיק איסוף/הפצה{" "}
+              <Link
+                to="/dashboard/shipments/$id"
+                params={{ id: casePayload.pickupCaseId }}
+                className="text-primary underline-offset-2 hover:underline"
+              >
+                {typeof casePayload.pickupCaseCode === "string" ? casePayload.pickupCaseCode : ""}
+              </Link>
+            </p>
+          )}
           {form ? (
             <div className="mt-2 flex items-center gap-2">
               <Label className="whitespace-nowrap text-xs text-muted-foreground">מס' תיק ביוניפרייט</Label>
@@ -711,9 +749,10 @@ function CaseDetail() {
                 variant="outline"
                 className="gap-2"
                 onClick={handleTransferToPickup}
-                disabled={statusMutation.isPending}
+                disabled={transferMutation.isPending || typeof casePayload.pickupCaseId === "string"}
               >
-                <ArrowLeftRight className="h-4 w-4" /> העבר לאיסוף/הפצה
+                <ArrowLeftRight className="h-4 w-4" />
+                {typeof casePayload.pickupCaseId === "string" ? "כבר הועבר לאיסוף/הפצה" : "העבר לאיסוף/הפצה"}
               </Button>
             </div>
           </div>

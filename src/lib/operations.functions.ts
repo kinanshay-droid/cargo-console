@@ -345,6 +345,141 @@ export const updateCasePipelineStatus = createServerFn({ method: "POST" })
     return row;
   });
 
+// Spins off a separate, independently-numbered operations_cases row when a
+// case is transferred to Pickup/Distribution, instead of just relabeling
+// the same case's status. The new case is a full snapshot copy of the
+// source at the moment of transfer (same "frozen copy" approach as
+// createCaseFromQuote), so the pickup/delivery team has all the shipment
+// context without needing to reopen the original case, and can manage it
+// as its own independent record from then on.
+//
+// The two cases stay linked by case number, in each other's payload:
+//  - the new (child) case gets payload.parentCaseId / parentCaseCode
+//    pointing back at the source case.
+//  - the source (parent) case gets payload.pickupCaseId / pickupCaseCode
+//    pointing forward at the new one.
+// The parent's own pipelineStatus/status are left untouched — it keeps
+// progressing through its own lifecycle independently of the pickup leg.
+//
+// Idempotent: if the case already has a linked pickup case (from a
+// previous transfer), this just returns that existing case instead of
+// creating a duplicate.
+export const createPickupCase = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string; pickupDueDate?: string | null }) => {
+    if (!input?.id || typeof input.id !== "string") throw new Error("id is required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profileError) throw profileError;
+    if (!profile?.organization_id) throw new Error("User has no organization");
+
+    const { data: parent, error: parentErr } = await supabase
+      .from("operations_cases")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (parentErr) throw parentErr;
+    if (!parent) throw new Error("Case not found");
+
+    const parentPayload =
+      parent.payload && typeof parent.payload === "object" && !Array.isArray(parent.payload)
+        ? (parent.payload as Record<string, unknown>)
+        : {};
+
+    const existingChildId = parentPayload.pickupCaseId;
+    if (typeof existingChildId === "string" && existingChildId) {
+      const { data: existingChild, error: existingErr } = await supabase
+        .from("operations_cases")
+        .select("id, case_code, status")
+        .eq("id", existingChildId)
+        .maybeSingle();
+      if (existingErr) throw existingErr;
+      if (existingChild) return existingChild;
+    }
+
+    // Fresh, independent case number (P-YYMM-####), separate from both the
+    // parent's own code and the Q-/quote numbering scheme, retrying on the
+    // rare collision.
+    let newCode = "";
+    for (let attempt = 0; attempt < 5 && !newCode; attempt++) {
+      const now = new Date();
+      const candidate = `P-${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}-${Math.floor(Math.random() * 9000 + 1000)}`;
+      const { data: clash, error: clashErr } = await supabase
+        .from("operations_cases")
+        .select("id")
+        .eq("case_code", candidate)
+        .maybeSingle();
+      if (clashErr) throw clashErr;
+      if (!clash) newCode = candidate;
+    }
+    if (!newCode) throw new Error("Failed to generate a unique pickup case number");
+
+    const nextPickupDueDate =
+      data.pickupDueDate !== undefined ? data.pickupDueDate : ((parentPayload.pickupDueDate as string | null) ?? null);
+
+    const childPayload: Record<string, unknown> = {
+      ...parentPayload,
+      pipelineStatus: "ready_for_pickup",
+      pickupDueDate: nextPickupDueDate,
+      parentCaseId: parent.id,
+      parentCaseCode: getCaseDisplayCode(parentPayload, parent.case_code),
+    };
+    // A fresh child case has its own new identity — it shouldn't inherit
+    // the parent's Unifreight override or a stale forward-link.
+    delete childPayload.unifreightNumber;
+    delete childPayload.pickupCaseId;
+    delete childPayload.pickupCaseCode;
+
+    const { data: child, error: insertErr } = await supabase
+      .from("operations_cases")
+      .insert({
+        organization_id: profile.organization_id,
+        created_by: userId,
+        case_code: newCode,
+        status: "in_progress",
+        customer_ref: parent.customer_ref,
+        customer_name: parent.customer_name,
+        shipment_kind: parent.shipment_kind,
+        shipment_mode: parent.shipment_mode,
+        incoterm: parent.incoterm,
+        origin_port: parent.origin_port,
+        dest_port: parent.dest_port,
+        transit_ports: parent.transit_ports ?? [],
+        depart_date: parent.depart_date,
+        arrive_date: parent.arrive_date,
+        agent: parent.agent,
+        airline: parent.airline,
+        currency: parent.currency,
+        total: parent.total,
+        payload: childPayload as never,
+      })
+      .select("id, case_code, status")
+      .single();
+    if (insertErr) throw insertErr;
+
+    const { error: linkErr } = await supabase
+      .from("operations_cases")
+      .update({
+        payload: {
+          ...parentPayload,
+          pickupCaseId: child.id,
+          pickupCaseCode: child.case_code,
+        } as never,
+      })
+      .eq("id", parent.id);
+    if (linkErr) throw linkErr;
+
+    return child;
+  });
+
 // The service department's employee roster. These people don't have app
 // logins (they're not rows in `profiles`), so this is a plain static list
 // rather than a DB-backed lookup — matches what was handed over directly.
