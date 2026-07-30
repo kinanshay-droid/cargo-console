@@ -5,11 +5,28 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { NewCustomerDialog } from "@/components/new-customer-dialog";
-import { Users, UserPlus, Settings2, FileText, Sparkles } from "lucide-react";
+import {
+  Users,
+  UserPlus,
+  Settings2,
+  Sparkles,
+  Target,
+  AlertTriangle,
+  Phone,
+  Mail,
+  MapPin,
+  FileText,
+  Presentation,
+  Award,
+  RotateCw,
+  StickyNote,
+  ClipboardList,
+} from "lucide-react";
 import { listCustomers } from "@/lib/customers.functions";
-import { listMyQuotes } from "@/lib/quotes.functions";
+import { listRecentActivity, type RecentActivityRow } from "@/lib/customer-activities.functions";
 import { useI18n } from "@/lib/i18n";
-import { TONE_OUTLINE_BUTTON, TONE_GRADIENT } from "@/lib/theme";
+import type { TranslationKey } from "@/lib/i18n-dictionary";
+import { TONE_OUTLINE_BUTTON, TONE_GRADIENT, TONE_BADGE, type Tone } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard/overview")({
@@ -24,50 +41,80 @@ export const Route = createFileRoute("/dashboard/overview")({
   component: CustomersDashboard,
 });
 
-type StatusKey = "active" | "inactive" | "frozen";
+const DONUT_PALETTE = [
+  "var(--primary)",
+  "var(--accent)",
+  "var(--success)",
+  "var(--warning)",
+  "var(--destructive)",
+  "var(--muted-foreground)",
+];
 
-const STATUS_COLOR: Record<StatusKey, string> = {
-  active: "bg-success",
-  inactive: "bg-muted-foreground",
-  frozen: "bg-accent",
+const ACTIVITY_ICON: Record<string, typeof Phone> = {
+  call: Phone,
+  email: Mail,
+  meeting: Users,
+  visit: MapPin,
+  quote: FileText,
+  demo: Presentation,
+  tender: Award,
+  follow_up: RotateCw,
+  note: StickyNote,
+  task: ClipboardList,
+};
+
+const ACTIVITY_TONE: Record<string, Tone> = {
+  call: "accent",
+  email: "primary",
+  meeting: "success",
+  visit: "warning",
+  quote: "primary",
+  demo: "accent",
+  tender: "warning",
+  follow_up: "muted",
+  note: "muted",
+  task: "accent",
 };
 
 function CustomersDashboard() {
   const { t, locale, dir } = useI18n();
   const listCustomersFn = useServerFn(listCustomers);
-  const listQuotesFn = useServerFn(listMyQuotes);
+  const listActivityFn = useServerFn(listRecentActivity);
 
   const { data: customers = [], isLoading, refetch } = useQuery({
     queryKey: ["customers"],
     queryFn: () => listCustomersFn(),
   });
-  const { data: quotes = [] } = useQuery({
-    queryKey: ["my-quotes"],
-    queryFn: () => listQuotesFn(),
+  const { data: activities = [] } = useQuery({
+    queryKey: ["customer-activities-recent"],
+    queryFn: () => listActivityFn(),
   });
 
+  const nonLeadCustomers = useMemo(() => customers.filter((c) => c.status !== "lead"), [customers]);
+
   const stats = useMemo(() => {
-    const total = customers.length;
-    const active = customers.filter((c) => c.status === "active").length;
-    const inactive = customers.filter((c) => c.status === "inactive").length;
-    const frozen = customers.filter((c) => c.status === "frozen").length;
+    const total = nonLeadCustomers.length;
+    const active = nonLeadCustomers.filter((c) => c.status === "active").length;
+    const inactive = nonLeadCustomers.filter((c) => c.status === "inactive").length;
+    const frozen = nonLeadCustomers.filter((c) => c.status === "frozen").length;
+    const potential = customers.filter((c) => c.status === "lead").length;
     const now = Date.now();
     const monthAgo = now - 30 * 24 * 60 * 60 * 1000;
-    const newThisMonth = customers.filter(
+    const newThisMonth = nonLeadCustomers.filter(
       (c) => new Date(c.created_at).getTime() >= monthAgo,
     ).length;
-    return { total, active, inactive, frozen, newThisMonth };
-  }, [customers]);
+    return { total, active, inactive, frozen, potential, newThisMonth };
+  }, [nonLeadCustomers, customers]);
 
   const recentCustomers = useMemo(
     () =>
-      [...customers]
+      [...nonLeadCustomers]
         .sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
         )
         .slice(0, 5),
-    [customers],
+    [nonLeadCustomers],
   );
 
   const recentLeads = useMemo(
@@ -82,15 +129,70 @@ function CustomersDashboard() {
     [customers],
   );
 
-  const statusSegments = useMemo(() => {
-    const total = stats.total || 1;
-    const segs: { key: StatusKey; value: number; pct: number; color: string }[] = [
-      { key: "active", value: stats.active, pct: (stats.active / total) * 100, color: "var(--success)" },
-      { key: "inactive", value: stats.inactive, pct: (stats.inactive / total) * 100, color: "var(--muted-foreground)" },
-      { key: "frozen", value: stats.frozen, pct: (stats.frozen / total) * 100, color: "var(--accent)" },
-    ];
-    return segs.filter((s) => s.value > 0);
-  }, [stats]);
+  const industryBreakdown = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of nonLeadCustomers) {
+      const key = (c.industry ?? "").trim() || t("overview.unspecifiedIndustry");
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const total = nonLeadCustomers.length || 1;
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 5);
+    const restCount = sorted.slice(5).reduce((s, [, c]) => s + c, 0);
+    const rows = top.map(([name, count], i) => ({
+      name,
+      count,
+      pct: (count / total) * 100,
+      color: DONUT_PALETTE[i % DONUT_PALETTE.length],
+    }));
+    if (restCount > 0) {
+      rows.push({
+        name: t("overview.otherIndustry"),
+        count: restCount,
+        pct: (restCount / total) * 100,
+        color: DONUT_PALETTE[rows.length % DONUT_PALETTE.length],
+      });
+    }
+    return rows.filter((r) => r.count > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nonLeadCustomers, locale]);
+
+  const taskStats = useMemo(() => {
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+    const weekEnd = new Date(todayStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    let overdue = 0;
+    let dueToday = 0;
+    let dueThisWeek = 0;
+    let total = 0;
+    for (const a of activities) {
+      if (!a.next_task || a.task_done_at) continue;
+      total++;
+      if (!a.due_at) continue;
+      const time = new Date(a.due_at).getTime();
+      if (time < todayStart.getTime()) overdue++;
+      else if (time <= todayEnd.getTime()) dueToday++;
+      else if (time <= weekEnd.getTime()) dueThisWeek++;
+    }
+    return { overdue, dueToday, dueThisWeek, total };
+  }, [activities]);
+
+  const recentFeed = useMemo<RecentActivityRow[]>(() => activities.slice(0, 8), [activities]);
+
+  function relativeTime(iso: string): string {
+    const ms = Date.now() - new Date(iso).getTime();
+    const minutes = Math.max(0, Math.round(ms / 60000));
+    if (minutes < 60) return locale === "he" ? `לפני ${minutes} דק'` : `${minutes}m ago`;
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return locale === "he" ? `לפני ${hours} שעות` : `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    if (days < 30) return locale === "he" ? `לפני ${days} ימים` : `${days}d ago`;
+    return new Date(iso).toLocaleDateString(locale === "he" ? "he-IL" : "en-US");
+  }
 
   return (
     <div dir={dir} className="space-y-6">
@@ -131,7 +233,7 @@ function CustomersDashboard() {
       </div>
 
       {/* Metric tiles */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricTile
           title={t("overview.statTotalCustomers")}
           value={stats.total}
@@ -141,6 +243,7 @@ function CustomersDashboard() {
         <MetricTile
           title={t("overview.statActiveCustomers")}
           value={stats.active}
+          sublabel={stats.total > 0 ? `${Math.round((stats.active / stats.total) * 100)}% ${t("overview.ofCustomers")}` : undefined}
           gradient={cn("bg-gradient-to-l", TONE_GRADIENT.success)}
           icon={<Users className="h-5 w-5" />}
         />
@@ -151,40 +254,40 @@ function CustomersDashboard() {
           icon={<UserPlus className="h-5 w-5" />}
         />
         <MetricTile
-          title={t("overview.statTotalQuotes")}
-          value={quotes.length}
-          gradient={cn("bg-gradient-to-l", TONE_GRADIENT.warning)}
-          icon={<FileText className="h-5 w-5" />}
+          title={t("overview.statPotentialCustomers")}
+          value={stats.potential}
+          gradient={cn("bg-gradient-to-l", TONE_GRADIENT.muted)}
+          icon={<Target className="h-5 w-5" />}
+        />
+        <MetricTile
+          title={t("overview.statFrozenCustomers")}
+          value={stats.frozen}
+          sublabel={t("overview.statFrozenSub")}
+          gradient={cn("bg-gradient-to-l", TONE_GRADIENT.destructive)}
+          icon={<AlertTriangle className="h-5 w-5" />}
         />
       </div>
 
-      {/* Bottom row */}
+      {/* Middle row: industry breakdown, leads, new customers */}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="p-5">
-          <h3 className="mb-4 text-right font-semibold">
-            {t("overview.recentCustomers")}
-          </h3>
-          {isLoading ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</div>
-          ) : recentCustomers.length === 0 ? (
-            <div className="py-6 text-center text-sm text-muted-foreground">
-              {t("overview.noCustomersYet")}
-            </div>
+          <h3 className="mb-4 text-right font-semibold">{t("overview.industryBreakdown")}</h3>
+          {industryBreakdown.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">{t("overview.noDataYet")}</div>
           ) : (
-            <div className="divide-y">
-              {recentCustomers.map((c) => (
-                <Link
-                  key={c.id}
-                  to="/dashboard/customers/$id"
-                  params={{ id: c.id }}
-                  className="flex items-center justify-between py-2.5 text-sm hover:bg-muted/30"
-                >
-                  <span className="text-muted-foreground">
-                    {new Date(c.created_at).toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
-                  </span>
-                  <span className="font-medium">{c.company_name}</span>
-                </Link>
-              ))}
+            <div className="flex items-center justify-between gap-6">
+              <DonutChart segments={industryBreakdown} />
+              <div className="flex-1 space-y-2">
+                {industryBreakdown.map((s) => (
+                  <div key={s.name} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{Math.round(s.pct)}%</span>
+                    <div className="flex items-center gap-2">
+                      <span className="truncate">{s.name}</span>
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </Card>
@@ -226,29 +329,83 @@ function CustomersDashboard() {
           )}
         </Card>
 
-
         <Card className="p-5">
-          <h3 className="mb-4 text-right font-semibold">{t("overview.statusBreakdown")}</h3>
-          {stats.total === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">
-              {t("overview.noDataYet")}
+          <h3 className="mb-4 text-right font-semibold">
+            {t("overview.recentCustomers")}
+          </h3>
+          {isLoading ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">{t("common.loading")}</div>
+          ) : recentCustomers.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">
+              {t("overview.noCustomersYet")}
             </div>
           ) : (
-            <div className="flex items-center justify-between gap-6">
-              <DonutChart segments={statusSegments} />
-              <div className="flex-1 space-y-2">
-                {statusSegments.map((s) => (
-                  <div key={s.key} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {s.value} ({Math.round(s.pct)}%)
+            <div className="divide-y">
+              {recentCustomers.map((c) => (
+                <Link
+                  key={c.id}
+                  to="/dashboard/customers/$id"
+                  params={{ id: c.id }}
+                  className="flex items-center justify-between py-2.5 text-sm hover:bg-muted/30"
+                >
+                  <span className="text-muted-foreground">
+                    {new Date(c.created_at).toLocaleDateString(locale === "he" ? "he-IL" : "en-US")}
+                  </span>
+                  <span className="font-medium">{c.company_name}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Bottom row: open tasks + recent activity */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card className="p-5">
+          <h3 className="mb-4 text-right font-semibold">{t("overview.openTasks")}</h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className={cn("rounded-xl p-3 text-center", TONE_BADGE.destructive)}>
+              <div className="text-xl font-bold">{taskStats.overdue}</div>
+              <div className="text-[11px]">{t("overview.tasksOverdue")}</div>
+            </div>
+            <div className={cn("rounded-xl p-3 text-center", TONE_BADGE.warning)}>
+              <div className="text-xl font-bold">{taskStats.dueToday}</div>
+              <div className="text-[11px]">{t("overview.tasksDueToday")}</div>
+            </div>
+            <div className={cn("rounded-xl p-3 text-center", TONE_BADGE.accent)}>
+              <div className="text-xl font-bold">{taskStats.dueThisWeek}</div>
+              <div className="text-[11px]">{t("overview.tasksDueThisWeek")}</div>
+            </div>
+            <div className={cn("rounded-xl p-3 text-center", TONE_BADGE.muted)}>
+              <div className="text-xl font-bold">{taskStats.total}</div>
+              <div className="text-[11px]">{t("overview.tasksTotalOpen")}</div>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <h3 className="mb-4 text-right font-semibold">{t("overview.recentActivity")}</h3>
+          {recentFeed.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">{t("overview.noActivityYet")}</div>
+          ) : (
+            <div className="space-y-2">
+              {recentFeed.map((a) => {
+                const Icon = ACTIVITY_ICON[a.activity_type] ?? StickyNote;
+                const tone = ACTIVITY_TONE[a.activity_type] ?? "muted";
+                const label = t((`activity.${a.activity_type}` as TranslationKey));
+                return (
+                  <div key={a.id} className="flex items-center gap-2.5">
+                    <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", TONE_BADGE[tone])}>
+                      <Icon className="h-3.5 w-3.5" />
                     </span>
-                    <div className="flex items-center gap-2">
-                      <span>{t(`status.${s.key}` as const)}</span>
-                      <span className={`h-2.5 w-2.5 rounded-full ${STATUS_COLOR[s.key]}`} />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-medium">{label}</span>
+                      <span className="text-xs text-muted-foreground"> · {a.company_name}</span>
                     </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{relativeTime(a.occurred_at)}</span>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
         </Card>
@@ -260,11 +417,13 @@ function CustomersDashboard() {
 function MetricTile({
   title,
   value,
+  sublabel,
   gradient,
   icon,
 }: {
   title: string;
   value: number;
+  sublabel?: string;
   gradient: string;
   icon: React.ReactNode;
 }) {
@@ -274,6 +433,7 @@ function MetricTile({
         <div className="text-right">
           <div className="text-sm font-medium opacity-95">{title}</div>
           <div className="text-3xl font-bold tracking-tight">{value}</div>
+          {sublabel ? <div className="text-xs opacity-90">{sublabel}</div> : null}
         </div>
         {icon}
       </div>
@@ -288,7 +448,7 @@ function DonutChart({ segments }: { segments: { pct: number; color: string }[] }
   const circ = 2 * Math.PI * radius;
   let offset = 0;
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
       <circle
         cx={size / 2}
         cy={size / 2}
