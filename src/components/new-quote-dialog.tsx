@@ -255,8 +255,12 @@ export const BIOTHERM_MODELS = [
 ];
 
 // A checked packaging model from the catalog above, with a quantity attached
-// so it can contribute to the weight/volumetric summary like a regular package.
-export type PackSelection = { key: string; qty: number };
+// so it can contribute to the weight/volumetric summary like a regular
+// package. productWeight is the actual goods' weight per unit (kg) packed
+// inside the box — separate from the box's own empty tare weight — so the
+// gross-weight total reflects package + product together, not just the
+// packaging.
+export type PackSelection = { key: string; qty: number; productWeight?: number };
 
 // key format is "<tempSeries>:<model name>" (see the catalog tables below).
 // deepFrozen always maps to the BioTherm catalog, every other series to
@@ -267,13 +271,14 @@ export function getPackModelCalc(sel: PackSelection) {
   const isBio = sel.key.startsWith("deepFrozen:");
   const catalog = isBio ? BIOTHERM_MODELS : COOLGUARD_MODELS;
   const m = catalog.find((x) => x.model === modelName);
-  if (!m) return { label: modelName, qty: sel.qty, grossWeight: 0, volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
+  const productWeight = sel.productWeight ?? 0;
+  if (!m) return { label: modelName, qty: sel.qty, grossWeight: sel.qty * productWeight, volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
   const tare = parseFloat(m.tare) || 0;
   const [outerL, outerW, outerH] = m.outer.split("×").map((v) => parseFloat(v) || 0);
   const hasDims = !!(outerL && outerW && outerH);
   const volumetricWeight = hasDims ? (sel.qty * outerL * outerW * outerH) / 6_000_000 : 0;
   const dims = hasDims ? { length: outerL / 10, width: outerW / 10, height: outerH / 10 } : null;
-  return { label: m.model, qty: sel.qty, grossWeight: sel.qty * tare, volumetricWeight, dims };
+  return { label: m.model, qty: sel.qty, grossWeight: sel.qty * (tare + productWeight), volumetricWeight, dims };
 }
 
 export const PALLETS = [
@@ -480,6 +485,9 @@ export function NewQuoteDialog({
         ? arr.map((s) => (s.key === key ? { ...s, qty } : s))
         : [...arr, { key, qty }];
     });
+  const getPackProductWeight = (key: string) => packSelections.find((s) => s.key === key)?.productWeight ?? "";
+  const setPackProductWeight = (key: string, productWeight: number) =>
+    setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, productWeight } : s)));
   const packModelCalcs = useMemo(() => packSelections.map((sel) => getPackModelCalc(sel)), [packSelections]);
   const [packages, setPackages] = useState<PackageRow[]>([makePackageRow()]);
   const updatePackage = (id: string, patch: Partial<PackageRow>) =>
@@ -1246,6 +1254,7 @@ export function NewQuoteDialog({
                                     <th className="px-3 py-2 text-right font-medium">קטגוריה</th>
                                     <th className="px-3 py-2 text-right font-medium">מידות חיצוניות</th>
                                     <th className="px-3 py-2 text-right font-medium">Tare</th>
+                                    <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
                                     <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
                                     <th className="px-3 py-2 text-right font-medium">משך</th>
                                   </tr>
@@ -1254,7 +1263,8 @@ export function NewQuoteDialog({
                                   {BIOTHERM_MODELS.map((m) => {
                                     const key = `${series}:${m.model}`;
                                     const qty = getPackQty(key);
-                                    const calc = qty > 0 ? getPackModelCalc({ key, qty }) : null;
+                                    const productWeight = getPackProductWeight(key);
+                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0 }) : null;
                                     return (
                                       <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
                                         <td className="px-2 py-2">
@@ -1264,6 +1274,17 @@ export function NewQuoteDialog({
                                         <td className="px-3 py-2 text-muted-foreground">{m.category}</td>
                                         <td className="px-3 py-2 text-muted-foreground">{m.outer}</td>
                                         <td className="px-3 py-2">{m.tare}</td>
+                                        <td className="px-3 py-2">
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step="0.1"
+                                            disabled={qty === 0}
+                                            value={productWeight}
+                                            onChange={(e) => setPackProductWeight(key, Number(e.target.value) || 0)}
+                                            className="w-20 rounded border bg-background px-2 py-1 text-sm disabled:opacity-40"
+                                          />
+                                        </td>
                                         <td className="px-3 py-2 text-muted-foreground">
                                           {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
                                         </td>
@@ -1282,6 +1303,7 @@ export function NewQuoteDialog({
                                     <th className="px-3 py-2 text-right font-medium">Payload</th>
                                     <th className="px-3 py-2 text-right font-medium">מידות חיצוניות</th>
                                     <th className="px-3 py-2 text-right font-medium">Tare</th>
+                                    <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
                                     <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
                                   </tr>
                                 </thead>
@@ -1289,7 +1311,8 @@ export function NewQuoteDialog({
                                   {COOLGUARD_MODELS.map((m) => {
                                     const key = `${series}:${m.model}`;
                                     const qty = getPackQty(key);
-                                    const calc = qty > 0 ? getPackModelCalc({ key, qty }) : null;
+                                    const productWeight = getPackProductWeight(key);
+                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0 }) : null;
                                     return (
                                       <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
                                         <td className="px-2 py-2">
@@ -1299,6 +1322,17 @@ export function NewQuoteDialog({
                                         <td className="px-3 py-2">{m.payload}</td>
                                         <td className="px-3 py-2 text-muted-foreground">{m.outer}</td>
                                         <td className="px-3 py-2">{m.tare}</td>
+                                        <td className="px-3 py-2">
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step="0.1"
+                                            disabled={qty === 0}
+                                            value={productWeight}
+                                            onChange={(e) => setPackProductWeight(key, Number(e.target.value) || 0)}
+                                            className="w-20 rounded border bg-background px-2 py-1 text-sm disabled:opacity-40"
+                                          />
+                                        </td>
                                         <td className="px-3 py-2 text-muted-foreground">
                                           {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
                                         </td>
