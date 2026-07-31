@@ -332,6 +332,14 @@ export function getPackageCalc(pkg: PackageRow) {
 
 function uid() { return Math.random().toString(36).slice(2, 9); }
 
+// Returns today + n days as "YYYY-MM-DD", for date-input defaults that
+// should always be relative to the current date rather than hardcoded.
+function addDaysISO(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
 // -------- Packaging Recommendation Engine wiring --------
 // Matches a package row's dimensions against the CoolGuard catalog (internal
 // dims + a standard packing clearance) and ranks the fitting options.
@@ -505,8 +513,8 @@ export function NewQuoteDialog({
   }, [kind]);
   const [transit, setTransit] = useState<string[]>([]);
   const [newTransit, setNewTransit] = useState("");
-  const [departDate, setDepartDate] = useState("2025-06-10");
-  const [arriveDate, setArriveDate] = useState("2025-06-12");
+  const [departDate, setDepartDate] = useState(() => addDaysISO(3));
+  const [arriveDate, setArriveDate] = useState(() => addDaysISO(5));
   const [services, setServices] = useState<Record<string, boolean>>({
     pickup: true, air: true, exportCustoms: true, importCustoms: true,
     clearance: true, land: true, delivery: true, insurance: true,
