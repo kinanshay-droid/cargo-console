@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { listCases, CASE_PIPELINE_STATUS_META, getCaseDisplayCode, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
+import { getReviewStatusStyle } from "@/lib/review-status";
 
 export const Route = createFileRoute("/dashboard/pickup-distribution/today")({
   head: () => ({
@@ -252,7 +253,16 @@ function TodayTasksPage() {
                             <TableCell className="whitespace-nowrap text-xs font-medium">{cl.courier || "—"}</TableCell>
                             <TableCell className="whitespace-nowrap">
                               {cl.reviewStatus ? (
-                                <Badge className="bg-accent/15 text-accent">{cl.reviewStatus}</Badge>
+                                <span
+                                  className="rounded px-2 py-0.5 text-xs font-medium"
+                                  style={
+                                    getReviewStatusStyle(cl.reviewStatus)
+                                      ? { backgroundColor: getReviewStatusStyle(cl.reviewStatus)!.bg, color: getReviewStatusStyle(cl.reviewStatus)!.fg }
+                                      : undefined
+                                  }
+                                >
+                                  {cl.reviewStatus}
+                                </span>
                               ) : (
                                 <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
                               )}

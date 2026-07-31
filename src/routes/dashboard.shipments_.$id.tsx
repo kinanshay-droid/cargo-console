@@ -57,6 +57,7 @@ import {
   type Stop,
   type StopKind,
 } from "@/lib/drop-stops";
+import { REVIEW_STATUS_OPTIONS, getReviewStatusStyle } from "@/lib/review-status";
 
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
@@ -896,7 +897,22 @@ function CaseDetail() {
               <Input value={form.critilog.type} onChange={(e) => updCl("type", e.target.value)} />
             </Field>
             <Field label="סטטוס לבדיקה">
-              <Input value={form.critilog.reviewStatus} onChange={(e) => updCl("reviewStatus", e.target.value)} />
+              <Select value={form.critilog.reviewStatus || ""} onValueChange={(v) => updCl("reviewStatus", v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="בחר סטטוס...">
+                    {form.critilog.reviewStatus ? (
+                      <ReviewStatusBadge value={form.critilog.reviewStatus} />
+                    ) : null}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {REVIEW_STATUS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      <ReviewStatusBadge value={o.value} />
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </Field>
             <Field label="איסוף/מסירה בישראל" hint="בחירת תאריך מעבירה את התיק למסך איסוף/הפצה">
               <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => handlePickupIsraelDate(e.target.value)} />
@@ -1297,6 +1313,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
+function ReviewStatusBadge({ value }: { value: string }) {
+  const style = getReviewStatusStyle(value);
+  return (
+    <span
+      className="rounded px-2 py-0.5 text-xs font-medium"
+      style={style ? { backgroundColor: style.bg, color: style.fg } : undefined}
+    >
+      {value}
+    </span>
+  );
+}
+
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
