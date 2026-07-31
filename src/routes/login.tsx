@@ -34,8 +34,9 @@ import {
   Package,
   Building2,
 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { ensureDemoUser } from "@/lib/demo.functions";
+import { ensureDemoUser, seedDemoCustomers } from "@/lib/demo.functions";
 import { toast } from "sonner";
 
 const FEATURES: { label: string; icon: typeof Eye }[] = [
@@ -150,6 +151,7 @@ function LoginPage() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
+  const seedDemoCustomersFn = useServerFn(seedDemoCustomers);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -186,6 +188,14 @@ const creds = {
         localStorage.setItem("demo_role", role.id);
       } catch {
         /* ignore storage errors */
+      }
+      // Best-effort, idempotent: populates the Demo Organization's customer
+      // list on first demo login. Never blocks the demo login itself if it
+      // fails for any reason (e.g. already seeded, or a transient error).
+      try {
+        await seedDemoCustomersFn();
+      } catch {
+        /* ignore — demo login should still proceed */
       }
       toast.success(`ברוך הבא לדמו — ${role.title}`);
       setRoleDialogOpen(false);
