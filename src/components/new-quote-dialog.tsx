@@ -240,12 +240,17 @@ export const COOLGUARD_MODELS = [
   { model: "CoolGuard Advance 4L", payload: "4L", inner: "312×310×310", outer: "152×152×152", tare: "6 kg" },
 ];
 
-// Dry-ice sample-transport packaging for Deep Frozen shipments (Intelsius BioTherm range).
+// Dry-ice sample-transport packaging for Deep Frozen shipments (Intelsius
+// BioTherm range). outer/tare are the published external dimensions (mm)
+// and empty system mass from Intelsius's own spec sheet ("BioTherm Dry Ice
+// Range" — BT074/BT077/BT041/BT049), same source format as the CoolGuard
+// table below, so both catalogs can feed the same weight/volumetric-weight
+// calculation instead of BioTherm always contributing zero.
 export const BIOTHERM_MODELS = [
-  { model: "BioTherm 7", category: "Category A / B", duration: "72 שעות" },
-  { model: "BioTherm 14", category: "Category A / B", duration: "96 שעות" },
-  { model: "BioTherm 15", category: "Category A", duration: "96+ שעות" },
-  { model: "BioTherm 30", category: "Category A / B", duration: "96+ שעות" },
+  { model: "BioTherm 7", category: "Category A / B", duration: "72 שעות", outer: "308×308×310", tare: "1.0 kg" },
+  { model: "BioTherm 14", category: "Category A / B", duration: "96 שעות", outer: "385×380×395", tare: "1.7 kg" },
+  { model: "BioTherm 15", category: "Category A", duration: "96+ שעות", outer: "403×396×416", tare: "1.9 kg" },
+  { model: "BioTherm 30", category: "Category A / B", duration: "96+ שעות", outer: "465×458×478", tare: "2.5 kg" },
 ];
 
 // A checked packaging model from the catalog above, with a quantity attached
@@ -253,17 +258,14 @@ export const BIOTHERM_MODELS = [
 export type PackSelection = { key: string; qty: number };
 
 // key format is "<tempSeries>:<model name>" (see the catalog tables below).
-// deepFrozen always maps to the BioTherm catalog, every other series to CoolGuard.
+// deepFrozen always maps to the BioTherm catalog, every other series to
+// CoolGuard — both catalogs share the same outer/tare shape, so one
+// calculation covers them both.
 export function getPackModelCalc(sel: PackSelection) {
   const modelName = sel.key.slice(sel.key.indexOf(":") + 1);
   const isBio = sel.key.startsWith("deepFrozen:");
-  if (isBio) {
-    const m = BIOTHERM_MODELS.find((x) => x.model === modelName);
-    // Intelsius doesn't publish weight/dimensions for the BioTherm range —
-    // no fabricated numbers, so this contributes qty only, not weight.
-    return { label: m?.model ?? modelName, qty: sel.qty, grossWeight: 0, volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
-  }
-  const m = COOLGUARD_MODELS.find((x) => x.model === modelName);
+  const catalog = isBio ? BIOTHERM_MODELS : COOLGUARD_MODELS;
+  const m = catalog.find((x) => x.model === modelName);
   if (!m) return { label: modelName, qty: sel.qty, grossWeight: 0, volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
   const tare = parseFloat(m.tare) || 0;
   const [outerL, outerW, outerH] = m.outer.split("×").map((v) => parseFloat(v) || 0);
@@ -1195,6 +1197,9 @@ export function NewQuoteDialog({
                                     <th className="w-28 px-2 py-2 text-center font-medium">כמות</th>
                                     <th className="px-3 py-2 text-right font-medium">דגם</th>
                                     <th className="px-3 py-2 text-right font-medium">קטגוריה</th>
+                                    <th className="px-3 py-2 text-right font-medium">מידות חיצוניות</th>
+                                    <th className="px-3 py-2 text-right font-medium">Tare</th>
+                                    <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
                                     <th className="px-3 py-2 text-right font-medium">משך</th>
                                   </tr>
                                 </thead>
@@ -1202,6 +1207,7 @@ export function NewQuoteDialog({
                                   {BIOTHERM_MODELS.map((m) => {
                                     const key = `${series}:${m.model}`;
                                     const qty = getPackQty(key);
+                                    const calc = qty > 0 ? getPackModelCalc({ key, qty }) : null;
                                     return (
                                       <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
                                         <td className="px-2 py-2">
@@ -1209,6 +1215,11 @@ export function NewQuoteDialog({
                                         </td>
                                         <td className="px-3 py-2 font-medium">{m.model}</td>
                                         <td className="px-3 py-2 text-muted-foreground">{m.category}</td>
+                                        <td className="px-3 py-2 text-muted-foreground">{m.outer}</td>
+                                        <td className="px-3 py-2">{m.tare}</td>
+                                        <td className="px-3 py-2 text-muted-foreground">
+                                          {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
+                                        </td>
                                         <td className="px-3 py-2">{m.duration}</td>
                                       </tr>
                                     );
