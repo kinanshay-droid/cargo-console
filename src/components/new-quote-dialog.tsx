@@ -97,6 +97,7 @@ import { Lookup } from "@/components/lookup";
 import { getLookupItemsByIds } from "@/lib/lookups.functions";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { PackagingRecommendationService, type PackageModel, type PackageMatch } from "@/lib/packaging-recommendation";
+import { SHIPMENT_TYPE_TAGS } from "@/lib/shipment-type-tags";
 
 const STEPS = [
   { n: 1, label: "לקוח" },
@@ -399,6 +400,7 @@ export function NewQuoteDialog({
   // Step 2 state
   const [kind, setKind] = useState<ShipKind | null>(null);
   const [incoterm, setIncoterm] = useState<string | null>(null);
+  const [shipmentTypeTag, setShipmentTypeTag] = useState<string | null>(null);
   const [cargo, setCargo] = useState<CargoRow[]>([{ id: uid(), sku: "", description: "", packaging: "", weight: "", notes: "" }]);
   const [containers, setContainers] = useState<ContainerRow[]>([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
   const [goods, setGoods] = useState<GoodsRow[]>([{ id: uid(), item: "", sku: "", origin: "", weight: "", dims: "", qty: 1 }]);
@@ -620,6 +622,7 @@ export function NewQuoteDialog({
     setQuery("");
     setKind(null);
     setIncoterm(null);
+    setShipmentTypeTag(null);
     setDropType(null);
     setCargo([{ id: uid(), sku: "", description: "", packaging: "", weight: "", notes: "" }]);
     setContainers([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
@@ -674,6 +677,7 @@ export function NewQuoteDialog({
             pickupContacts: pickupContacts.filter((c) => c.name || c.phone || c.email),
             deliveryContacts: deliveryContacts.filter((c) => c.name || c.phone || c.email),
             cargoType,
+            shipmentTypeTag,
             attrs,
             tempSeriesList,
             tempSeriesNone,
@@ -916,6 +920,31 @@ export function NewQuoteDialog({
                             <div className="text-[11px] leading-tight text-muted-foreground">{t.name}</div>
                             <div className="mt-0.5 text-[11px] text-muted-foreground/80">{t.hint}</div>
                           </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* סוג משלוח — תגית צבעונית, מתחת לתנאי המכר */}
+              {kind && (
+                <Section title="סוג משלוח">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                    {SHIPMENT_TYPE_TAGS.map((t) => {
+                      const active = shipmentTypeTag === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          onClick={() => setShipmentTypeTag(active ? null : t.value)}
+                          style={{ backgroundColor: t.bg, color: t.fg }}
+                          className={cn(
+                            "rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition",
+                            active ? "ring-2 ring-primary ring-offset-2" : "opacity-90 hover:opacity-100",
+                          )}
+                        >
+                          {t.value}
                         </button>
                       );
                     })}
