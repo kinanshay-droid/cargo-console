@@ -497,6 +497,10 @@ export function NewQuoteDialog({
   const [agent, setAgent] = useState("QUICKSTAT");
   const [agents, setAgents] = useState<string[]>([]);
   const [airline, setAirline] = useState("Lufthansa Cargo");
+  // Journey mode for step 2's "ה. פרטי מסע" section — determines whether the
+  // vessel/flight-name field there is replaced by an airline picker (feeding
+  // the same `airline` state used later in step 4's "חברת תעופה מתוכננת").
+  const [journeyMode, setJourneyMode] = useState<"air" | "land" | null>(null);
   const [logisticsNotes, setLogisticsNotes] = useState("");
   const [dropType, setDropType] = useState<DropTypeId | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -956,10 +960,47 @@ export function NewQuoteDialog({
               {kind === "import" && (
                 <Section title="ה. פרטי מסע">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    <Field label="סוג מסע" placeholder="ימי / אווירי / יבשתי" />
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">סוג מסע</Label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setJourneyMode("air")}
+                          className={cn(
+                            "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border text-sm transition",
+                            journeyMode === "air" ? "border-primary bg-primary/10 font-medium text-primary" : "hover:bg-muted/50",
+                          )}
+                        >
+                          <Plane className="h-3.5 w-3.5" /> אווירי
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setJourneyMode("land")}
+                          className={cn(
+                            "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border text-sm transition",
+                            journeyMode === "land" ? "border-primary bg-primary/10 font-medium text-primary" : "hover:bg-muted/50",
+                          )}
+                        >
+                          <Truck className="h-3.5 w-3.5" /> יבשתי
+                        </button>
+                      </div>
+                    </div>
                     <Field label="נמל מוצא" />
                     <Field label="נמל יעד" />
-                    <Field label="שם כלי שיט / טיסה" />
+                    {journeyMode === "air" ? (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">חברת תעופה</Label>
+                        <Lookup
+                          type="airlines"
+                          matchBy="code"
+                          value={airline || null}
+                          onChange={(item) => setAirline(item?.code ?? "")}
+                          placeholder="בחר חברת תעופה..."
+                        />
+                      </div>
+                    ) : (
+                      <Field label="שם כלי שיט / טיסה" />
+                    )}
                     <Field label="מספר מסע" />
                     <Field label="קוד מסע" />
                   </div>
