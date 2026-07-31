@@ -123,6 +123,14 @@ function CustomerDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
 
+  // Lets callers deep-link straight to a tab (e.g. the "quote" quick action
+  // navigating here with hash="commercial") instead of always landing on
+  // "פרטי חברה" — the Tabs below previously used an uncontrolled
+  // defaultValue, so the hash was silently ignored.
+  const [activeTab, setActiveTab] = useState(
+    () => (typeof window !== "undefined" && window.location.hash ? window.location.hash.slice(1) : "company"),
+  );
+
   const getCustomerFn = useServerFn(getCustomer);
   const listAddressesFn = useServerFn(listAddresses);
   const listContactsFn = useServerFn(listContacts);
@@ -400,7 +408,7 @@ function CustomerDetail() {
         </div>
       </div>
 
-      <Tabs defaultValue="company" dir="rtl" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl" className="w-full">
         <TabsList className="grid w-full max-w-3xl grid-cols-5">
           <TabsTrigger value="company" className="gap-2">
             <FileText className="h-4 w-4" />

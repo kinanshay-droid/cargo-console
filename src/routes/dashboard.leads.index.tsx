@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { ArrowRight, Sparkles, Plus, Circle, CalendarClock, Search, Loader2, ExternalLink, ListTodo, Zap, FileText, Calendar, Phone, Mail, Folder, Paperclip, Star, Bell, ClipboardList } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { ArrowRight, Sparkles, Plus, Circle, CalendarClock, Search, Loader2, ExternalLink, ListTodo, Zap, FileText, Calendar, Phone, Mail, Folder, Paperclip, Star, Bell, ClipboardList, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { listLeadTasks, addLeadTask, completeLeadTask, type LeadWithTasks, type LeadTaskRow } from "@/lib/lead-tasks.functions";
 import { createActivity } from "@/lib/customer-activities.functions";
+import { getCommercial, saveCommercial } from "@/lib/customers.functions";
+import { supabase } from "@/integrations/supabase/client";
 import { customerInitials, customerPalette } from "@/lib/customers-demo";
 import { TONE_GRADIENT, type Tone } from "@/lib/theme";
 
@@ -250,7 +252,7 @@ function QuickActionsMenu({ customerId, companyName }: { customerId: string; com
       navigate({ to: "/dashboard/customers/$id", params: { id: customerId } });
       return;
     }
-    if (kind === "docs" || kind === "favorite") {
+    if (kind === "favorite") {
       toast.info("בקרוב");
       return;
     }
@@ -296,7 +298,15 @@ function QuickActionsMenu({ customerId, companyName }: { customerId: string; com
           onOpenChange={(v) => !v && setActiveKind(null)}
         />
       )}
-      {activeKind && activeKind !== "task" && (
+      {activeKind === "docs" && (
+        <DocsDialog
+          customerId={customerId}
+          companyName={companyName}
+          open
+          onOpenChange={(v) => !v && setActiveKind(null)}
+        />
+      )}
+      {activeKind && activeKind !== "task" && activeKind !== "docs" && (
         <ActivityDialog
           customerId={customerId}
           companyName={companyName}
@@ -311,7 +321,7 @@ function QuickActionsMenu({ customerId, companyName }: { customerId: string; com
 
 const ACTIVITY_META: Record<string, { label: string; type: string; withDue?: boolean }> = {
   meeting: { label: "פגישה", type: "meeting", withDue: true },
-  call: { label: "שיחה", type: "call" },
+  call: { label: "שיחה", type: "call", withDue: true },
   email: { label: "Email", type: "email" },
   reminder: { label: "תזכורת", type: "note", withDue: true },
 };
@@ -382,6 +392,134 @@ function ActivityDialog({
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Documents are stored in Supabase Storage (bucket "customer-documents",
+// mirroring the existing "price-lists" bucket pattern — see
+// customer-commercial-tab.tsx) and the file list itself is persisted as a
+// `documents` array inside customer_commercial.data, the same generic
+// per-customer JSONB blob getCommercial/saveCommercial already manage.
+// saveCommercial replaces the whole `data` column, so every write here
+// spreads the freshly-loaded commercial data first to avoid clobbering
+// unrelated fields (price list, discount, etc.) already saved there.
+const DOCUMENTS_BUCKET = "customer-documents";
+type DocumentRecord = { path: string; name: string; uploadedAt: string };
+
+function DocsDialog({
+  customerId, companyName, open, onOpenChange,
+}: {
+  customerId: string; companyName: string; open: boolean; onOpenChange: (v: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const getCommercialFn = useServerFn(getCommercial);
+  const saveCommercialFn = useServerFn(saveCommercial);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const { data: commercial, isLoading } = useQuery({
+    queryKey: ["customer-commercial", customerId],
+    queryFn: () => getCommercialFn({ data: { customerId } }),
+    enabled: open,
+  });
+  const documents: DocumentRecord[] = Array.isArray(commercial?.documents)
+    ? (commercial.documents as unknown as DocumentRecord[])
+    : [];
+
+  async function persist(nextDocs: DocumentRecord[]) {
+    const base = (commercial ?? {}) as Record<string, unknown>;
+    await saveCommercialFn({ data: { customerId, data: { ...base, documents: nextDocs } } });
+    qc.invalidateQueries({ queryKey: ["customer-commercial", customerId] });
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "bin";
+      const path = `${customerId}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from(DOCUMENTS_BUCKET).upload(path, file, { upsert: false });
+      if (error) throw error;
+      await persist([...documents, { path, name: file.name, uploadedAt: new Date().toISOString() }]);
+      toast.success("המסמך הועלה");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "העלאת המסמך נכשלה");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function handleOpen(doc: DocumentRecord) {
+    const { data, error } = await supabase.storage.from(DOCUMENTS_BUCKET).createSignedUrl(doc.path, 60 * 10);
+    if (error || !data) {
+      toast.error("לא ניתן לפתוח את הקובץ");
+      return;
+    }
+    window.open(data.signedUrl, "_blank");
+  }
+
+  async function handleRemove(doc: DocumentRecord) {
+    await supabase.storage.from(DOCUMENTS_BUCKET).remove([doc.path]);
+    await persist(documents.filter((d) => d.path !== doc.path));
+    toast.success("המסמך הוסר");
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent dir="rtl" className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-right">מסמכים — {companyName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 pt-2">
+          <input ref={fileRef} type="file" className="hidden" onChange={handleUpload} />
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+            העלאת מסמך
+          </Button>
+          {isLoading ? (
+            <div className="py-4 text-center text-sm text-muted-foreground">טוען...</div>
+          ) : documents.length === 0 ? (
+            <div className="py-4 text-center text-sm text-muted-foreground">אין מסמכים עדיין</div>
+          ) : (
+            <div className="space-y-1.5">
+              {documents.map((doc) => (
+                <div key={doc.path} className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
+                  <FileText className="h-4 w-4 shrink-0 text-primary" />
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 truncate text-right hover:underline"
+                    onClick={() => handleOpen(doc)}
+                  >
+                    {doc.name}
+                  </button>
+                  <button
+                    type="button"
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => handleRemove(doc)}
+                    aria-label="הסרה"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <DialogFooter className="flex-row-reverse justify-start gap-2 sm:flex-row-reverse sm:justify-start">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            סגירה
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
