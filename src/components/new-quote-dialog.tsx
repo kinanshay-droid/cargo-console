@@ -1144,9 +1144,8 @@ export function NewQuoteDialog({
               </Section>
 
               <Section title="מאפייני מטען" action={<span className="text-xs text-muted-foreground">ניתן לבחור כמה שדרוש</span>}>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="flex flex-wrap gap-2">
                   {ATTR_OPTIONS.map((a) => {
-                    const Icon = a.icon;
                     const on = attrs[a.id];
                     return (
                       <button
@@ -1154,17 +1153,12 @@ export function NewQuoteDialog({
                         type="button"
                         onClick={() => setAttrs((s) => ({ ...s, [a.id]: !s[a.id] }))}
                         className={cn(
-                          "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition",
-                          on ? "border-primary bg-primary/5 text-foreground" : "hover:bg-muted/40 text-muted-foreground",
+                          "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                          on ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground hover:bg-muted",
                         )}
                       >
-                        <div className={cn("flex h-7 w-7 items-center justify-center rounded-md", on ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                          <Icon className="h-3.5 w-3.5" />
-                        </div>
-                        <span className="flex-1 text-right">{a.label}</span>
-                        <div className={cn("h-4 w-4 rounded border", on ? "border-primary bg-primary" : "border-muted-foreground/30")}>
-                          {on && <Check className="h-3 w-3 text-primary-foreground" />}
-                        </div>
+                        {on && <Check className="h-3 w-3" />}
+                        {a.label}
                       </button>
                     );
                   })}
