@@ -178,6 +178,24 @@ function CustomerDetail() {
   const [saving, setSaving] = useState(false);
   const commercialRef = useRef<CommercialHandle>(null);
 
+  // Once a customer is registered in Priority (via "ייצא ל-PDF (Priority)"
+  // below), Priority assigns its own customer number — recorded here and,
+  // once set, shown instead of the internal CUST- code everywhere on this
+  // page (display only: customer_code/id stay the real routing/lookup
+  // keys). Stored in customer_commercial.data, same generic per-customer
+  // JSONB blob the "documents" quick action already writes to — so save()
+  // below must merge with the existing commercial data, not replace it
+  // wholesale, or it would silently wipe out those documents.
+  const [priorityCustomerNumber, setPriorityCustomerNumber] = useState("");
+
+  useEffect(() => {
+    if (!commercialData) return;
+    const raw = (commercialData as Record<string, unknown>).priorityCustomerNumber;
+    setPriorityCustomerNumber(typeof raw === "string" ? raw : "");
+  }, [commercialData]);
+
+  const displayCustomerCode = priorityCustomerNumber.trim() || customer?.customer_code || "";
+
   useEffect(() => {
     if (!customer) return;
     const c = customer as Record<string, string | null>;
@@ -320,7 +338,16 @@ function CustomerDetail() {
         saveCommercialFn({
           data: {
             customerId: id,
-            data: commercialRef.current?.getData() ?? {},
+            // Merge onto the existing commercial data instead of replacing
+            // it outright — saveCommercial overwrites the whole JSONB
+            // column, and CustomerCommercialTab's getData() only returns
+            // the fields it manages, so a plain replace here would drop
+            // priorityCustomerNumber and the documents list.
+            data: {
+              ...(commercialData as Record<string, unknown> | undefined),
+              ...(commercialRef.current?.getData() ?? {}),
+              priorityCustomerNumber: priorityCustomerNumber.trim() || null,
+            },
           },
         }),
       ]);
@@ -378,7 +405,7 @@ function CustomerDetail() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{customer.company_name}</h1>
-            <p className="text-sm text-muted-foreground">תיק לקוח · <span className="font-mono">{customer.customer_code}</span></p>
+            <p className="text-sm text-muted-foreground">תיק לקוח · <span className="font-mono">{displayCustomerCode}</span></p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -443,7 +470,15 @@ function CustomerDetail() {
                 <Input value={tradeName} onChange={(e) => setTradeName(e.target.value)} />
               </Field>
               <Field label="מספר לקוח">
-                <Input value={customer.customer_code} readOnly className="bg-muted font-mono" />
+                <Input value={displayCustomerCode} readOnly className="bg-muted font-mono" />
+              </Field>
+              <Field label="מספר תיק בפריוריטי" hint="אחרי פתיחת הלקוח ב-Priority — יחליף את מספר הלקוח המוצג בכל מקום בתיק זה">
+                <Input
+                  value={priorityCustomerNumber}
+                  onChange={(e) => setPriorityCustomerNumber(e.target.value)}
+                  placeholder="לדוגמה: 12345"
+                  className="font-mono"
+                />
               </Field>
               <Field label="סטטוס">
                 <Select value={companyStatus} onValueChange={(v) => setCompanyStatus(v as typeof companyStatus)}>
@@ -682,15 +717,18 @@ function Field({
   label,
   children,
   className,
+  hint,
 }: {
   label: string;
   children: React.ReactNode;
   className?: string;
+  hint?: string;
 }) {
   return (
     <div className={`space-y-1.5 ${className ?? ""}`}>
       <Label className="text-xs font-medium text-muted-foreground">{label}</Label>
       {children}
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
