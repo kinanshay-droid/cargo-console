@@ -1590,7 +1590,7 @@ export function NewQuoteDialog({
                     <FolderOpen className="h-4 w-4" />
                   </span>
                   <span className="flex-1">
-                    <span className="block text-sm font-medium">פתח תיק ייצוא</span>
+                    <span className="block text-sm font-medium">פתח הצעה</span>
                     <span className="block text-xs text-muted-foreground">שמור ועבור לדף ההצעה</span>
                   </span>
                 </button>
