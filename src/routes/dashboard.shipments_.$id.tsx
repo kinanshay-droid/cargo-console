@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeftRight, ArrowRight, Check, Plus, Save, Trash2, UserRound } from "lucide-react";
+import { ArrowRight, Check, Plus, Save, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,6 @@ import {
   getCase,
   updateCase,
   updateCasePipelineStatus,
-  createPickupCase,
   listServiceReps,
   assignCaseRep,
   CASE_PIPELINE_STATUS_META,
@@ -286,7 +285,6 @@ function CaseDetail() {
   const getCaseFn = useServerFn(getCase);
   const updateCaseFn = useServerFn(updateCase);
   const updateCasePipelineStatusFn = useServerFn(updateCasePipelineStatus);
-  const createPickupCaseFn = useServerFn(createPickupCase);
   const listServiceRepsFn = useServerFn(listServiceReps);
   const assignCaseRepFn = useServerFn(assignCaseRep);
 
@@ -309,21 +307,6 @@ function CaseDetail() {
       queryClient.invalidateQueries({ queryKey: ["operations-cases"] });
     },
     onError: () => toast.error("עדכון הסטטוס נכשל"),
-  });
-
-  // Creates a genuinely separate, independently-numbered case for the
-  // pickup/distribution leg (linked back to this one by case number),
-  // rather than just relabeling this case's own status.
-  const transferMutation = useMutation({
-    mutationFn: (input: { pickupDueDate: string | null }) =>
-      createPickupCaseFn({ data: { id, pickupDueDate: input.pickupDueDate } }),
-    onSuccess: (child) => {
-      toast.success(`נפתח תיק איסוף/הפצה ${child.case_code}, מקושר לתיק זה`);
-      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
-      queryClient.invalidateQueries({ queryKey: ["operations-cases"] });
-      navigate({ to: "/dashboard/shipments/$id", params: { id: child.id } });
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "העברה לאיסוף/הפצה נכשלה"),
   });
 
   const assignRepMutation = useMutation({
@@ -357,16 +340,28 @@ function CaseDetail() {
   const [originalPayload, setOriginalPayload] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
 
-  const [pickupDueDate, setPickupDueDate] = useState("");
-  useEffect(() => {
-    if (!caseRow) return;
-    const raw = casePayload.pickupDueDate;
-    setPickupDueDate(typeof raw === "string" ? raw : "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseRow]);
-
-  function handleTransferToPickup() {
-    transferMutation.mutate({ pickupDueDate: pickupDueDate || null });
+  // Picking a date here (the CritiLog "איסוף/מסירה בישראל" field, the same
+  // one the courier team's own sheet is keyed off) is now the one and only
+  // way a case gets routed into the Pickup/Distribution flow — replaces the
+  // old separate "מועד לביצוע" field + transfer button. The chosen date IS
+  // the task's due date, and picking it immediately moves this case's own
+  // pipeline status to "ready_for_pickup" (rather than forking a new linked
+  // case) and takes the user straight to the Pickup/Distribution screen.
+  function handlePickupIsraelDate(value: string) {
+    updCl("pickupIsrael", value);
+    if (!value || !form) return;
+    statusMutation.mutate(
+      {
+        status: "ready_for_pickup",
+        extra: { pickupDueDate: value, critilog: { ...form.critilog, pickupIsrael: value } },
+      },
+      {
+        onSuccess: () => {
+          toast.success("התיק הועבר למסך איסוף/הפצה");
+          navigate({ to: "/dashboard/pickup-distribution" });
+        },
+      },
+    );
   }
 
   useEffect(() => {
@@ -903,8 +898,8 @@ function CaseDetail() {
             <Field label="סטטוס לבדיקה">
               <Input value={form.critilog.reviewStatus} onChange={(e) => updCl("reviewStatus", e.target.value)} />
             </Field>
-            <Field label="איסוף/מסירה בישראל">
-              <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => updCl("pickupIsrael", e.target.value)} />
+            <Field label="איסוף/מסירה בישראל" hint="בחירת תאריך מעבירה את התיק למסך איסוף/הפצה">
+              <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => handlePickupIsraelDate(e.target.value)} />
             </Field>
             <Field label="איסוף/מסירה בחול">
               <Input type="date" value={form.critilog.pickupAbroad} onChange={(e) => updCl("pickupAbroad", e.target.value)} />
@@ -1302,11 +1297,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     </div>
   );
 }
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
