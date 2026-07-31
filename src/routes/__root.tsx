@@ -132,9 +132,35 @@ function RootComponent() {
         <Outlet />
         <Toaster richColors position="top-right" />
         <SupabaseAuthListener />
+        <OverlayPointerEventsGuard />
       </I18nProvider>
     </QueryClientProvider>
   );
+}
+
+// Known Radix UI issue: when one overlay primitive (e.g. a Popover, like the
+// "פעולה מהירה" quick-actions menu) closes at almost the same moment another
+// (a Dialog it opened) does too — every save-and-close action-dialog flow in
+// this app does exactly that — each primitive manages
+// document.body.style.pointerEvents independently and can leave it stuck at
+// "none" after the last one closes, even though nothing is open anymore.
+// That silently blocks every click on the page, including the very button
+// that's supposed to reopen the menu, until a full reload. This watches for
+// that specific stuck state (pointer-events: none with zero Radix overlays
+// actually open) and clears it.
+function OverlayPointerEventsGuard() {
+  useEffect(() => {
+    const clearIfStuck = () => {
+      if (document.body.style.pointerEvents !== "none") return;
+      if (!document.querySelector('[data-state="open"]')) {
+        document.body.style.pointerEvents = "";
+      }
+    };
+    const observer = new MutationObserver(clearIfStuck);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
+    return () => observer.disconnect();
+  }, []);
+  return null;
 }
 
 // One global listener: refetch on identity transitions and redirect on sign-out.
