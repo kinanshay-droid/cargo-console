@@ -21,8 +21,8 @@ import { TONE_GRADIENT } from "@/lib/theme";
 export const Route = createFileRoute("/dashboard/pickup-distribution/today")({
   head: () => ({
     meta: [
-      { title: "משימות להיום — איסוף/הפצה — AFIK Logistics Platform" },
-      { name: "description", content: "משלוחי איסוף/הפצה שמועד הביצוע שלהם הוא היום." },
+      { title: "משימות להיום — צוות הבלדרים — AFIK Logistics Platform" },
+      { name: "description", content: "דשבורד תפעול איסוף/הפצה לצוות הבלדרים — משימות מתוזמנות להיום." },
     ],
   }),
   component: TodayTasksPage,
@@ -49,30 +49,66 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function toText(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
 function getPipelineStatus(payload: unknown): CasePipelineStatus {
   const p = isRecord(payload) ? payload : {};
   const raw = p.pipelineStatus;
   return typeof raw === "string" && raw in CASE_PIPELINE_STATUS_META ? (raw as CasePipelineStatus) : "new";
 }
 
-function getAssignedRep(payload: unknown): CaseRep {
-  const p = isRecord(payload) ? payload : {};
-  const rep = p.assignedRep;
-  return isRecord(rep) && typeof rep.id === "string" && rep.id
-    ? { id: String(rep.id), name: String(rep.name ?? ""), role: String(rep.role ?? "") }
-    : null;
-}
-
-function getBlNumber(payload: unknown): string | null {
-  const p = isRecord(payload) ? payload : {};
-  const raw = p.blNumber;
-  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
-}
-
 function getPickupDueDate(payload: unknown): string | null {
   const p = isRecord(payload) ? payload : {};
   const raw = p.pickupDueDate;
   return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
+
+// Mirrors the same payload.critilog columns edited on the case detail page's
+// "מעקב" section (itself mirroring the CritiLog operational tracking sheet)
+// — this is the exact set of columns the courier team's own reference sheet
+// uses day to day (see "דשבורד תפעול אסוף הפצה.xlsx"): Name / לקוח / איש
+// שירות / שטר מטען / REF / לתפעול / ניתוב / איסוף-מסירה בישראל / סוג /
+// בלדר / סטטוס לבדיקה.
+type CritiLogRow = {
+  name: string;
+  serviceRep: string;
+  blNumber: string;
+  customer: string;
+  ref: string;
+  route: string;
+  type: string;
+  reviewStatus: string;
+  opsNotes: string;
+  pickupIsrael: string;
+  courier: string;
+};
+
+function getCritiLog(payload: unknown): CritiLogRow {
+  const p = isRecord(payload) ? payload : {};
+  const raw = isRecord(p.critilog) ? p.critilog : {};
+  return {
+    name: toText(raw.name),
+    serviceRep: toText(raw.serviceRep),
+    blNumber: toText(raw.blNumber),
+    customer: toText(raw.customer),
+    ref: toText(raw.ref),
+    route: toText(raw.route),
+    type: toText(raw.type),
+    reviewStatus: toText(raw.reviewStatus),
+    opsNotes: toText(raw.opsNotes),
+    pickupIsrael: toText(raw.pickupIsrael),
+    courier: toText(raw.courier),
+  };
+}
+
+function formatPickupIsrael(raw: string): string {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return raw;
+  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+  return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }) + (hasTime ? ` · ${d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}` : "");
 }
 
 const PICKUP_STAGE: CasePipelineStatus = "ready_for_pickup";
@@ -102,6 +138,14 @@ function TodayTasksPage() {
     [cases],
   );
 
+  const todayCasesByKind = useMemo(() => {
+    const groups: Record<ShipKindValue, typeof todayCases> = { export: [], import: [], distribution: [], domestic: [] };
+    for (const c of todayCases) {
+      if (isShipKind(c.shipment_kind)) groups[c.shipment_kind].push(c);
+    }
+    return groups;
+  }, [todayCases]);
+
   const todayLabel = useMemo(
     () => new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
     [],
@@ -110,8 +154,8 @@ function TodayTasksPage() {
   return (
     <div dir="rtl" className="space-y-6">
       <PageHeader
-        title="משימות להיום"
-        description={`איסוף/הפצה — ${todayLabel}`}
+        title="דשבורד תפעול — צוות הבלדרים"
+        description={`משימות איסוף/הפצה מתוזמנות להיום — ${todayLabel}`}
         action={
           <Button asChild variant="outline" className="gap-2">
             <Link to="/dashboard/pickup-distribution">
@@ -133,79 +177,97 @@ function TodayTasksPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-right">לקוח</TableHead>
-              <TableHead className="text-right">מס' תיק</TableHead>
-              <TableHead className="text-right">סוג משלוח</TableHead>
-              <TableHead className="text-right">נציג מטפל</TableHead>
-              <TableHead className="text-right">מס' שטר מטען</TableHead>
-              <TableHead className="text-right">סטטוס</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                  טוען...
-                </TableCell>
-              </TableRow>
-            ) : todayCases.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
-                  אין משימות מתוזמנות להיום
-                </TableCell>
-              </TableRow>
-            ) : (
-              todayCases.map((c) => {
-                const rep = getAssignedRep(c.payload);
-                const blNumber = getBlNumber(c.payload);
-                const kind = isShipKind(c.shipment_kind) ? SHIP_KIND_CONFIG[c.shipment_kind] : null;
-                return (
-                  <TableRow
-                    key={c.id}
-                    onClick={() => navigate({ to: "/dashboard/shipments/$id", params: { id: c.id } })}
-                    className="cursor-pointer hover:bg-muted/40"
-                  >
-                    <TableCell className="text-xs">
-                      <div className="font-medium">{c.customer_name ?? "—"}</div>
-                      {c.customer_ref ? (
-                        <div className="text-[11px] text-muted-foreground">{c.customer_ref}</div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <Link
-                        to="/dashboard/shipments/$id"
-                        params={{ id: c.id }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-primary hover:underline"
-                      >
-                        {getCaseDisplayCode(c.payload, c.case_code)}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {kind ? (
-                        <Badge className={cn("gap-1", kind.badgeClass)}>
-                          <kind.icon className="h-3 w-3" /> {kind.label}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {isLoading ? (
+        <div className="rounded-2xl border bg-card py-10 text-center text-muted-foreground">טוען...</div>
+      ) : todayCases.length === 0 ? (
+        <div className="rounded-2xl border bg-card py-10 text-center text-sm text-muted-foreground">
+          אין משימות מתוזמנות להיום
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {SHIP_KIND_ORDER.map((kind) => {
+            const kindCases = todayCasesByKind[kind];
+            if (kindCases.length === 0) return null;
+            const conf = SHIP_KIND_CONFIG[kind];
+            const KindIcon = conf.icon;
+            return (
+              <div key={kind} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="flex items-center justify-between border-b p-4">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <span className={cn("flex h-7 w-7 items-center justify-center rounded-full", conf.badgeClass)}>
+                      <KindIcon className="h-3.5 w-3.5" />
+                    </span>
+                    {conf.label}
+                  </div>
+                  <Badge className={conf.badgeClass}>{kindCases.length}</Badge>
+                </div>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="whitespace-nowrap text-right">מס' תיק</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">Name</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">לקוח</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">איש שירות</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">שטר מטען</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">REF</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">לתפעול</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">ניתוב</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">איסוף/מסירה בישראל</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">סוג</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">בלדר</TableHead>
+                        <TableHead className="whitespace-nowrap text-right">סטטוס לבדיקה</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {kindCases.map((c) => {
+                        const cl = getCritiLog(c.payload);
+                        return (
+                          <TableRow
+                            key={c.id}
+                            onClick={() => navigate({ to: "/dashboard/shipments/$id", params: { id: c.id } })}
+                            className="cursor-pointer hover:bg-muted/40"
+                          >
+                            <TableCell className="whitespace-nowrap font-mono text-xs">
+                              <Link
+                                to="/dashboard/shipments/$id"
+                                params={{ id: c.id }}
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-primary hover:underline"
+                              >
+                                {getCaseDisplayCode(c.payload, c.case_code)}
+                              </Link>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">{cl.name || "—"}</TableCell>
+                            <TableCell className="whitespace-nowrap text-xs">{cl.customer || c.customer_name || "—"}</TableCell>
+                            <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{cl.serviceRep || "—"}</TableCell>
+                            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">{cl.blNumber || "—"}</TableCell>
+                            <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">{cl.ref || c.customer_ref || "—"}</TableCell>
+                            <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground" title={cl.opsNotes}>
+                              {cl.opsNotes || "—"}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{cl.route || "—"}</TableCell>
+                            <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{formatPickupIsrael(cl.pickupIsrael)}</TableCell>
+                            <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{cl.type || "—"}</TableCell>
+                            <TableCell className="whitespace-nowrap text-xs font-medium">{cl.courier || "—"}</TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {cl.reviewStatus ? (
+                                <Badge className="bg-accent/15 text-accent">{cl.reviewStatus}</Badge>
+                              ) : (
+                                <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
