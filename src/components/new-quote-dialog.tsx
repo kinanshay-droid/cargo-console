@@ -297,7 +297,12 @@ export type PackageRow = {
 };
 
 export function makePackageRow(): PackageRow {
-  return { id: uid(), pallet: null, customLength: "", customWidth: "", customHeight: "", unitWeight: "1", unitQty: "" };
+  // unitQty defaults to "1" (not blank) so a freshly added package —
+  // dims + weight filled in, quantity left untouched — immediately counts
+  // toward the gross/volumetric weight summary as one real item, instead of
+  // silently contributing zero until the person also remembers to type a
+  // quantity (matches unitWeight's own "1" default, for the same reason).
+  return { id: uid(), pallet: null, customLength: "", customWidth: "", customHeight: "", unitWeight: "1", unitQty: "1" };
 }
 
 // Resolves a package's L×W×H in cm, whether it came from a preset pallet or manual entry.
