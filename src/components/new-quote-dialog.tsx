@@ -503,7 +503,7 @@ export function NewQuoteDialog({
     setOriginPort("(TLV) Tel Aviv, Israel");
     setDestPort("(JFK) New York, USA");
   }, [kind]);
-  const [transit, setTransit] = useState<string[]>(["FRA"]);
+  const [transit, setTransit] = useState<string[]>([]);
   const [newTransit, setNewTransit] = useState("");
   const [departDate, setDepartDate] = useState("2025-06-10");
   const [arriveDate, setArriveDate] = useState("2025-06-12");
