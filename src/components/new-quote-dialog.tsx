@@ -74,6 +74,7 @@ import {
   FolderOpen,
   Save,
   FileDown,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   Dialog,
@@ -747,19 +748,29 @@ export function NewQuoteDialog({
     >
       <DialogContent dir="rtl" className="max-w-5xl p-0 overflow-hidden">
         <div className="border-b bg-muted/30 p-6">
-          <DialogHeader className="text-right">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Building2 className="h-4 w-4" />
-              </span>
-              {step === 1 ? "בחירת לקוח" : STEPS[step - 1].label}
-            </DialogTitle>
-            <DialogDescription>
-              {step === 1
-                ? "בחר את הלקוח עבור תיעוד הצעת המחיר"
-                : `שלב ${step} מתוך 6 — הצעת מחיר חדשה`}
-            </DialogDescription>
-          </DialogHeader>
+          <div className="flex items-start justify-between gap-3">
+            <DialogHeader className="text-right">
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                {step === 1 ? "בחירת לקוח" : STEPS[step - 1].label}
+              </DialogTitle>
+              <DialogDescription>
+                {step === 1
+                  ? "בחר את הלקוח עבור תיעוד הצעת המחיר"
+                  : `שלב ${step} מתוך 6 — הצעת מחיר חדשה`}
+              </DialogDescription>
+            </DialogHeader>
+            <a
+              href="/shipment-checklist.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" /> צ'קליסט למשלוח
+            </a>
+          </div>
 
           {/* Stepper */}
           <div className="mt-5 flex items-center justify-between gap-2" dir="ltr">
