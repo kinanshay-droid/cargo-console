@@ -191,11 +191,19 @@ const creds = {
       }
       // Best-effort, idempotent: populates the Demo Organization's customer
       // list on first demo login. Never blocks the demo login itself if it
-      // fails for any reason (e.g. already seeded, or a transient error).
+      // fails — but the error is surfaced (instead of silently swallowed)
+      // so a real failure (RLS, missing table, etc.) is visible/debuggable
+      // rather than just quietly not seeding anything.
       try {
-        await seedDemoCustomersFn();
-      } catch {
-        /* ignore — demo login should still proceed */
+        const result = await seedDemoCustomersFn();
+        if (result?.inserted) {
+          toast.success(`נוספו ${result.inserted} לקוחות דמו`);
+        }
+      } catch (seedErr) {
+        console.error("seedDemoCustomers failed", seedErr);
+        toast.error(
+          `זריעת לקוחות הדמו נכשלה: ${seedErr instanceof Error ? seedErr.message : String(seedErr)}`,
+        );
       }
       toast.success(`ברוך הבא לדמו — ${role.title}`);
       setRoleDialogOpen(false);
