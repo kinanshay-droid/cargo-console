@@ -183,6 +183,19 @@ function PickupDistributionPage() {
     for (const c of dateFilteredCases) {
       if (isShipKind(c.shipment_kind)) groups[c.shipment_kind].push(c);
     }
+    // Sort each kind's rows by "מועד לביצוע" (payload.pickupDueDate), soonest
+    // first — rows with no due date set yet sink to the bottom rather than
+    // being sorted arbitrarily.
+    for (const k of SHIP_KIND_ORDER) {
+      groups[k].sort((a, b) => {
+        const da = getPickupDueDate(a.payload);
+        const db = getPickupDueDate(b.payload);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return new Date(da).getTime() - new Date(db).getTime();
+      });
+    }
     return groups;
   }, [dateFilteredCases]);
 
