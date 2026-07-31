@@ -2,9 +2,10 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck, CalendarRange } from "lucide-react";
+import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck, CalendarRange, ListChecks } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
@@ -190,6 +191,13 @@ function PickupDistributionPage() {
       <PageHeader
         title="איסוף/הפצה"
         description={`משלוחים שהועברו לסטטוס "${CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}" — ${CASE_PIPELINE_STATUS_META[PICKUP_STAGE].description}.`}
+        action={
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/dashboard/pickup-distribution/today">
+              <ListChecks className="h-4 w-4" /> הצג משימות להיום
+            </Link>
+          </Button>
+        }
       />
 
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
