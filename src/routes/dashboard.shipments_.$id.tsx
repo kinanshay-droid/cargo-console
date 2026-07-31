@@ -733,28 +733,6 @@ function CaseDetail() {
             <p className="mt-2 text-xs text-muted-foreground">
               {CASE_PIPELINE_STATUS_META[currentPipelineStatus].description}
             </p>
-
-            <div className="mt-4 flex flex-wrap items-end gap-3 border-t pt-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">מועד לביצוע</Label>
-                <Input
-                  type="date"
-                  value={pickupDueDate}
-                  onChange={(e) => setPickupDueDate(e.target.value)}
-                  className="w-40"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2"
-                onClick={handleTransferToPickup}
-                disabled={transferMutation.isPending || typeof casePayload.pickupCaseId === "string"}
-              >
-                <ArrowLeftRight className="h-4 w-4" />
-                {typeof casePayload.pickupCaseId === "string" ? "כבר הועבר לאיסוף/הפצה" : "העבר לאיסוף/הפצה"}
-              </Button>
-            </div>
           </div>
 
           {form.shipmentKind !== "domestic" && (
