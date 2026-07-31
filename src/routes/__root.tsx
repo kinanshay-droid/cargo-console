@@ -142,23 +142,38 @@ function RootComponent() {
 // "פעולה מהירה" quick-actions menu) closes at almost the same moment another
 // (a Dialog it opened) does too — every save-and-close action-dialog flow in
 // this app does exactly that — each primitive manages
-// document.body.style.pointerEvents independently and can leave it stuck at
-// "none" after the last one closes, even though nothing is open anymore.
-// That silently blocks every click on the page, including the very button
-// that's supposed to reopen the menu, until a full reload. This watches for
-// that specific stuck state (pointer-events: none with zero Radix overlays
-// actually open) and clears it.
+// document.body.style.pointerEvents (and aria-hidden on background siblings)
+// independently and can leave it stuck after the last one closes, even
+// though nothing is open anymore. That silently blocks every click on the
+// page, including the very button that's supposed to reopen the menu, until
+// a full reload.
+//
+// A MutationObserver alone isn't reliable here: it only fires on the
+// mutation event itself, and if that fires while the *other* primitive's
+// close/cleanup effect hasn't run yet, clearing it there can race with that
+// cleanup re-locking it right after. So this also polls on an interval —
+// cheap, and guarantees the stuck state gets caught and corrected on the
+// very next tick no matter how the two primitives' timings interleave.
 function OverlayPointerEventsGuard() {
   useEffect(() => {
     const clearIfStuck = () => {
-      if (document.body.style.pointerEvents !== "none") return;
-      if (!document.querySelector('[data-state="open"]')) {
+      const hasOpenOverlay = !!document.querySelector('[data-state="open"]');
+      if (hasOpenOverlay) return;
+      if (document.body.style.pointerEvents === "none") {
         document.body.style.pointerEvents = "";
+      }
+      if (document.documentElement.style.pointerEvents === "none") {
+        document.documentElement.style.pointerEvents = "";
       }
     };
     const observer = new MutationObserver(clearIfStuck);
     observer.observe(document.body, { attributes: true, attributeFilter: ["style"] });
-    return () => observer.disconnect();
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    const interval = setInterval(clearIfStuck, 400);
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
   }, []);
   return null;
 }

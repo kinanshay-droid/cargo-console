@@ -256,7 +256,13 @@ function QuickActionsMenu({ customerId, companyName }: { customerId: string; com
       toast.info("בקרוב");
       return;
     }
-    setActiveKind(kind);
+    // Deferred by a tick on purpose: opening the follow-up Dialog in the
+    // same tick the Popover above closes is the known Radix pattern that
+    // leaves document.body's pointer-events stuck at "none" afterward,
+    // silently blocking every click on the page (including this same
+    // button) until reload — this lets the Popover's own close/cleanup
+    // finish first instead of racing it.
+    setTimeout(() => setActiveKind(kind), 0);
   };
 
   return (
