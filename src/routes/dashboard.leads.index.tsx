@@ -353,7 +353,13 @@ function ActivityDialog({
           subject: subject || meta.label,
           notes: notes || null,
           dueAt: dueAt ? new Date(dueAt).toISOString() : null,
-          nextTask: kind === "reminder" ? subject || meta.label : null,
+          // Only "reminder" set this before, so a saved פגישה/שיחה never
+          // showed up in the lead's open-tasks list (listLeadTasks only
+          // surfaces activities with next_task set) even though it has a
+          // real follow-up date — meta.withDue already marks exactly the
+          // kinds that represent a scheduled follow-up (meeting, call,
+          // reminder), so use that instead of singling out "reminder".
+          nextTask: meta.withDue ? subject || meta.label : null,
         },
       }),
     onSuccess: () => {
