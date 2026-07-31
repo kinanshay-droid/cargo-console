@@ -490,8 +490,19 @@ export function NewQuoteDialog({
   const [extraNotes, setExtraNotes] = useState("");
 
   // Step 4 state — אופי לוגיסטי
+  // Defaults assume an import (goods arriving into Israel), the more common
+  // case — but for an export shipment that's backwards (it should start in
+  // Israel, not end there), so a dedicated effect below flips them the
+  // first time "ייצוא" is selected.
   const [originPort, setOriginPort] = useState("(JFK) New York, USA");
   const [destPort, setDestPort] = useState("(TLV) Tel Aviv, Israel");
+  const portsSwappedForExport = useRef(false);
+  useEffect(() => {
+    if (kind !== "export" || portsSwappedForExport.current) return;
+    portsSwappedForExport.current = true;
+    setOriginPort("(TLV) Tel Aviv, Israel");
+    setDestPort("(JFK) New York, USA");
+  }, [kind]);
   const [transit, setTransit] = useState<string[]>(["FRA"]);
   const [newTransit, setNewTransit] = useState("");
   const [departDate, setDepartDate] = useState("2025-06-10");
