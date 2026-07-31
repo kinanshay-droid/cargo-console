@@ -32,7 +32,7 @@ export const REVIEW_STATUS_OPTIONS: ReviewStatusOption[] = [
   { value: "המראה", bg: "#4a6fa5", fg: "#ffffff" },
   { value: "POD", bg: "#6b7280", fg: "#ffffff" },
   { value: "ממתין ל-PA", bg: "#e0c341", fg: "#332b04" },
-  { value: "לוגיסטיקה המשכיות", bg: "#8b6fb3", fg: "#ffffff" },
+  { value: "לוודא המשכיות", bg: "#8b6fb3", fg: "#ffffff" },
   { value: "נתוני רשם", bg: "#d16b7f", fg: "#ffffff" },
   { value: "חשבון מסוכן", bg: "#7dd8d8", fg: "#0c2b2b" },
 ];
