@@ -129,6 +129,16 @@ function PackagingChecklistFormDialog({
             <Label className="text-xs">לקוח</Label>
             <Input value={data.customer} onChange={(e) => setData((d) => ({ ...d, customer: e.target.value }))} />
           </div>
+          {caseSnapshot?.boxType && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs">סוג מארז</Label>
+              <Input
+                value={caseSnapshot.boxSize ? `${caseSnapshot.boxType} — ${caseSnapshot.boxSize}` : caseSnapshot.boxType}
+                disabled
+                className="bg-muted/50 font-medium text-foreground disabled:opacity-100"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label className="text-xs">יעד</Label>
             <Input value={data.destination} onChange={(e) => setData((d) => ({ ...d, destination: e.target.value }))} />
