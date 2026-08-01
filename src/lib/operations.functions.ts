@@ -345,6 +345,46 @@ export const updateCasePipelineStatus = createServerFn({ method: "POST" })
     return row;
   });
 
+// Saves the filled-in packaging checklist (see src/lib/packaging-checklist.ts)
+// into the case's own payload as payload.packagingChecklist, using the same
+// read-modify-write pattern as updateCasePipelineStatus above — no schema
+// change needed since it rides along inside the existing JSONB column.
+export const saveCaseChecklist = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string; checklist: Record<string, unknown> }) => {
+    if (!input?.id || typeof input.id !== "string") throw new Error("id is required");
+    if (!input?.checklist || typeof input.checklist !== "object") throw new Error("checklist is required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: existing, error: getErr } = await supabase
+      .from("operations_cases")
+      .select("payload")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (getErr) throw getErr;
+    if (!existing) throw new Error("Case not found");
+
+    const payload =
+      existing.payload && typeof existing.payload === "object" && !Array.isArray(existing.payload)
+        ? (existing.payload as Record<string, unknown>)
+        : {};
+    const nextPayload = {
+      ...payload,
+      packagingChecklist: { ...data.checklist, savedAt: new Date().toISOString() },
+    };
+
+    const { data: row, error } = await supabase
+      .from("operations_cases")
+      .update({ payload: nextPayload as never })
+      .eq("id", data.id)
+      .select("id, payload")
+      .single();
+    if (error) throw error;
+    return row;
+  });
+
 // Spins off a separate, independently-numbered operations_cases row when a
 // case is transferred to Pickup/Distribution, instead of just relabeling
 // the same case's status. The new case is a full snapshot copy of the

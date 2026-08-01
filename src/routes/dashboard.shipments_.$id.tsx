@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, ClipboardCheck, Plus, Save, Trash2, UserRound } from "lucide-react";
+import { ArrowRight, Check, Plus, Save, Trash2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,6 +58,7 @@ import {
   type StopKind,
 } from "@/lib/drop-stops";
 import { REVIEW_STATUS_OPTIONS, getReviewStatusStyle } from "@/lib/review-status";
+import { PackagingChecklistDialog } from "@/components/packaging-checklist-dialog";
 
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
@@ -671,11 +672,15 @@ function CaseDetail() {
         {form && caseRow ? (
           <div className="flex flex-wrap items-center gap-2">
             {form.critilog.pickupIsrael && (
-              <Button asChild variant="outline" className="gap-2">
-                <a href="/shipment-checklist.pdf" target="_blank" rel="noopener noreferrer">
-                  <ClipboardCheck className="h-4 w-4" /> צ'קליסט למשלוח
-                </a>
-              </Button>
+              <PackagingChecklistDialog
+                caseId={id}
+                existing={casePayload.packagingChecklist}
+                defaults={{
+                  shipmentNumber: form.unifreightNumber.trim() || caseRow.case_code,
+                  customer: form.customerName,
+                  destination: form.destPort,
+                }}
+              />
             )}
             <ActionButtonGroup onSave={handleSave} saving={saving} />
           </div>
