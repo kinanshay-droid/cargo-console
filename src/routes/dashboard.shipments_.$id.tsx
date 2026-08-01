@@ -58,8 +58,8 @@ import {
   type StopKind,
 } from "@/lib/drop-stops";
 import { REVIEW_STATUS_OPTIONS, getReviewStatusStyle } from "@/lib/review-status";
-import { PackagingChecklistDialog } from "@/components/packaging-checklist-dialog";
-import type { ChecklistCaseSnapshot } from "@/lib/packaging-checklist";
+import { PackagingChecklistLauncher } from "@/components/packaging-checklist-dialog";
+import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checklist";
 
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
@@ -564,6 +564,39 @@ function CaseDetail() {
     };
   }, [form, caseRow]);
 
+  // Which physical box(es) the case actually ships in — one checklist per
+  // box. Prefers the checked temperature-packaging models (CoolGuard/
+  // BioTherm), since that's what the checklist itself is about; falls back
+  // to the general pallet rows for non-temperature-controlled cargo so the
+  // feature still works there too.
+  const checklistBoxes: ChecklistBox[] = useMemo(() => {
+    if (!form) return [];
+    const fromPackModels = form.packSelections
+      .filter((sel) => sel.qty > 0)
+      .map((sel): ChecklistBox => {
+        const calc = getPackModelCalc(sel);
+        const boxSize = calc.dims
+          ? `${calc.dims.length}×${calc.dims.width}×${calc.dims.height} ס״מ`
+          : undefined;
+        return { id: `pack:${sel.key}`, label: `${calc.label} (${sel.qty} יח')`, boxType: calc.label, boxSize };
+      });
+    if (fromPackModels.length > 0) return fromPackModels;
+
+    return form.packages
+      .filter((p) => p.pallet && Number(p.unitQty) > 0)
+      .map((p): ChecklistBox => {
+        const pallet = PALLETS.find((pl) => pl.id === p.pallet);
+        const label = pallet?.label ?? "משטח";
+        const boxSize =
+          p.pallet === "custom"
+            ? p.customLength && p.customWidth && p.customHeight
+              ? `${p.customLength}×${p.customWidth}×${p.customHeight} ס״מ`
+              : undefined
+            : pallet?.size;
+        return { id: `pallet:${p.id}`, label: `${label} (${p.unitQty} יח')`, boxType: label, boxSize };
+      });
+  }, [form]);
+
   async function handleSave() {
     if (!form) return;
     setSaving(true);
@@ -707,15 +740,16 @@ function CaseDetail() {
         {form && caseRow ? (
           <div className="flex flex-wrap items-center gap-2">
             {form.critilog.pickupIsrael && (
-              <PackagingChecklistDialog
+              <PackagingChecklistLauncher
                 caseId={id}
-                existing={casePayload.packagingChecklist}
+                boxes={checklistBoxes}
+                existingChecklists={isRecord(casePayload.packagingChecklists) ? casePayload.packagingChecklists : {}}
+                baseSnapshot={checklistCaseSnapshot ?? {}}
                 defaults={{
                   shipmentNumber: form.unifreightNumber.trim() || caseRow.case_code,
                   customer: form.customerName,
                   destination: form.destPort,
                 }}
-                caseSnapshot={checklistCaseSnapshot}
               />
             )}
             <ActionButtonGroup onSave={handleSave} saving={saving} />

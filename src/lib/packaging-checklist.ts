@@ -209,6 +209,8 @@ export type ChecklistCaseSnapshot = {
   specialInstructions?: string;
   awb?: string;
   destAddress?: string;
+  boxType?: string;
+  boxSize?: string;
 };
 
 export function buildCaseReferenceValues(snap: ChecklistCaseSnapshot): Record<string, string> {
@@ -221,5 +223,18 @@ export function buildCaseReferenceValues(snap: ChecklistCaseSnapshot): Record<st
   if (snap.specialInstructions) out.special_instructions = snap.specialInstructions;
   if (snap.awb) out.awb = snap.awb;
   if (snap.destAddress) out.dest_address = snap.destAddress;
+  if (snap.boxType) out.box_type = snap.boxType;
+  if (snap.boxSize) out.box_size = snap.boxSize;
   return out;
 }
+
+// A single physical box/packaging unit selected on the case (a checked
+// CoolGuard/BioTherm model, or — for cargo with no temperature packaging —
+// a pallet row). Each box gets its own independently-saved checklist, keyed
+// by this id, since a shipment can go out in more than one box and each one
+// needs to be verified on its own.
+export type ChecklistBox = { id: string; label: string; boxType: string; boxSize?: string };
+
+// The id used when the case has no identifiable packaging yet — a single,
+// generic checklist with no box-type reference value.
+export const GENERAL_BOX_ID = "general";

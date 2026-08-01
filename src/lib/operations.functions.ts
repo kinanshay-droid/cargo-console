@@ -345,14 +345,18 @@ export const updateCasePipelineStatus = createServerFn({ method: "POST" })
     return row;
   });
 
-// Saves the filled-in packaging checklist (see src/lib/packaging-checklist.ts)
-// into the case's own payload as payload.packagingChecklist, using the same
-// read-modify-write pattern as updateCasePipelineStatus above — no schema
-// change needed since it rides along inside the existing JSONB column.
+// Saves one box's filled-in packaging checklist (see
+// src/lib/packaging-checklist.ts) into the case's own payload, under
+// payload.packagingChecklists[boxId] — a case can ship in more than one box,
+// each verified independently, so checklists are keyed by box id rather than
+// a single object. Same read-modify-write pattern as updateCasePipelineStatus
+// above, still no schema change needed (rides along inside the existing
+// JSONB column).
 export const saveCaseChecklist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string; checklist: Record<string, unknown> }) => {
+  .inputValidator((input: { id: string; boxId: string; checklist: Record<string, unknown> }) => {
     if (!input?.id || typeof input.id !== "string") throw new Error("id is required");
+    if (!input?.boxId || typeof input.boxId !== "string") throw new Error("boxId is required");
     if (!input?.checklist || typeof input.checklist !== "object") throw new Error("checklist is required");
     return input;
   })
@@ -370,9 +374,16 @@ export const saveCaseChecklist = createServerFn({ method: "POST" })
       existing.payload && typeof existing.payload === "object" && !Array.isArray(existing.payload)
         ? (existing.payload as Record<string, unknown>)
         : {};
+    const existingChecklists =
+      payload.packagingChecklists && typeof payload.packagingChecklists === "object" && !Array.isArray(payload.packagingChecklists)
+        ? (payload.packagingChecklists as Record<string, unknown>)
+        : {};
     const nextPayload = {
       ...payload,
-      packagingChecklist: { ...data.checklist, savedAt: new Date().toISOString() },
+      packagingChecklists: {
+        ...existingChecklists,
+        [data.boxId]: { ...data.checklist, savedAt: new Date().toISOString() },
+      },
     };
 
     const { data: row, error } = await supabase
