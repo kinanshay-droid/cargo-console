@@ -1,19 +1,19 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
-import { apiRequest, clearToken } from "@/lib/api";
-import { toastApiError } from "@/lib/toast-error";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/dashboard/account")({
   head: () => ({
     meta: [
-      { title: "Account — AFIK Logistics Platform" },
-      { name: "description", content: "Update your password and email." },
+      { title: "החשבון שלי — AFIK Logistics Platform" },
+      { name: "description", content: "עדכון סיסמה וכתובת מייל." },
     ],
   }),
   component: AccountPage,
@@ -21,11 +21,8 @@ export const Route = createFileRoute("/dashboard/account")({
 
 function AccountPage() {
   return (
-    <div className="mx-auto max-w-2xl">
-      <PageHeader
-        title="Account"
-        description="Manage your own login credentials."
-      />
+    <div className="mx-auto max-w-2xl" dir="rtl">
+      <PageHeader title="החשבון שלי" description="ניהול פרטי ההתחברות שלך." />
       <div className="space-y-6">
         <ChangePasswordCard />
         <ChangeEmailCard />
@@ -35,26 +32,28 @@ function AccountPage() {
 }
 
 function ChangePasswordCard() {
-  const [form, setForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirm: "",
-  });
+  const { user } = useCurrentUser();
+  const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirm: "" });
 
   const mutation = useMutation({
-    mutationFn: () =>
-      apiRequest("/users/me/password", {
-        method: "PATCH",
-        body: {
-          currentPassword: form.currentPassword,
-          newPassword: form.newPassword,
-        },
-      }),
+    mutationFn: async () => {
+      if (!user?.email) throw new Error("לא ניתן לזהות את המשתמש המחובר");
+      // Verify the current password by re-authenticating with it before
+      // accepting a new one — supabase.auth.updateUser() alone doesn't ask
+      // for the current password, so this is the only real check we have.
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: form.currentPassword,
+      });
+      if (verifyErr) throw new Error("הסיסמה הנוכחית שגויה");
+      const { error } = await supabase.auth.updateUser({ password: form.newPassword });
+      if (error) throw new Error(error.message);
+    },
     onSuccess: () => {
-      toast.success("Password updated");
+      toast.success("הסיסמה עודכנה");
       setForm({ currentPassword: "", newPassword: "", confirm: "" });
     },
-    onError: (e) => toastApiError(e),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "עדכון הסיסמה נכשל"),
   });
 
   return (
@@ -62,26 +61,23 @@ function ChangePasswordCard() {
       className="rounded-lg border bg-card p-6"
       onSubmit={(e) => {
         e.preventDefault();
-        if (form.newPassword !== form.confirm)
-          return toast.error("New passwords don't match");
+        if (form.newPassword !== form.confirm) return toast.error("הסיסמאות החדשות אינן תואמות");
         mutation.mutate();
       }}
     >
-      <h2 className="text-lg font-semibold">Change password</h2>
+      <h2 className="text-lg font-semibold">שינוי סיסמה</h2>
       <div className="mt-4 space-y-4">
         <div className="space-y-1.5">
-          <Label>Current password</Label>
+          <Label>סיסמה נוכחית</Label>
           <Input
             required
             type="password"
             value={form.currentPassword}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, currentPassword: e.target.value }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, currentPassword: e.target.value }))}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>New password</Label>
+          <Label>סיסמה חדשה</Label>
           <Input
             required
             type="password"
@@ -91,7 +87,7 @@ function ChangePasswordCard() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Confirm new password</Label>
+          <Label>אימות סיסמה חדשה</Label>
           <Input
             required
             type="password"
@@ -103,7 +99,7 @@ function ChangePasswordCard() {
       </div>
       <div className="mt-4 flex justify-end">
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? "Saving…" : "Update password"}
+          {mutation.isPending ? "שומר…" : "עדכן סיסמה"}
         </Button>
       </div>
     </form>
@@ -111,24 +107,25 @@ function ChangePasswordCard() {
 }
 
 function ChangeEmailCard() {
-  const navigate = useNavigate();
+  const { user } = useCurrentUser();
   const [form, setForm] = useState({ currentPassword: "", newEmail: "" });
 
   const mutation = useMutation({
-    mutationFn: () =>
-      apiRequest("/users/me/email", {
-        method: "PATCH",
-        body: {
-          currentPassword: form.currentPassword,
-          newEmail: form.newEmail,
-        },
-      }),
-    onSuccess: () => {
-      toast.success("Email updated. Please sign in again.");
-      clearToken();
-      navigate({ to: "/login", replace: true });
+    mutationFn: async () => {
+      if (!user?.email) throw new Error("לא ניתן לזהות את המשתמש המחובר");
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: form.currentPassword,
+      });
+      if (verifyErr) throw new Error("הסיסמה הנוכחית שגויה");
+      const { error } = await supabase.auth.updateUser({ email: form.newEmail.trim() });
+      if (error) throw new Error(error.message);
     },
-    onError: (e) => toastApiError(e),
+    onSuccess: () => {
+      toast.success("נשלח אישור לכתובת המייל החדשה — יש לאשר כדי להשלים את השינוי");
+      setForm({ currentPassword: "", newEmail: "" });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "עדכון המייל נכשל"),
   });
 
   return (
@@ -139,24 +136,22 @@ function ChangeEmailCard() {
         mutation.mutate();
       }}
     >
-      <h2 className="text-lg font-semibold">Change email</h2>
+      <h2 className="text-lg font-semibold">שינוי כתובת מייל</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        You'll be signed out and asked to sign in with your new email.
+        יישלח מייל אישור לכתובת החדשה. השינוי ייכנס לתוקף רק לאחר האישור.
       </p>
       <div className="mt-4 space-y-4">
         <div className="space-y-1.5">
-          <Label>Current password</Label>
+          <Label>סיסמה נוכחית</Label>
           <Input
             required
             type="password"
             value={form.currentPassword}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, currentPassword: e.target.value }))
-            }
+            onChange={(e) => setForm((f) => ({ ...f, currentPassword: e.target.value }))}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>New email</Label>
+          <Label>כתובת מייל חדשה</Label>
           <Input
             required
             type="email"
@@ -167,7 +162,7 @@ function ChangeEmailCard() {
       </div>
       <div className="mt-4 flex justify-end">
         <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? "Saving…" : "Update email"}
+          {mutation.isPending ? "שומר…" : "עדכן מייל"}
         </Button>
       </div>
     </form>

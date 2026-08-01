@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Plus, KeyRound, Trash2 } from "lucide-react";
-import { apiRequest, getSessionEmail, type AppUser, type UserStatus } from "@/lib/api";
-import { toastApiError } from "@/lib/toast-error";
+import { listOrgUsers, inviteOrgUser, setUserActive, removeOrgUser, resetUserPassword, type OrgUser } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -33,160 +33,139 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 export const Route = createFileRoute("/dashboard/users")({
   head: () => ({
     meta: [
-      { title: "Users — AFIK Logistics Platform" },
-      { name: "description", content: "Manage members of your organization." },
+      { title: "משתמשים — AFIK Logistics Platform" },
+      { name: "description", content: "ניהול המשתמשים בארגון שלך." },
     ],
   }),
   component: UsersPage,
 });
 
-const STATUS_STYLE: Record<UserStatus, string> = {
-  ACTIVE: "bg-success/15 text-success",
-  INACTIVE: "bg-muted text-muted-foreground",
-  SUSPENDED: "bg-destructive/15 text-destructive",
-};
+const ROLE_LABEL: Record<string, string> = { admin: "מנהל", member: "חבר צוות" };
 
 function UsersPage() {
-  const qc = useQueryClient();
-  const currentEmail = getSessionEmail();
   const { isAdmin, isLoading: meLoading } = useCurrentUser();
-  const [resetForId, setResetForId] = useState<string | null>(null);
-
-  if (!meLoading && !isAdmin) return <AccessDenied />;
-
-  return <UsersPageInner qc={qc} currentEmail={currentEmail} resetForId={resetForId} setResetForId={setResetForId} />;
+  if (!meLoading && !isAdmin) return <AccessDenied message="עמוד זה זמין רק למנהלי הארגון." />;
+  return <UsersPageInner />;
 }
 
-function UsersPageInner({
-  qc,
-  currentEmail,
-  resetForId,
-  setResetForId,
-}: {
-  qc: ReturnType<typeof useQueryClient>;
-  currentEmail: string | null;
-  resetForId: string | null;
-  setResetForId: (v: string | null) => void;
-}) {
+function UsersPageInner() {
+  const qc = useQueryClient();
+  const { user: me } = useCurrentUser();
+  const listOrgUsersFn = useServerFn(listOrgUsers);
+  const setUserActiveFn = useServerFn(setUserActive);
+  const removeOrgUserFn = useServerFn(removeOrgUser);
+  const [resetForId, setResetForId] = useState<string | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
-    queryKey: ["users"],
-    queryFn: () => apiRequest<AppUser[]>("/users"),
+    queryKey: ["org-users"],
+    queryFn: () => listOrgUsersFn(),
   });
 
   const toggleStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: UserStatus }) =>
-      apiRequest<AppUser>(`/users/${id}`, { method: "PATCH", body: { status } }),
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      setUserActiveFn({ data: { targetUserId: id, isActive } }),
     onSuccess: () => {
-      toast.success("User updated");
-      qc.invalidateQueries({ queryKey: ["users"] });
+      toast.success("המשתמש עודכן");
+      qc.invalidateQueries({ queryKey: ["org-users"] });
     },
-    onError: (e) => toastApiError(e),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "העדכון נכשל"),
   });
 
   const remove = useMutation({
-    mutationFn: (id: string) => apiRequest(`/users/${id}`, { method: "DELETE" }),
+    mutationFn: (id: string) => removeOrgUserFn({ data: { targetUserId: id } }),
     onSuccess: () => {
-      toast.success("User removed");
-      qc.invalidateQueries({ queryKey: ["users"] });
+      toast.success("המשתמש הוסר");
+      qc.invalidateQueries({ queryKey: ["org-users"] });
     },
-    onError: (e) => toastApiError(e),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "ההסרה נכשלה"),
   });
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-6xl" dir="rtl">
       <PageHeader
-        title="Users"
-        description="Everyone with access to your organization."
-        action={<NewUserDialog onCreated={() => qc.invalidateQueries({ queryKey: ["users"] })} />}
+        title="משתמשים"
+        description="כל מי שיש לו גישה לארגון שלך."
+        action={<NewUserDialog onCreated={() => qc.invalidateQueries({ queryKey: ["org-users"] })} />}
       />
 
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-right">שם</TableHead>
+              <TableHead className="text-right">מייל</TableHead>
+              <TableHead className="text-right">תפקיד</TableHead>
+              <TableHead className="text-right">סטטוס</TableHead>
+              <TableHead className="text-right">פעולות</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">
-                  Loading…
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  טוען…
+                </TableCell>
+              </TableRow>
+            ) : users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                  אין עדיין משתמשים.
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((u) => {
-                const isSelf = currentEmail && u.email === currentEmail;
+              users.map((u: OrgUser) => {
+                const isSelf = me?.id === u.id;
                 return (
-                  <>
-                    <TableRow key={u.id}>
+                  <Fragment key={u.id}>
+                    <TableRow>
                       <TableCell className="font-medium">
-                        {u.firstName} {u.lastName}
-                        {isSelf ? (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            (you)
-                          </span>
-                        ) : null}
+                        {u.fullName || "—"}
+                        {isSelf && <span className="mr-2 text-xs text-muted-foreground">(את/ה)</span>}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{u.email}</TableCell>
                       <TableCell>
-                        <Badge className={STATUS_STYLE[u.status]}>{u.status}</Badge>
+                        <Badge className={u.role === "admin" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}>
+                          {u.role ? ROLE_LABEL[u.role] : "—"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={u.isActive ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}>
+                          {u.isActive ? "פעיל" : "מושבת"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         {isSelf ? (
-                          <span className="text-xs text-muted-foreground">
-                            manage your own account in Account
-                          </span>
+                          <span className="text-xs text-muted-foreground">נהל את החשבון שלך בעמוד "החשבון שלי"</span>
                         ) : (
                           <div className="flex flex-wrap justify-end gap-2">
                             <ConfirmDialog
-                              title={u.status === "ACTIVE" ? "Deactivate user?" : "Reactivate user?"}
+                              title={u.isActive ? "להשבית משתמש?" : "להפעיל מחדש משתמש?"}
                               description={
-                                u.status === "ACTIVE"
-                                  ? `${u.email} will lose access until reactivated.`
-                                  : `${u.email} will regain access to the organization.`
+                                u.isActive
+                                  ? `${u.email} יאבד גישה עד להפעלה מחדש.`
+                                  : `${u.email} יקבל בחזרה גישה לארגון.`
                               }
-                              confirmLabel={u.status === "ACTIVE" ? "Deactivate" : "Reactivate"}
-                              destructive={u.status === "ACTIVE"}
-                              onConfirm={() =>
-                                toggleStatus.mutate({
-                                  id: u.id,
-                                  status: u.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
-                                })
-                              }
+                              confirmLabel={u.isActive ? "השבת" : "הפעל מחדש"}
+                              destructive={u.isActive}
+                              onConfirm={() => toggleStatus.mutate({ id: u.id, isActive: !u.isActive })}
                               trigger={
                                 <Button size="sm" variant="outline" disabled={toggleStatus.isPending}>
-                                  {u.status === "ACTIVE" ? "Deactivate" : "Reactivate"}
+                                  {u.isActive ? "השבת" : "הפעל מחדש"}
                                 </Button>
                               }
                             />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() =>
-                                setResetForId(resetForId === u.id ? null : u.id)
-                              }
-                            >
-                              <KeyRound className="h-3.5 w-3.5" /> Reset password
+                            <Button size="sm" variant="outline" onClick={() => setResetForId(resetForId === u.id ? null : u.id)}>
+                              <KeyRound className="h-3.5 w-3.5" /> איפוס סיסמה
                             </Button>
                             <ConfirmDialog
-                              title={`Remove ${u.email}?`}
-                              description="This user will lose access immediately. This can't be undone."
-                              confirmLabel="Remove user"
+                              title={`להסיר את ${u.email}?`}
+                              description="המשתמש יאבד גישה מיידית ולא ניתן יהיה לבטל פעולה זו."
+                              confirmLabel="הסר משתמש"
                               destructive
                               onConfirm={() => remove.mutate(u.id)}
                               trigger={
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-destructive hover:text-destructive"
-                                  disabled={remove.isPending}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" /> Remove
+                                <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={remove.isPending}>
+                                  <Trash2 className="h-3.5 w-3.5" /> הסר
                                 </Button>
                               }
                             />
@@ -196,15 +175,12 @@ function UsersPageInner({
                     </TableRow>
                     {resetForId === u.id && !isSelf ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="bg-muted/40">
-                          <ResetPasswordInline
-                            userId={u.id}
-                            onDone={() => setResetForId(null)}
-                          />
+                        <TableCell colSpan={5} className="bg-muted/40">
+                          <ResetPasswordInline userId={u.id} onDone={() => setResetForId(null)} />
                         </TableCell>
                       </TableRow>
                     ) : null}
-                  </>
+                  </Fragment>
                 );
               })
             )}
@@ -215,27 +191,18 @@ function UsersPageInner({
   );
 }
 
-function ResetPasswordInline({
-  userId,
-  onDone,
-}: {
-  userId: string;
-  onDone: () => void;
-}) {
+function ResetPasswordInline({ userId, onDone }: { userId: string; onDone: () => void }) {
+  const resetUserPasswordFn = useServerFn(resetUserPassword);
   const [pwd, setPwd] = useState("");
   const [confirmPwd, setConfirmPwd] = useState("");
 
   const mutation = useMutation({
-    mutationFn: () =>
-      apiRequest(`/users/${userId}/password`, {
-        method: "PATCH",
-        body: { newPassword: pwd },
-      }),
+    mutationFn: () => resetUserPasswordFn({ data: { targetUserId: userId, newPassword: pwd } }),
     onSuccess: () => {
-      toast.success("Password reset. The user has been signed out of every device.");
+      toast.success("הסיסמה אופסה");
       onDone();
     },
-    onError: (e) => toastApiError(e),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "איפוס הסיסמה נכשל"),
   });
 
   return (
@@ -243,71 +210,54 @@ function ResetPasswordInline({
       className="flex flex-wrap items-end gap-3 py-2"
       onSubmit={(e) => {
         e.preventDefault();
-        if (pwd !== confirmPwd) return toast.error("Passwords don't match");
+        if (pwd !== confirmPwd) return toast.error("הסיסמאות אינן תואמות");
         mutation.mutate();
       }}
     >
       <div className="space-y-1">
-        <Label className="text-xs">New password</Label>
-        <Input
-          type="password"
-          required
-          minLength={8}
-          value={pwd}
-          onChange={(e) => setPwd(e.target.value)}
-        />
+        <Label className="text-xs">סיסמה חדשה</Label>
+        <Input type="password" required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Confirm password</Label>
-        <Input
-          type="password"
-          required
-          minLength={8}
-          value={confirmPwd}
-          onChange={(e) => setConfirmPwd(e.target.value)}
-        />
+        <Label className="text-xs">אימות סיסמה</Label>
+        <Input type="password" required minLength={8} value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
       </div>
       <Button size="sm" type="submit" disabled={mutation.isPending}>
-        {mutation.isPending ? "Saving…" : "Reset password"}
+        {mutation.isPending ? "שומר…" : "אפס סיסמה"}
       </Button>
       <Button size="sm" type="button" variant="ghost" onClick={onDone}>
-        Cancel
+        ביטול
       </Button>
     </form>
   );
 }
 
 function NewUserDialog({ onCreated }: { onCreated: () => void }) {
+  const inviteOrgUserFn = useServerFn(inviteOrgUser);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    password: "",
-  });
+  const [form, setForm] = useState({ fullName: "", email: "", password: "" });
 
   const create = useMutation({
-    mutationFn: () =>
-      apiRequest<AppUser>("/users", { method: "POST", body: form }),
+    mutationFn: () => inviteOrgUserFn({ data: form }),
     onSuccess: () => {
-      toast.success("User created");
+      toast.success("המשתמש נוצר");
       setOpen(false);
-      setForm({ firstName: "", lastName: "", email: "", password: "" });
+      setForm({ fullName: "", email: "", password: "" });
       onCreated();
     },
-    onError: (e) => toastApiError(e),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "יצירת המשתמש נכשלה"),
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
-          <Plus className="h-4 w-4" /> New user
+          <Plus className="h-4 w-4" /> משתמש חדש
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent dir="rtl">
         <DialogHeader>
-          <DialogTitle>Create user</DialogTitle>
+          <DialogTitle>יצירת משתמש</DialogTitle>
         </DialogHeader>
         <form
           className="space-y-4"
@@ -316,49 +266,24 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
             create.mutate();
           }}
         >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>First name</Label>
-              <Input
-                required
-                value={form.firstName}
-                onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Last name</Label>
-              <Input
-                required
-                value={form.lastName}
-                onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
-              />
-            </div>
+          <div className="space-y-1.5">
+            <Label>שם מלא</Label>
+            <Input required value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Email</Label>
-            <Input
-              required
-              type="email"
-              value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-            />
+            <Label>מייל</Label>
+            <Input required type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
           </div>
           <div className="space-y-1.5">
-            <Label>Temporary password</Label>
-            <Input
-              required
-              type="password"
-              minLength={8}
-              value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-            />
+            <Label>סיסמה זמנית</Label>
+            <Input required type="password" minLength={8} value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              ביטול
             </Button>
             <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? "Creating…" : "Create user"}
+              {create.isPending ? "יוצר…" : "צור משתמש"}
             </Button>
           </DialogFooter>
         </form>
