@@ -192,3 +192,34 @@ export function checklistProgress(data: ChecklistData): { done: number; total: n
   const values = Object.values(data.items);
   return { done: values.filter((v) => v.status !== "unset").length, total: values.length };
 }
+
+// A snapshot of already-known case data, handed in by the case detail page.
+// Item keys below (shipment_number, temp_range, destination, transit_time,
+// product_type, special_instructions, awb, dest_address) match item.key
+// values in CHECKLIST_SECTIONS above — wherever a match exists, the dialog
+// shows the case's own value next to the checklist row as a reference to
+// compare the physical shipment against, instead of leaving it a blind
+// checkbox.
+export type ChecklistCaseSnapshot = {
+  shipmentNumber?: string;
+  tempRange?: string;
+  destination?: string;
+  transitTime?: string;
+  productType?: string;
+  specialInstructions?: string;
+  awb?: string;
+  destAddress?: string;
+};
+
+export function buildCaseReferenceValues(snap: ChecklistCaseSnapshot): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (snap.shipmentNumber) out.shipment_number = snap.shipmentNumber;
+  if (snap.tempRange) out.temp_range = snap.tempRange;
+  if (snap.destination) out.destination = snap.destination;
+  if (snap.transitTime) out.transit_time = snap.transitTime;
+  if (snap.productType) out.product_type = snap.productType;
+  if (snap.specialInstructions) out.special_instructions = snap.specialInstructions;
+  if (snap.awb) out.awb = snap.awb;
+  if (snap.destAddress) out.dest_address = snap.destAddress;
+  return out;
+}

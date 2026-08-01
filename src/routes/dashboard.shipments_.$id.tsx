@@ -59,6 +59,7 @@ import {
 } from "@/lib/drop-stops";
 import { REVIEW_STATUS_OPTIONS, getReviewStatusStyle } from "@/lib/review-status";
 import { PackagingChecklistDialog } from "@/components/packaging-checklist-dialog";
+import type { ChecklistCaseSnapshot } from "@/lib/packaging-checklist";
 
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
@@ -529,6 +530,40 @@ function CaseDetail() {
     return { grossWeight, volumetricWeight, chargeableWeight: Math.max(grossWeight, volumetricWeight) };
   }, [packageCalcs, packModelCalcs]);
 
+  // Pulls whatever the case already knows into "comparison" reference values
+  // shown next to the matching checklist rows (see buildCaseReferenceValues
+  // in packaging-checklist.ts) — so the person filling out the checklist can
+  // check the physical shipment against what's on file instead of guessing.
+  const checklistCaseSnapshot: ChecklistCaseSnapshot | undefined = useMemo(() => {
+    if (!form) return undefined;
+    const tempRange = form.tempSeriesNone
+      ? "ללא בקרת טמפרטורה"
+      : form.tempSeriesList.length > 0
+        ? form.tempSeriesList
+            .map((k) => {
+              const t = TEMP_SERIES.find((s) => s.key === k);
+              return t ? `${t.label} (${t.range})` : k;
+            })
+            .join(", ")
+        : undefined;
+    const productType = form.cargoType ? CARGO_TYPES.find((c) => c.id === form.cargoType)?.label : undefined;
+    const transitTime = form.departDate && form.arriveDate ? `${form.departDate} → ${form.arriveDate}` : undefined;
+    const attrLabels = ATTR_OPTIONS.filter((a) => form.attrs[a.id]).map((a) => a.label).join(", ");
+    const specialInstructions = form.specialReq.trim() || attrLabels || undefined;
+    const dropStop = form.dropType ? [...form.stops].reverse().find((s) => s.kind === "Drop") : undefined;
+    const destAddress = dropStop?.address || form.destPort || undefined;
+    return {
+      shipmentNumber: form.unifreightNumber.trim() || caseRow?.case_code,
+      tempRange,
+      destination: form.destPort || undefined,
+      transitTime,
+      productType,
+      specialInstructions,
+      awb: form.blNumber.trim() || form.houseBlNumber.trim() || undefined,
+      destAddress,
+    };
+  }, [form, caseRow]);
+
   async function handleSave() {
     if (!form) return;
     setSaving(true);
@@ -680,6 +715,7 @@ function CaseDetail() {
                   customer: form.customerName,
                   destination: form.destPort,
                 }}
+                caseSnapshot={checklistCaseSnapshot}
               />
             )}
             <ActionButtonGroup onSave={handleSave} saving={saving} />

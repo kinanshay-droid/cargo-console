@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ClipboardCheck, Check, X } from "lucide-react";
@@ -22,8 +22,10 @@ import {
   emptyChecklistData,
   parseChecklistData,
   checklistProgress,
+  buildCaseReferenceValues,
   type ChecklistData,
   type ChecklistItemStatus,
+  type ChecklistCaseSnapshot,
 } from "@/lib/packaging-checklist";
 
 function todayISO(): string {
@@ -34,13 +36,15 @@ type Props = {
   caseId: string;
   existing: unknown;
   defaults: { shipmentNumber?: string; customer?: string; destination?: string };
+  caseSnapshot?: ChecklistCaseSnapshot;
 };
 
-export function PackagingChecklistDialog({ caseId, existing, defaults }: Props) {
+export function PackagingChecklistDialog({ caseId, existing, defaults, caseSnapshot }: Props) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<ChecklistData>(emptyChecklistData);
   const queryClient = useQueryClient();
   const saveChecklistFn = useServerFn(saveCaseChecklist);
+  const caseRef = useMemo(() => buildCaseReferenceValues(caseSnapshot ?? {}), [caseSnapshot]);
 
   useEffect(() => {
     if (!open) return;
@@ -124,9 +128,15 @@ export function PackagingChecklistDialog({ caseId, existing, defaults }: Props) 
               <div className="divide-y">
                 {section.items.map((item) => {
                   const state = data.items[item.key] ?? { status: "unset", note: "" };
+                  const ref = caseRef[item.key];
                   return (
                     <div key={item.key} className="flex flex-wrap items-center gap-2 px-4 py-2">
-                      <span className="min-w-[180px] flex-1 text-sm">{item.label}</span>
+                      <span className="min-w-[180px] flex-1 text-sm">
+                        {item.label}
+                        {ref && (
+                          <span className="mt-0.5 block text-xs font-medium text-primary">מהתיק: {ref}</span>
+                        )}
+                      </span>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
