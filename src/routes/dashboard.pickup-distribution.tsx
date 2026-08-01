@@ -59,6 +59,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 // The detailed pipeline status lives on payload.pipelineStatus (JSONB), not
 // a dedicated column — same read pattern used by the Operations dashboard.
+// Shown as-is per row (no longer forced to "ready_for_pickup").
 function getPipelineStatus(payload: unknown): CasePipelineStatus {
   const p = isRecord(payload) ? payload : {};
   const raw = p.pipelineStatus;
@@ -81,19 +82,19 @@ function getBlNumber(payload: unknown): string | null {
   return typeof raw === "string" && raw.trim() ? raw.trim() : null;
 }
 
-// The scheduled pickup/distribution date is set on the case detail page's
-// "העבר לאיסוף/הפצה" action (payload.pickupDueDate) — this is what the
-// date filter below should key off, not the shipment's arrive_date (which
-// is the port/destination ETA, a different date entirely).
-function getPickupDueDate(payload: unknown): string | null {
+// A case is linked into this screen purely by having a pickup/delivery date
+// set on the case detail page's CritiLog "איסוף/מסירה בישראל" field
+// (payload.critilog.pickupIsrael) — no separate status transition. This is
+// also what the date filter below keys off, not the shipment's arrive_date
+// (which is the port/destination ETA, a different date entirely).
+function getPickupIsraelDate(payload: unknown): string | null {
   const p = isRecord(payload) ? payload : {};
-  const raw = p.pickupDueDate;
+  const critilog = isRecord(p.critilog) ? p.critilog : {};
+  const raw = critilog.pickupIsrael;
   return typeof raw === "string" && raw.trim() ? raw.trim() : null;
 }
 
-const PICKUP_STAGE: CasePipelineStatus = "ready_for_pickup";
-
-// Date-filter options — filters rows by payload.pickupDueDate ("מועד לביצוע").
+// Date-filter options — filters rows by the CritiLog pickup date ("מועד לביצוע").
 type DateFilter = "all" | "today" | "tomorrow" | "next_week" | "custom";
 
 const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
@@ -152,7 +153,7 @@ function PickupDistributionPage() {
   });
 
   const pickupCases = useMemo(
-    () => cases.filter((c) => getPipelineStatus(c.payload) === PICKUP_STAGE),
+    () => cases.filter((c) => !!getPickupIsraelDate(c.payload)),
     [cases],
   );
 
@@ -168,7 +169,7 @@ function PickupDistributionPage() {
   const dateFilteredCases = useMemo(() => {
     if (!dateRange) return pickupCases;
     return pickupCases.filter((c) => {
-      const dueDate = getPickupDueDate(c.payload);
+      const dueDate = getPickupIsraelDate(c.payload);
       if (!dueDate) return false;
       const d = new Date(dueDate);
       return d >= dateRange.from && d <= dateRange.to;
@@ -183,13 +184,13 @@ function PickupDistributionPage() {
     for (const c of dateFilteredCases) {
       if (isShipKind(c.shipment_kind)) groups[c.shipment_kind].push(c);
     }
-    // Sort each kind's rows by "מועד לביצוע" (payload.pickupDueDate), soonest
-    // first — rows with no due date set yet sink to the bottom rather than
-    // being sorted arbitrarily.
+    // Sort each kind's rows by "מועד לביצוע" (the CritiLog pickup date),
+    // soonest first — rows with no due date set yet sink to the bottom
+    // rather than being sorted arbitrarily.
     for (const k of SHIP_KIND_ORDER) {
       groups[k].sort((a, b) => {
-        const da = getPickupDueDate(a.payload);
-        const db = getPickupDueDate(b.payload);
+        const da = getPickupIsraelDate(a.payload);
+        const db = getPickupIsraelDate(b.payload);
         if (!da && !db) return 0;
         if (!da) return 1;
         if (!db) return -1;
@@ -203,7 +204,7 @@ function PickupDistributionPage() {
     <div dir="rtl" className="space-y-6">
       <PageHeader
         title="איסוף/הפצה"
-        description={`משלוחים שהועברו לסטטוס "${CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}" — ${CASE_PIPELINE_STATUS_META[PICKUP_STAGE].description}.`}
+        description='תיקים עם תאריך "איסוף/מסירה בישראל" — מוזנים בסעיף המעקב בדף התיק.'
         action={
           <Button asChild variant="outline" className="gap-2">
             <Link to="/dashboard/pickup-distribution/today">
@@ -307,7 +308,7 @@ function PickupDistributionPage() {
                       kindCases.map((c) => {
                         const rep = getAssignedRep(c.payload);
                         const blNumber = getBlNumber(c.payload);
-                        const dueDate = getPickupDueDate(c.payload);
+                        const dueDate = getPickupIsraelDate(c.payload);
                         return (
                           <TableRow
                             key={c.id}
@@ -333,7 +334,7 @@ function PickupDistributionPage() {
                             <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
                             <TableCell>
-                              <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
+                              <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[getPipelineStatus(c.payload)].label}</Badge>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
                               {dueDate ? new Date(dueDate).toLocaleDateString("he-IL") : "—"}

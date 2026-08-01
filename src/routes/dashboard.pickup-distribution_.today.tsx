@@ -60,12 +60,6 @@ function getPipelineStatus(payload: unknown): CasePipelineStatus {
   return typeof raw === "string" && raw in CASE_PIPELINE_STATUS_META ? (raw as CasePipelineStatus) : "new";
 }
 
-function getPickupDueDate(payload: unknown): string | null {
-  const p = isRecord(payload) ? payload : {};
-  const raw = p.pickupDueDate;
-  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
-}
-
 // Mirrors the same payload.critilog columns edited on the case detail page's
 // "מעקב" section (itself mirroring the CritiLog operational tracking sheet)
 // — this is the exact set of columns the courier team's own reference sheet
@@ -112,8 +106,6 @@ function formatPickupIsrael(raw: string): string {
   return d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }) + (hasTime ? ` · ${d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}` : "");
 }
 
-const PICKUP_STAGE: CasePipelineStatus = "ready_for_pickup";
-
 function isToday(dateStr: string): boolean {
   const d = new Date(dateStr);
   const now = new Date();
@@ -132,8 +124,7 @@ function TodayTasksPage() {
   const todayCases = useMemo(
     () =>
       cases.filter((c) => {
-        if (getPipelineStatus(c.payload) !== PICKUP_STAGE) return false;
-        const due = getPickupDueDate(c.payload);
+        const due = getCritiLog(c.payload).pickupIsrael;
         return !!due && isToday(due);
       }),
     [cases],
@@ -264,7 +255,7 @@ function TodayTasksPage() {
                                   {cl.reviewStatus}
                                 </span>
                               ) : (
-                                <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[PICKUP_STAGE].label}</Badge>
+                                <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[getPipelineStatus(c.payload)].label}</Badge>
                               )}
                             </TableCell>
                           </TableRow>

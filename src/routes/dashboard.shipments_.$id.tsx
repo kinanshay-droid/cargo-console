@@ -341,29 +341,11 @@ function CaseDetail() {
   const [originalPayload, setOriginalPayload] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
 
-  // Picking a date here (the CritiLog "איסוף/מסירה בישראל" field, the same
-  // one the courier team's own sheet is keyed off) is now the one and only
-  // way a case gets routed into the Pickup/Distribution flow — replaces the
-  // old separate "מועד לביצוע" field + transfer button. The chosen date IS
-  // the task's due date, and picking it immediately moves this case's own
-  // pipeline status to "ready_for_pickup" (rather than forking a new linked
-  // case) and takes the user straight to the Pickup/Distribution screen.
-  function handlePickupIsraelDate(value: string) {
-    updCl("pickupIsrael", value);
-    if (!value || !form) return;
-    statusMutation.mutate(
-      {
-        status: "ready_for_pickup",
-        extra: { pickupDueDate: value, critilog: { ...form.critilog, pickupIsrael: value } },
-      },
-      {
-        onSuccess: () => {
-          toast.success("התיק הועבר למסך איסוף/הפצה");
-          navigate({ to: "/dashboard/pickup-distribution" });
-        },
-      },
-    );
-  }
+  // Filling in the CritiLog "איסוף/מסירה בישראל" date (the same field the
+  // courier team's own sheet is keyed off) is what links this case into the
+  // Pickup/Distribution screen — no separate status transition or
+  // navigation happens here, the Pickup/Distribution page itself picks up
+  // any case with this date set (see getPickupIsraelDate there).
 
   useEffect(() => {
     if (!caseRow) return;
@@ -688,7 +670,7 @@ function CaseDetail() {
         </div>
         {form && caseRow ? (
           <div className="flex flex-wrap items-center gap-2">
-            {currentPipelineStatus === "ready_for_pickup" && (
+            {form.critilog.pickupIsrael && (
               <Button asChild variant="outline" className="gap-2">
                 <a href="/shipment-checklist.pdf" target="_blank" rel="noopener noreferrer">
                   <ClipboardCheck className="h-4 w-4" /> צ'קליסט למשלוח
@@ -923,8 +905,8 @@ function CaseDetail() {
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="איסוף/מסירה בישראל" hint="בחירת תאריך מעבירה את התיק למסך איסוף/הפצה">
-              <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => handlePickupIsraelDate(e.target.value)} />
+            <Field label="איסוף/מסירה בישראל" hint="הזנת תאריך מקשרת את התיק למסך איסוף/הפצה">
+              <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => updCl("pickupIsrael", e.target.value)} />
             </Field>
             <Field label="איסוף/מסירה בחול">
               <Input type="date" value={form.critilog.pickupAbroad} onChange={(e) => updCl("pickupAbroad", e.target.value)} />
