@@ -15,6 +15,7 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
+import { Route as PresentationRouteImport } from './routes/presentation'
 import { Route as DashboardAccountRouteImport } from './routes/dashboard.account'
 import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
 import { Route as DashboardCommercialRouteImport } from './routes/dashboard.commercial'
@@ -66,6 +67,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PresentationRoute = PresentationRouteImport.update({
+  id: '/presentation',
+  path: '/presentation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardAccountRoute = DashboardAccountRouteImport.update({
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/presentation': typeof PresentationRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/presentation': typeof PresentationRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -247,6 +255,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/presentation': typeof PresentationRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -279,6 +288,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/presentation'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -309,6 +319,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/presentation'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -338,6 +349,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/presentation'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -369,6 +381,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  PresentationRoute: typeof PresentationRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -413,6 +426,13 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/presentation': {
+      id: '/presentation'
+      path: '/presentation'
+      fullPath: '/presentation'
+      preLoaderRoute: typeof PresentationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/account': {
@@ -661,6 +681,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  PresentationRoute: PresentationRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

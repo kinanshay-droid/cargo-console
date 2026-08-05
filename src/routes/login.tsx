@@ -239,10 +239,9 @@ const creds = {
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px]">
         <div className="mb-8 flex justify-center">
-          <a
-            href="/afik-presentation.pdf"
+          <Link
+            to="/presentation"
             target="_blank"
-            rel="noopener noreferrer"
             title="פתח את מצגת המערכת"
             className="max-w-xs transition-opacity hover:opacity-90"
           >
@@ -251,7 +250,7 @@ const creds = {
               alt="AFIK Logistics Platform — The Intelligence Behind Every Shipment."
               className="h-auto w-full"
             />
-          </a>
+          </Link>
         </div>
 
         <div className="grid items-start gap-6 lg:grid-cols-[260px_400px_minmax(0,1fr)]">
