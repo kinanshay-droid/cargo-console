@@ -410,6 +410,14 @@ export function NewQuoteDialog({
   const [containers, setContainers] = useState<ContainerRow[]>([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
   const [goods, setGoods] = useState<GoodsRow[]>([{ id: uid(), item: "", sku: "", origin: "", weight: "", dims: "", qty: 1 }]);
   const [notes, setNotes] = useState("");
+  // ד. פרטי משלוח — estimated pickup/delivery date+time window. Previously
+  // rendered as plain uncontrolled <Field>s (no state, nothing saved,
+  // nothing validated) — now real fields so "all details filled" can
+  // actually be enforced before letting the user continue.
+  const [pickupDateEst, setPickupDateEst] = useState("");
+  const [pickupTimeEst, setPickupTimeEst] = useState("");
+  const [deliveryDateEst, setDeliveryDateEst] = useState("");
+  const [deliveryTimeEst, setDeliveryTimeEst] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [pickupContacts, setPickupContacts] = useState<ContactRow[]>([makeContactRow()]);
@@ -537,6 +545,15 @@ export function NewQuoteDialog({
   // vessel/flight-name field there is replaced by an airline picker (feeding
   // the same `airline` state used later in step 4's "חברת תעופה מתוכננת").
   const [journeyMode, setJourneyMode] = useState<"air" | "land" | null>(null);
+  // Step 2's "ה. פרטי מסע" (import only) — kept as its own state rather than
+  // reusing step 4's originPort/destPort, since these describe the specific
+  // journey/flight leg, not the shipment's overall origin/destination.
+  // Previously uncontrolled <Field>s, same as the ד. section above.
+  const [journeyOriginPort, setJourneyOriginPort] = useState("");
+  const [journeyDestPort, setJourneyDestPort] = useState("");
+  const [journeyVesselOrFlight, setJourneyVesselOrFlight] = useState("");
+  const [journeyNumber, setJourneyNumber] = useState("");
+  const [journeyCode, setJourneyCode] = useState("");
   const [logisticsNotes, setLogisticsNotes] = useState("");
   const [dropType, setDropType] = useState<DropTypeId | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
@@ -609,6 +626,16 @@ export function NewQuoteDialog({
       if (kind === null) return false;
       if (kind !== "domestic" && incoterm === null) return false;
       if (kind === "distribution" && dropType === null) return false;
+      if (shipmentTypeTag === null) return false;
+      if (!pickupDateEst || !pickupTimeEst || !deliveryDateEst || !deliveryTimeEst) return false;
+      if (kind === "import") {
+        if (journeyMode === null) return false;
+        if (!journeyOriginPort.trim() || !journeyDestPort.trim()) return false;
+        if (journeyMode === "air" ? !airline.trim() : !journeyVesselOrFlight.trim()) return false;
+        if (!journeyNumber.trim() || !journeyCode.trim()) return false;
+      }
+      if (!pickupAddress.trim() || !pickupContacts.some((c) => c.name.trim())) return false;
+      if (!deliveryAddress.trim() || !deliveryContacts.some((c) => c.name.trim())) return false;
       return true;
     }
     if (step === 3) {
@@ -622,7 +649,35 @@ export function NewQuoteDialog({
     }
     if (step === 4) return shipmentMode !== null;
     return true;
-  }, [step, selectedId, kind, incoterm, dropType, cargoType, tempSeriesChosen, tempSeriesList, packSelections, packages, shipmentMode]);
+  }, [
+    step,
+    selectedId,
+    kind,
+    incoterm,
+    dropType,
+    shipmentTypeTag,
+    pickupDateEst,
+    pickupTimeEst,
+    deliveryDateEst,
+    deliveryTimeEst,
+    journeyMode,
+    journeyOriginPort,
+    journeyDestPort,
+    journeyVesselOrFlight,
+    journeyNumber,
+    journeyCode,
+    airline,
+    pickupAddress,
+    pickupContacts,
+    deliveryAddress,
+    deliveryContacts,
+    cargoType,
+    tempSeriesChosen,
+    tempSeriesList,
+    packSelections,
+    packages,
+    shipmentMode,
+  ]);
 
   const reset = () => {
     setStep(1);
@@ -636,10 +691,20 @@ export function NewQuoteDialog({
     setContainers([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
     setGoods([{ id: uid(), item: "", sku: "", origin: "", weight: "", dims: "", qty: 1 }]);
     setNotes("");
+    setPickupDateEst("");
+    setPickupTimeEst("");
+    setDeliveryDateEst("");
+    setDeliveryTimeEst("");
     setPickupAddress("");
     setDeliveryAddress("");
     setPickupContacts([makeContactRow()]);
     setDeliveryContacts([makeContactRow()]);
+    setJourneyMode(null);
+    setJourneyOriginPort("");
+    setJourneyDestPort("");
+    setJourneyVesselOrFlight("");
+    setJourneyNumber("");
+    setJourneyCode("");
     setCargoType(null);
     setTempSeriesList([]);
     setTempSeriesNone(false);
@@ -680,10 +745,25 @@ export function NewQuoteDialog({
             accountManager: currentUser
               ? { name: currentUser.fullName || currentUser.email, email: currentUser.email }
               : null,
+            pickupDateEst: pickupDateEst || null,
+            pickupTimeEst: pickupTimeEst.trim() || null,
+            deliveryDateEst: deliveryDateEst || null,
+            deliveryTimeEst: deliveryTimeEst.trim() || null,
             pickupAddress: pickupAddress.trim() || null,
             deliveryAddress: deliveryAddress.trim() || null,
             pickupContacts: pickupContacts.filter((c) => c.name || c.phone || c.email),
             deliveryContacts: deliveryContacts.filter((c) => c.name || c.phone || c.email),
+            journey:
+              kind === "import"
+                ? {
+                    mode: journeyMode,
+                    originPort: journeyOriginPort.trim() || null,
+                    destPort: journeyDestPort.trim() || null,
+                    vesselOrFlight: journeyMode === "land" ? journeyVesselOrFlight.trim() || null : null,
+                    journeyNumber: journeyNumber.trim() || null,
+                    journeyCode: journeyCode.trim() || null,
+                  }
+                : null,
             cargoType,
             shipmentTypeTag,
             attrs,
@@ -868,7 +948,7 @@ export function NewQuoteDialog({
           {step === 2 && (
             <div className="space-y-6">
               {/* א. סוג משלוח */}
-              <Section title="א. סוג משלוח">
+              <Section title="א. סוג משלוח *">
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   {SHIP_TYPES.map((t) => {
                     const Icon = t.icon;
@@ -901,7 +981,7 @@ export function NewQuoteDialog({
 
               {/* ב. תנאי מכר — לא רלוונטי לפנים ארצי, ולא מוצג לפני שנבחר סוג משלוח */}
               {kind && kind !== "domestic" && (
-                <Section title="ב. תנאי מכר (Incoterms 2020)">
+                <Section title="ב. תנאי מכר (Incoterms 2020) *">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                     {INCOTERMS.map((t) => {
                       const active = incoterm === t.code;
@@ -937,7 +1017,7 @@ export function NewQuoteDialog({
 
               {/* סוג משלוח — תגית צבעונית, מתחת לתנאי המכר */}
               {kind && (
-                <Section title="סוג משלוח">
+                <Section title="סוג משלוח *">
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     {SHIPMENT_TYPE_TAGS.map((t) => {
                       const active = shipmentTypeTag === t.value;
@@ -1010,21 +1090,41 @@ export function NewQuoteDialog({
 
 
               {/* ד. פרטי משלוח (משותף) */}
-              <Section title="ד. פרטי משלוח">
+              <Section title="ד. פרטי משלוח *">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-                  <Field label="תאריך איסוף משוער" type="date" />
-                  <Field label="שעת איסוף" placeholder="09:00 – 12:00" />
-                  <Field label="תאריך הגעה משוער" type="date" />
-                  <Field label="שעת הגעה" placeholder="14:00 – 18:00" />
+                  <Field
+                    label="תאריך איסוף משוער *"
+                    type="date"
+                    value={pickupDateEst}
+                    onChange={(e) => setPickupDateEst(e.target.value)}
+                  />
+                  <Field
+                    label="שעת איסוף *"
+                    placeholder="09:00 – 12:00"
+                    value={pickupTimeEst}
+                    onChange={(e) => setPickupTimeEst(e.target.value)}
+                  />
+                  <Field
+                    label="תאריך הגעה משוער *"
+                    type="date"
+                    value={deliveryDateEst}
+                    onChange={(e) => setDeliveryDateEst(e.target.value)}
+                  />
+                  <Field
+                    label="שעת הגעה *"
+                    placeholder="14:00 – 18:00"
+                    value={deliveryTimeEst}
+                    onChange={(e) => setDeliveryTimeEst(e.target.value)}
+                  />
                 </div>
               </Section>
 
               {/* ה. פרטי מסע — ייבוא בלבד */}
               {kind === "import" && (
-                <Section title="ה. פרטי מסע">
+                <Section title="ה. פרטי מסע *">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">סוג מסע</Label>
+                      <Label className="text-xs text-muted-foreground">סוג מסע *</Label>
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -1048,11 +1148,11 @@ export function NewQuoteDialog({
                         </button>
                       </div>
                     </div>
-                    <Field label="נמל מוצא" />
-                    <Field label="נמל יעד" />
+                    <Field label="נמל מוצא *" value={journeyOriginPort} onChange={(e) => setJourneyOriginPort(e.target.value)} />
+                    <Field label="נמל יעד *" value={journeyDestPort} onChange={(e) => setJourneyDestPort(e.target.value)} />
                     {journeyMode === "air" ? (
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">חברת תעופה</Label>
+                        <Label className="text-xs text-muted-foreground">חברת תעופה *</Label>
                         <Lookup
                           type="airlines"
                           matchBy="code"
@@ -1062,18 +1162,22 @@ export function NewQuoteDialog({
                         />
                       </div>
                     ) : (
-                      <Field label="שם כלי שיט / טיסה" />
+                      <Field
+                        label="שם כלי שיט / טיסה *"
+                        value={journeyVesselOrFlight}
+                        onChange={(e) => setJourneyVesselOrFlight(e.target.value)}
+                      />
                     )}
-                    <Field label="מספר מסע" />
-                    <Field label="קוד מסע" />
+                    <Field label="מספר מסע *" value={journeyNumber} onChange={(e) => setJourneyNumber(e.target.value)} />
+                    <Field label="קוד מסע *" value={journeyCode} onChange={(e) => setJourneyCode(e.target.value)} />
                   </div>
                 </Section>
               )}
 
               {/* ו. אנשי קשר — איסוף ומסירה, כל אחד תומך בכמה אנשי קשר */}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Section title="איש קשר באיסוף">
-                  <Field label="כתובת איסוף" value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} placeholder="רחוב, עיר, מדינה" />
+                <Section title="איש קשר באיסוף *">
+                  <Field label="כתובת איסוף *" value={pickupAddress} onChange={(e) => setPickupAddress(e.target.value)} placeholder="רחוב, עיר, מדינה" />
                   <div className="mt-3 space-y-3">
                     {pickupContacts.map((c, idx) => (
                       <div key={c.id} className={cn("space-y-2", idx > 0 && "border-t pt-3")}>
@@ -1090,7 +1194,7 @@ export function NewQuoteDialog({
                           </div>
                         )}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          <Field label="שם" value={c.name} onChange={(e) => updatePickupContact(c.id, { name: e.target.value })} />
+                          <Field label="שם *" value={c.name} onChange={(e) => updatePickupContact(c.id, { name: e.target.value })} />
                           <Field label="טלפון" type="tel" value={c.phone} onChange={(e) => updatePickupContact(c.id, { phone: e.target.value })} />
                           <Field label='דוא"ל' type="email" value={c.email} onChange={(e) => updatePickupContact(c.id, { email: e.target.value })} />
                         </div>
@@ -1106,8 +1210,8 @@ export function NewQuoteDialog({
                   </button>
                 </Section>
 
-                <Section title="איש קשר במסירה">
-                  <Field label="כתובת מסירה" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} placeholder="רחוב, עיר, מדינה" />
+                <Section title="איש קשר במסירה *">
+                  <Field label="כתובת מסירה *" value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)} placeholder="רחוב, עיר, מדינה" />
                   <div className="mt-3 space-y-3">
                     {deliveryContacts.map((c, idx) => (
                       <div key={c.id} className={cn("space-y-2", idx > 0 && "border-t pt-3")}>
@@ -1124,7 +1228,7 @@ export function NewQuoteDialog({
                           </div>
                         )}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                          <Field label="שם" value={c.name} onChange={(e) => updateDeliveryContact(c.id, { name: e.target.value })} />
+                          <Field label="שם *" value={c.name} onChange={(e) => updateDeliveryContact(c.id, { name: e.target.value })} />
                           <Field label="טלפון" type="tel" value={c.phone} onChange={(e) => updateDeliveryContact(c.id, { phone: e.target.value })} />
                           <Field label='דוא"ל' type="email" value={c.email} onChange={(e) => updateDeliveryContact(c.id, { email: e.target.value })} />
                         </div>
@@ -1600,11 +1704,14 @@ export function NewQuoteDialog({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-6 py-4">
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             {step === 1 && (
               <Button variant="outline" size="sm" className="gap-1">
                 <Plus className="h-4 w-4" /> לקוח פוטנציאלי חדש
               </Button>
+            )}
+            {!canContinue && !submitting && (
+              <span className="text-xs text-muted-foreground">יש למלא את כל השדות המסומנים ב-* לפני שממשיכים</span>
             )}
           </div>
           <div className="flex gap-2">
