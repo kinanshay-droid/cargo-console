@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listCases, CASE_PIPELINE_STATUS_META, getCaseDisplayCode, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
+import { listCases, isCaseArchived, CASE_PIPELINE_STATUS_META, getCaseDisplayCode, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
 import { getReviewStatusStyle } from "@/lib/review-status";
 
@@ -124,6 +124,7 @@ function TodayTasksPage() {
   const todayCases = useMemo(
     () =>
       cases.filter((c) => {
+        if (isCaseArchived(c.payload)) return false;
         const due = getCritiLog(c.payload).pickupIsrael;
         return !!due && isToday(due);
       }),

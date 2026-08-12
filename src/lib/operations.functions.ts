@@ -85,8 +85,17 @@ export const createCaseFromQuote = createServerFn({ method: "POST" })
         airline: quote.airline,
         currency: quote.currency,
         total: quote.total,
-        // Full copy of the quote's payload, frozen at the moment of transfer.
-        payload: quote.payload as never,
+        // Full copy of the quote's payload, frozen at the moment of transfer,
+        // plus the customer's real id (quotes has a customer_id FK;
+        // operations_cases doesn't, so it rides along in payload — same
+        // migration-free pattern as everything else added to this table).
+        // This is what lets the customer's page later look up "their" cases.
+        payload: {
+          ...(quote.payload && typeof quote.payload === "object" && !Array.isArray(quote.payload)
+            ? (quote.payload as Record<string, unknown>)
+            : {}),
+          customerId: quote.customer_id ?? null,
+        } as never,
       })
       .select("id, case_code, status")
       .single();
@@ -332,7 +341,20 @@ export const updateCasePipelineStatus = createServerFn({ method: "POST" })
     // read-modify-write (e.g. a scheduled pickup date set together with the
     // "ready for pickup" transition), avoiding a second round trip that
     // could race with this one.
-    const nextPayload = { ...payload, pipelineStatus: data.status, ...(data.extra ?? {}) };
+    //
+    // Reaching "completed" also archives the case: payload.archived flips
+    // on and the case drops out of the active Shipments/Operations lists
+    // (filtered client-side — see listCases callers), while still being
+    // reachable from the case's customer via payload.customerId. Moving the
+    // status back off "completed" (e.g. reopening a case) un-archives it.
+    const isCompleting = data.status === "completed";
+    const nextPayload = {
+      ...payload,
+      pipelineStatus: data.status,
+      archived: isCompleting,
+      archivedAt: isCompleting ? ((payload.archivedAt as string | undefined) ?? new Date().toISOString()) : null,
+      ...(data.extra ?? {}),
+    };
     const coarse = CASE_PIPELINE_STATUS_META[data.status].coarse;
 
     const { data: row, error } = await supabase
@@ -562,6 +584,23 @@ export function getCaseDisplayCode(payload: unknown, fallbackCode: string): stri
     if (typeof raw === "string" && raw.trim()) return raw.trim();
   }
   return fallbackCode;
+}
+
+// A case is archived once its pipeline status reaches "completed" (see
+// updateCasePipelineStatus). Archived cases are hidden from the active
+// Shipments/Operations/Commercial/Pickup-Distribution lists by default and
+// surface instead on the case's customer page — this helper is the single
+// source of truth every list screen filters on.
+export function isCaseArchived(payload: unknown): boolean {
+  return !!(payload && typeof payload === "object" && !Array.isArray(payload) && (payload as Record<string, unknown>).archived === true);
+}
+
+export function getCaseCustomerId(payload: unknown): string | null {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const raw = (payload as Record<string, unknown>).customerId;
+    if (typeof raw === "string" && raw) return raw;
+  }
+  return null;
 }
 
 export type CaseRep = { id: string; name: string; role: string } | null;

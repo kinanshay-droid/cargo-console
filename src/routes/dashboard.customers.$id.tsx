@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Plus, Trash2, Building2, Users, MapPin, Save, FileText, Upload, Briefcase, Loader2, FileDown } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Plus, Trash2, Building2, Users, MapPin, Save, FileText, Upload, Briefcase, Loader2, FileDown, Archive, FolderOpen } from "lucide-react";
 import { exportCustomerToPriorityPdf } from "@/lib/priority-export";
+import { listCases, isCaseArchived, getCaseCustomerId, getCaseDisplayCode } from "@/lib/operations.functions";
 import { CustomerCommercialTab, type CommercialHandle } from "@/components/customer-commercial-tab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -139,11 +140,36 @@ function CustomerDetail() {
   const saveAddressesFn = useServerFn(saveAddresses);
   const saveContactsFn = useServerFn(saveContacts);
   const saveCommercialFn = useServerFn(saveCommercial);
+  const listCasesFn = useServerFn(listCases);
 
   const { data: customer, isLoading } = useQuery({
     queryKey: ["customer", id],
     queryFn: () => getCustomerFn({ data: { id } }),
   });
+  // Same query key/fn as Shipments/Operations, so this reuses their cache
+  // instead of firing a redundant request when navigating between screens.
+  const { data: allCases = [] } = useQuery({
+    queryKey: ["operations-cases"],
+    queryFn: () => listCasesFn(),
+  });
+
+  // Cases don't carry a real customer_id FK (see operations_cases schema) —
+  // new cases get payload.customerId copied from the source quote at
+  // transfer time, but older cases predate that. Fall back to matching on
+  // the free-text customer_ref/customer_name copied onto every case, so
+  // nothing already-archived silently disappears from this view.
+  const archivedCases = useMemo(() => {
+    return allCases.filter((c) => {
+      if (!isCaseArchived(c.payload)) return false;
+      const cid = getCaseCustomerId(c.payload);
+      if (cid) return cid === id;
+      if (!customer) return false;
+      return (
+        (!!c.customer_name && c.customer_name === customer.company_name) ||
+        (!!c.customer_ref && c.customer_ref === customer.customer_code)
+      );
+    });
+  }, [allCases, customer, id]);
   const { data: addressesData } = useQuery({
     queryKey: ["customer-addresses", id],
     queryFn: () => listAddressesFn({ data: { customerId: id } }),
@@ -436,7 +462,7 @@ function CustomerDetail() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl" className="w-full">
-        <TabsList className="grid w-full max-w-3xl grid-cols-5">
+        <TabsList className="grid w-full max-w-4xl grid-cols-6">
           <TabsTrigger value="company" className="gap-2">
             <FileText className="h-4 w-4" />
             פרטי חברה
@@ -456,6 +482,10 @@ function CustomerDetail() {
           <TabsTrigger value="contacts" className="gap-2">
             <Users className="h-4 w-4" />
             אנשי קשר ({contacts.length})
+          </TabsTrigger>
+          <TabsTrigger value="archive" className="gap-2">
+            <Archive className="h-4 w-4" />
+            ארכיון ({archivedCases.length})
           </TabsTrigger>
         </TabsList>
 
@@ -707,6 +737,45 @@ function CustomerDetail() {
             <Plus className="h-4 w-4" />
             הוסף איש קשר
           </Button>
+        </TabsContent>
+
+        <TabsContent value="archive" className="mt-4">
+          <div className="rounded-2xl border bg-card p-6 shadow-sm">
+            <h2 className="mb-1 text-lg font-semibold">תיקים בארכיון</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              תיקים של הלקוח שהסטטוס שלהם עודכן ל"הושלם" — עוברים לכאן אוטומטית ומוסתרים מרשימת המשלוחים הפעילה.
+            </p>
+            {archivedCases.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">
+                <Archive className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+                אין עדיין תיקים בארכיון עבור לקוח זה.
+              </div>
+            ) : (
+              <div className="divide-y">
+                {[...archivedCases]
+                  .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                  .map((c) => (
+                    <Link
+                      key={c.id}
+                      to="/dashboard/shipments/$id"
+                      params={{ id: c.id }}
+                      className="flex items-center justify-between gap-3 py-3 text-sm hover:bg-muted/40"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-mono font-medium">{getCaseDisplayCode(c.payload, c.case_code)}</span>
+                        <span className="text-muted-foreground">
+                          {c.origin_port ?? "—"} → {c.dest_port ?? "—"}
+                        </span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        הושלם ב-{new Date(c.updated_at).toLocaleDateString("he-IL")}
+                      </span>
+                    </Link>
+                  ))}
+              </div>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

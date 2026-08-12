@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Archive,
   Bell,
   Briefcase,
   CheckCircle2,
@@ -19,6 +20,8 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -28,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listCases, getCaseDisplayCode, type CaseStatus } from "@/lib/operations.functions";
+import { listCases, getCaseDisplayCode, isCaseArchived, type CaseStatus } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
 
 // Same four categories as step 1 of the New Quote wizard ("סוג משלוח") — a
@@ -101,16 +104,27 @@ function ShipmentsDashboard() {
   });
 
   const [kindFilter, setKindFilter] = useState<ShipKindValue | "all">("all");
+  const [showArchived, setShowArchived] = useState(false);
+
+  // Cases whose pipeline status reached "הושלם" are archived automatically
+  // (see updateCasePipelineStatus) and dropped from this active work list by
+  // default — the switch below reveals them again. They're always still
+  // reachable from the case's customer page.
+  const archivedCount = useMemo(() => cases.filter((c) => isCaseArchived(c.payload)).length, [cases]);
+  const visibleCases = useMemo(
+    () => (showArchived ? cases : cases.filter((c) => !isCaseArchived(c.payload))),
+    [cases, showArchived],
+  );
 
   const kindCounts = useMemo(() => {
     const result: Record<ShipKindValue, number> = { export: 0, import: 0, distribution: 0, domestic: 0 };
-    for (const c of cases) if (isShipKind(c.shipment_kind)) result[c.shipment_kind]++;
+    for (const c of visibleCases) if (isShipKind(c.shipment_kind)) result[c.shipment_kind]++;
     return result;
-  }, [cases]);
+  }, [visibleCases]);
 
   const filteredCases = useMemo(
-    () => (kindFilter === "all" ? cases : cases.filter((c) => c.shipment_kind === kindFilter)),
-    [cases, kindFilter],
+    () => (kindFilter === "all" ? visibleCases : visibleCases.filter((c) => c.shipment_kind === kindFilter)),
+    [visibleCases, kindFilter],
   );
 
   const counts: Record<CaseStatus, number> = { new: 0, in_progress: 0, completed: 0, cancelled: 0 };
@@ -149,29 +163,39 @@ function ShipmentsDashboard() {
         description="תיקים תפעוליים שנפתחו מהצעות מחיר שהועברו — מעקב סטטוס מקצה לקצה."
       />
 
-      <Tabs value={kindFilter} onValueChange={(v) => setKindFilter(v as ShipKindValue | "all")} dir="rtl">
-        <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
-          <TabsTrigger
-            value="all"
-            className="gap-1.5 rounded-full border bg-card px-3 py-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-          >
-            <LayoutGrid className="h-3.5 w-3.5" /> הכל ({cases.length})
-          </TabsTrigger>
-          {SHIP_KIND_ORDER.map((k) => {
-            const conf = SHIP_KIND_CONFIG[k];
-            const Icon = conf.icon;
-            return (
-              <TabsTrigger
-                key={k}
-                value={k}
-                className="gap-1.5 rounded-full border bg-card px-3 py-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                <Icon className="h-3.5 w-3.5" /> {conf.label} ({kindCounts[k]})
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Tabs value={kindFilter} onValueChange={(v) => setKindFilter(v as ShipKindValue | "all")} dir="rtl">
+          <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
+            <TabsTrigger
+              value="all"
+              className="gap-1.5 rounded-full border bg-card px-3 py-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> הכל ({visibleCases.length})
+            </TabsTrigger>
+            {SHIP_KIND_ORDER.map((k) => {
+              const conf = SHIP_KIND_CONFIG[k];
+              const Icon = conf.icon;
+              return (
+                <TabsTrigger
+                  key={k}
+                  value={k}
+                  className="gap-1.5 rounded-full border bg-card px-3 py-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                >
+                  <Icon className="h-3.5 w-3.5" /> {conf.label} ({kindCounts[k]})
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </Tabs>
+
+        <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5">
+          <Archive className="h-3.5 w-3.5 text-muted-foreground" />
+          <Label htmlFor="show-archived" className="cursor-pointer text-xs font-medium text-muted-foreground">
+            הצג ארכיון ({archivedCount})
+          </Label>
+          <Switch id="show-archived" checked={showArchived} onCheckedChange={setShowArchived} />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {(["new", "in_progress", "completed", "cancelled"] as CaseStatus[]).map((s) => (

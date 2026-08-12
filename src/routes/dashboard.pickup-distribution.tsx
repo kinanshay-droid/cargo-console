@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listCases, CASE_PIPELINE_STATUS_META, getCaseDisplayCode, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
+import { listCases, isCaseArchived, CASE_PIPELINE_STATUS_META, getCaseDisplayCode, type CasePipelineStatus, type CaseRep } from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
 
 export const Route = createFileRoute("/dashboard/pickup-distribution")({
@@ -153,7 +153,7 @@ function PickupDistributionPage() {
   });
 
   const pickupCases = useMemo(
-    () => cases.filter((c) => !!getPickupIsraelDate(c.payload)),
+    () => cases.filter((c) => !isCaseArchived(c.payload) && !!getPickupIsraelDate(c.payload)),
     [cases],
   );
 
