@@ -745,7 +745,7 @@ export function NewQuoteDialog({
         if (!v) reset();
       }}
     >
-      <DialogContent dir="rtl" className="max-w-5xl p-0 overflow-hidden">
+      <DialogContent dir="rtl" className="max-w-6xl p-0 overflow-hidden">
         <div className="border-b bg-muted/30 p-6">
           <DialogHeader className="text-right">
             <DialogTitle className="flex items-center gap-2 text-xl">
