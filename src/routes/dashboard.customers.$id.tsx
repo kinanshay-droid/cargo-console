@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Plus, Trash2, Building2, Users, MapPin, Save, FileText, Upload, Briefcase, Loader2, FileDown, Archive, FolderOpen } from "lucide-react";
 import { exportCustomerToPriorityPdf } from "@/lib/priority-export";
 import { listCases, isCaseArchived, getCaseCustomerId, getCaseDisplayCode } from "@/lib/operations.functions";
+import { extractDomainFromWebsite, logoCandidateUrls } from "@/lib/logo-fetch";
 import { CustomerCommercialTab, type CommercialHandle } from "@/components/customer-commercial-tab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,6 +192,14 @@ function CustomerDetail() {
   const [industry, setIndustry] = useState("");
   const [website, setWebsite] = useState("");
   const [logo, setLogo] = useState<string | null>(null);
+  // True once the logo shown was auto-fetched from the website (drives the
+  // fallback chain on load failure + the "מהאתר" hint).
+  const [logoIsAuto, setLogoIsAuto] = useState(false);
+  // True once the logo is under the user's manual control — either they
+  // uploaded/removed it themselves, or the customer already had one saved
+  // when this page loaded. Only false (auto-fetch armed) for a customer
+  // with no logo yet whose website field gets filled in.
+  const [manualLogo, setManualLogo] = useState(true);
 
   const [sector, setSector] = useState<string>("Pharma");
   const [accountManager, setAccountManager] = useState("");
@@ -233,6 +242,10 @@ function CustomerDetail() {
     setIndustry(c.industry ?? "");
     setWebsite(c.website ?? "");
     setLogo(c.logo_url ?? null);
+    // A customer that already has a saved logo keeps it — auto-fetch only
+    // arms itself for customers with no logo yet.
+    setManualLogo(!!c.logo_url);
+    setLogoIsAuto(false);
     setSector(c.sector ?? "Pharma");
     setAccountManager(c.account_manager ?? "");
     setSalesRep(c.sales_rep ?? "");
@@ -283,6 +296,30 @@ function CustomerDetail() {
 
   const p = customerPalette(customer?.company_name ?? "");
 
+  useEffect(() => {
+    if (manualLogo) return;
+    const domain = extractDomainFromWebsite(website);
+    if (!domain) return;
+    const t = setTimeout(() => {
+      setLogo(logoCandidateUrls(domain)[0]);
+      setLogoIsAuto(true);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [website, manualLogo]);
+
+  const onLogoImgError = () => {
+    if (!logoIsAuto) return;
+    const domain = extractDomainFromWebsite(website);
+    const candidates = domain ? logoCandidateUrls(domain) : [];
+    const nextIdx = candidates.indexOf(logo ?? "") + 1;
+    if (nextIdx > 0 && nextIdx < candidates.length) {
+      setLogo(candidates[nextIdx]);
+    } else {
+      setLogo(null);
+      setLogoIsAuto(false);
+    }
+  };
+
   const onLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -291,7 +328,11 @@ function CustomerDetail() {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setLogo(reader.result as string);
+    reader.onload = () => {
+      setLogo(reader.result as string);
+      setLogoIsAuto(false);
+      setManualLogo(true);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -529,28 +570,42 @@ function CustomerDetail() {
               <Field label="תחום פעילות">
                 <Input value={industry} onChange={(e) => setIndustry(e.target.value)} />
               </Field>
-              <Field label="אתר אינטרנט">
+              <Field label="אתר אינטרנט" hint="הלוגו יאותר אוטומטית מהאתר אם עדיין אין לוגו">
                 <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://" dir="ltr" />
               </Field>
               <Field label="לוגו" className="md:col-span-2">
                 <div className="flex items-center gap-4">
                   <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border bg-muted">
                     {logo ? (
-                      <img src={logo} alt="לוגו" className="h-full w-full object-contain" />
+                      <img key={logo} src={logo} alt="לוגו" className="h-full w-full object-contain" onError={onLogoImgError} />
                     ) : (
                       <span className="text-xs text-muted-foreground">אין לוגו</span>
                     )}
                   </div>
-                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted">
-                    <Upload className="h-4 w-4" />
-                    העלה לוגו
-                    <input type="file" accept="image/*" className="hidden" onChange={onLogoChange} />
-                  </label>
-                  {logo && (
-                    <Button variant="ghost" size="sm" onClick={() => setLogo(null)} className="text-destructive">
-                      הסר
-                    </Button>
-                  )}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-muted">
+                        <Upload className="h-4 w-4" />
+                        העלה לוגו
+                        <input type="file" accept="image/*" className="hidden" onChange={onLogoChange} />
+                      </label>
+                      {logo && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setLogo(null);
+                            setLogoIsAuto(false);
+                            setManualLogo(true);
+                          }}
+                          className="text-destructive"
+                        >
+                          הסר
+                        </Button>
+                      )}
+                    </div>
+                    {logoIsAuto && logo && <p className="text-xs text-muted-foreground">אותר אוטומטית מהאתר</p>}
+                  </div>
                 </div>
               </Field>
             </div>

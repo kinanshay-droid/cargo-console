@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { createCustomer } from "@/lib/customers.functions";
+import { extractDomainFromWebsite, logoCandidateUrls } from "@/lib/logo-fetch";
 
 type Status = "active" | "inactive" | "frozen" | "lead";
 
@@ -61,17 +62,57 @@ export function NewCustomerDialog({
   const [status, setStatus] = useState<Status>(isLead ? "lead" : "active");
   const [companyType, setCompanyType] = useState<string>("");
   const [industry, setIndustry] = useState<string>("");
+  const [website, setWebsite] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  // True once the logo shown was auto-fetched from the website (not
+  // uploaded by hand) — controls the fallback chain on load failure and the
+  // "מהאתר" hint next to the preview.
+  const [logoIsAuto, setLogoIsAuto] = useState(false);
+  // True once the user has taken manual control of the logo (uploaded a
+  // file or removed it) — from then on, further edits to the website field
+  // stop overwriting their choice.
+  const [manualLogo, setManualLogo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const createCustomerFn = useServerFn(createCustomer);
   const queryClient = useQueryClient();
 
+  // Debounced auto-fetch: once the website field settles into a real-looking
+  // domain, try loading a logo for it. Runs again on every domain change
+  // unless the user has taken manual control (see manualLogo above).
+  useEffect(() => {
+    if (manualLogo) return;
+    const domain = extractDomainFromWebsite(website);
+    if (!domain) return;
+    const t = setTimeout(() => {
+      setLogoPreview(logoCandidateUrls(domain)[0]);
+      setLogoIsAuto(true);
+    }, 600);
+    return () => clearTimeout(t);
+  }, [website, manualLogo]);
+
+  function onLogoImgError() {
+    if (!logoIsAuto) return;
+    const domain = extractDomainFromWebsite(website);
+    const candidates = domain ? logoCandidateUrls(domain) : [];
+    const nextIdx = candidates.indexOf(logoPreview ?? "") + 1;
+    if (nextIdx > 0 && nextIdx < candidates.length) {
+      setLogoPreview(candidates[nextIdx]);
+    } else {
+      // Every candidate failed — give up quietly and let the user upload one.
+      setLogoPreview(null);
+      setLogoIsAuto(false);
+    }
+  }
+
   function reset() {
     setStatus(isLead ? "lead" : "active");
     setCompanyType("");
     setIndustry("");
+    setWebsite("");
     setLogoPreview(null);
+    setLogoIsAuto(false);
+    setManualLogo(false);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -83,12 +124,18 @@ export function NewCustomerDialog({
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setLogoPreview(reader.result as string);
+    reader.onload = () => {
+      setLogoPreview(reader.result as string);
+      setLogoIsAuto(false);
+      setManualLogo(true);
+    };
     reader.readAsDataURL(file);
   }
 
   function clearLogo() {
     setLogoPreview(null);
+    setLogoIsAuto(false);
+    setManualLogo(true);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -213,12 +260,14 @@ export function NewCustomerDialog({
                 </SelectContent>
               </Select>
             </Field>
-            <Field label="אתר אינטרנט">
+            <Field label="אתר אינטרנט" hint="הלוגו יאותר אוטומטית מהאתר">
               <Input
                 name="website"
                 type="url"
                 dir="ltr"
                 placeholder="https://example.com"
+                value={website}
+                onChange={(e) => setWebsite(e.target.value)}
               />
             </Field>
           </div>
@@ -227,12 +276,21 @@ export function NewCustomerDialog({
             <div className="flex items-center gap-3">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed bg-muted/40">
                 {logoPreview ? (
-                  <img src={logoPreview} alt="לוגו" className="h-full w-full object-cover" />
+                  <img
+                    key={logoPreview}
+                    src={logoPreview}
+                    alt="לוגו"
+                    className="h-full w-full object-contain"
+                    onError={onLogoImgError}
+                  />
                 ) : (
                   <Building2 className="h-6 w-6 text-muted-foreground" />
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
+                {logoIsAuto && logoPreview && (
+                  <span className="flex w-full items-center text-xs text-muted-foreground">אותר אוטומטית מהאתר</span>
+                )}
                 <Button
                   type="button"
                   variant="outline"
