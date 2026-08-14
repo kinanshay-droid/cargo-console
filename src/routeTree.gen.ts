@@ -16,6 +16,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as PresentationRouteImport } from './routes/presentation'
+import { Route as PortalRouteImport } from './routes/portal'
+import { Route as PortalDashboardRouteImport } from './routes/portal_.dashboard'
 import { Route as DashboardAccountRouteImport } from './routes/dashboard.account'
 import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
 import { Route as DashboardCommercialRouteImport } from './routes/dashboard.commercial'
@@ -72,6 +74,16 @@ const SignupRoute = SignupRouteImport.update({
 const PresentationRoute = PresentationRouteImport.update({
   id: '/presentation',
   path: '/presentation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalDashboardRoute = PortalDashboardRouteImport.update({
+  id: '/portal_/dashboard',
+  path: '/portal/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardAccountRoute = DashboardAccountRouteImport.update({
@@ -194,6 +206,8 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/presentation': typeof PresentationRoute
+  '/portal': typeof PortalRoute
+  '/portal/dashboard': typeof PortalDashboardRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -225,6 +239,8 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/presentation': typeof PresentationRoute
+  '/portal': typeof PortalRoute
+  '/portal/dashboard': typeof PortalDashboardRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -256,6 +272,8 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/presentation': typeof PresentationRoute
+  '/portal': typeof PortalRoute
+  '/portal_/dashboard': typeof PortalDashboardRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -289,6 +307,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/presentation'
+    | '/portal'
+    | '/portal/dashboard'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -320,6 +340,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/presentation'
+    | '/portal'
+    | '/portal/dashboard'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -350,6 +372,8 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/presentation'
+    | '/portal'
+    | '/portal_/dashboard'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -382,6 +406,8 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   PresentationRoute: typeof PresentationRoute
+  PortalRoute: typeof PortalRoute
+  PortalDashboardRoute: typeof PortalDashboardRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -433,6 +459,20 @@ declare module '@tanstack/react-router' {
       path: '/presentation'
       fullPath: '/presentation'
       preLoaderRoute: typeof PresentationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal_/dashboard': {
+      id: '/portal_/dashboard'
+      path: '/portal/dashboard'
+      fullPath: '/portal/dashboard'
+      preLoaderRoute: typeof PortalDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/account': {
@@ -682,6 +722,8 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   PresentationRoute: PresentationRoute,
+  PortalRoute: PortalRoute,
+  PortalDashboardRoute: PortalDashboardRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

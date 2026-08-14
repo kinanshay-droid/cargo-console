@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Plus, Trash2, Building2, Users, MapPin, Save, FileText, Upload, Briefcase, Loader2, FileDown, Archive, FolderOpen } from "lucide-react";
+import { ArrowRight, Plus, Trash2, Building2, Users, MapPin, Save, FileText, Upload, Briefcase, Loader2, FileDown, Archive, FolderOpen, KeyRound } from "lucide-react";
 import { exportCustomerToPriorityPdf } from "@/lib/priority-export";
 import { listCases, isCaseArchived, getCaseCustomerId, getCaseDisplayCode } from "@/lib/operations.functions";
 import { extractDomainFromWebsite, logoCandidateUrls } from "@/lib/logo-fetch";
 import { CustomerCommercialTab, type CommercialHandle } from "@/components/customer-commercial-tab";
+import { CustomerPortalTab } from "@/components/customer-portal-tab";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -503,7 +504,7 @@ function CustomerDetail() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl" className="w-full">
-        <TabsList className="grid w-full max-w-4xl grid-cols-6">
+        <TabsList className="grid w-full max-w-5xl grid-cols-7">
           <TabsTrigger value="company" className="gap-2">
             <FileText className="h-4 w-4" />
             פרטי חברה
@@ -523,6 +524,10 @@ function CustomerDetail() {
           <TabsTrigger value="contacts" className="gap-2">
             <Users className="h-4 w-4" />
             אנשי קשר ({contacts.length})
+          </TabsTrigger>
+          <TabsTrigger value="portal" className="gap-2">
+            <KeyRound className="h-4 w-4" />
+            פורטל לקוח
           </TabsTrigger>
           <TabsTrigger value="archive" className="gap-2">
             <Archive className="h-4 w-4" />
@@ -792,6 +797,10 @@ function CustomerDetail() {
             <Plus className="h-4 w-4" />
             הוסף איש קשר
           </Button>
+        </TabsContent>
+
+        <TabsContent value="portal" className="mt-4">
+          <CustomerPortalTab customerId={id} />
         </TabsContent>
 
         <TabsContent value="archive" className="mt-4">

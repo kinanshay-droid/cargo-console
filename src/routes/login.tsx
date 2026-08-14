@@ -351,6 +351,12 @@ const creds = {
                 הרשמה
               </Link>
             </p>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              לקוח חיצוני?{" "}
+              <Link to="/portal" className="font-medium text-accent hover:underline">
+                כניסה לפורטל הלקוחות
+              </Link>
+            </p>
           </div>
 
           {/* Live product glimpse: a real, detailed peek at the operations dashboard —
