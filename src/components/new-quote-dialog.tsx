@@ -405,7 +405,11 @@ export function NewQuoteDialog({
   // Step 2 state
   const [kind, setKind] = useState<ShipKind | null>(null);
   const [incoterm, setIncoterm] = useState<string | null>(null);
-  const [shipmentTypeTag, setShipmentTypeTag] = useState<string | null>(null);
+  // Multi-select: one shipment can hold more than one package, and those
+  // packages can span more than one temperature/handling type at once
+  // (e.g. some cartons Dry Shipper, some Dry-Ice) — so this isn't mutually
+  // exclusive like incoterm/shipment kind above.
+  const [shipmentTypeTags, setShipmentTypeTags] = useState<string[]>([]);
   const [cargo, setCargo] = useState<CargoRow[]>([{ id: uid(), sku: "", description: "", packaging: "", weight: "", notes: "" }]);
   const [containers, setContainers] = useState<ContainerRow[]>([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
   const [goods, setGoods] = useState<GoodsRow[]>([{ id: uid(), item: "", sku: "", origin: "", weight: "", dims: "", qty: 1 }]);
@@ -626,7 +630,7 @@ export function NewQuoteDialog({
       if (kind === null) return false;
       if (kind !== "domestic" && incoterm === null) return false;
       if (kind === "distribution" && dropType === null) return false;
-      if (shipmentTypeTag === null) return false;
+      if (shipmentTypeTags.length === 0) return false;
       if (!pickupDateEst || !pickupTimeEst || !deliveryDateEst || !deliveryTimeEst) return false;
       if (kind === "import") {
         if (journeyMode === null) return false;
@@ -655,7 +659,7 @@ export function NewQuoteDialog({
     kind,
     incoterm,
     dropType,
-    shipmentTypeTag,
+    shipmentTypeTags,
     pickupDateEst,
     pickupTimeEst,
     deliveryDateEst,
@@ -685,7 +689,7 @@ export function NewQuoteDialog({
     setQuery("");
     setKind(null);
     setIncoterm(null);
-    setShipmentTypeTag(null);
+    setShipmentTypeTags([]);
     setDropType(null);
     setCargo([{ id: uid(), sku: "", description: "", packaging: "", weight: "", notes: "" }]);
     setContainers([{ id: uid(), type: "", sku: "", destination: "", weight: "" }]);
@@ -765,7 +769,7 @@ export function NewQuoteDialog({
                   }
                 : null,
             cargoType,
-            shipmentTypeTag,
+            shipmentTypeTags,
             attrs,
             tempSeriesList,
             tempSeriesNone,
@@ -1015,17 +1019,25 @@ export function NewQuoteDialog({
                 </Section>
               )}
 
-              {/* סוג משלוח — תגית צבעונית, מתחת לתנאי המכר */}
+              {/* סוג משלוח — תגיות צבעוניות, מתחת לתנאי המכר. בחירה מרובה: משלוח
+                  אחד יכול להכיל כמה אריזות ולכלול כמה סוגי טמפרטורה בבת אחת. */}
               {kind && (
-                <Section title="סוג משלוח *">
+                <Section
+                  title="סוג משלוח *"
+                  action={<span className="text-xs text-muted-foreground">ניתן לבחור יותר מאחד</span>}
+                >
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
                     {SHIPMENT_TYPE_TAGS.map((t) => {
-                      const active = shipmentTypeTag === t.value;
+                      const active = shipmentTypeTags.includes(t.value);
                       return (
                         <button
                           key={t.value}
                           type="button"
-                          onClick={() => setShipmentTypeTag(active ? null : t.value)}
+                          onClick={() =>
+                            setShipmentTypeTags((prev) =>
+                              active ? prev.filter((v) => v !== t.value) : [...prev, t.value],
+                            )
+                          }
                           style={{ backgroundColor: t.bg, color: t.fg }}
                           className={cn(
                             "rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition",
