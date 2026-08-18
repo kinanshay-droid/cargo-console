@@ -1492,33 +1492,47 @@ export function NewQuoteDialog({
                           </button>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                        {PALLETS.map((p) => {
-                          const active = pkg.pallet === p.id;
-                          const size = p.id === "custom" && pkg.customLength && pkg.customWidth && pkg.customHeight
-                            ? `${pkg.customLength} × ${pkg.customWidth} × ${pkg.customHeight} ס״מ`
-                            : p.size;
-                          return (
+                      {pkg.pallet === "custom" ? (
+                        // Once "מידה ידנית" is chosen, showing the preset pallet
+                        // cards alongside it is just noise — this row becomes
+                        // pure manual entry, with a small link back to the
+                        // presets instead of re-showing all of them.
+                        <div className="rounded-lg border bg-muted/20 p-3">
+                          <div className="mb-3 flex items-center justify-between">
+                            <span className="text-sm font-medium">מידה ידנית</span>
                             <button
-                              key={p.id}
                               type="button"
-                              onClick={() => updatePackage(pkg.id, { pallet: p.id })}
-                              className={cn(
-                                "rounded-lg border p-3 text-right transition",
-                                active ? "border-primary bg-primary/5" : "hover:bg-muted/40",
-                              )}
+                              onClick={() => updatePackage(pkg.id, { pallet: null })}
+                              className="text-xs font-medium text-accent hover:underline"
                             >
-                              <div className="text-sm font-medium">{p.label}</div>
-                              <div className="mt-1 text-[11px] text-muted-foreground">{size}</div>
+                              בחירת סוג משטח מוגדר מראש
                             </button>
-                          );
-                        })}
-                      </div>
-                      {pkg.pallet === "custom" && (
-                        <div className="mt-3 grid grid-cols-3 gap-3 rounded-lg border bg-muted/20 p-3">
-                          <Field label='אורך (ס"מ)' type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} placeholder="120" />
-                          <Field label='רוחב (ס"מ)' type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} placeholder="80" />
-                          <Field label='גובה (ס"מ)' type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} placeholder="14.4" />
+                          </div>
+                          <div className="grid grid-cols-3 gap-3">
+                            <Field label='אורך (ס"מ)' type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} placeholder="120" />
+                            <Field label='רוחב (ס"מ)' type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} placeholder="80" />
+                            <Field label='גובה (ס"מ)' type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} placeholder="14.4" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                          {PALLETS.map((p) => {
+                            const active = pkg.pallet === p.id;
+                            return (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => updatePackage(pkg.id, { pallet: p.id })}
+                                className={cn(
+                                  "rounded-lg border p-3 text-right transition",
+                                  active ? "border-primary bg-primary/5" : "hover:bg-muted/40",
+                                )}
+                              >
+                                <div className="text-sm font-medium">{p.label}</div>
+                                <div className="mt-1 text-[11px] text-muted-foreground">{p.size}</div>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
