@@ -308,7 +308,9 @@ export function makePackageRow(): PackageRow {
   // toward the gross/volumetric weight summary as one real item, instead of
   // silently contributing zero until the person also remembers to type a
   // quantity (matches unitWeight's own "1" default, for the same reason).
-  return { id: uid(), pallet: null, customLength: "", customWidth: "", customHeight: "", unitWeight: "1", unitQty: "1" };
+  // pallet is always "custom": the wizard only offers manual L/W/H entry
+  // here, no preset pallet sizes to pick from.
+  return { id: uid(), pallet: "custom", customLength: "", customWidth: "", customHeight: "", unitWeight: "1", unitQty: "1" };
 }
 
 // Resolves a package's L×W×H in cm, whether it came from a preset pallet or manual entry.
@@ -1492,49 +1494,11 @@ export function NewQuoteDialog({
                           </button>
                         </div>
                       )}
-                      {pkg.pallet === "custom" ? (
-                        // Once "מידה ידנית" is chosen, showing the preset pallet
-                        // cards alongside it is just noise — this row becomes
-                        // pure manual entry, with a small link back to the
-                        // presets instead of re-showing all of them.
-                        <div className="rounded-lg border bg-muted/20 p-3">
-                          <div className="mb-3 flex items-center justify-between">
-                            <span className="text-sm font-medium">מידה ידנית</span>
-                            <button
-                              type="button"
-                              onClick={() => updatePackage(pkg.id, { pallet: null })}
-                              className="text-xs font-medium text-accent hover:underline"
-                            >
-                              בחירת סוג משטח מוגדר מראש
-                            </button>
-                          </div>
-                          <div className="grid grid-cols-3 gap-3">
-                            <Field label='אורך (ס"מ)' type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} placeholder="120" />
-                            <Field label='רוחב (ס"מ)' type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} placeholder="80" />
-                            <Field label='גובה (ס"מ)' type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} placeholder="14.4" />
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-                          {PALLETS.map((p) => {
-                            const active = pkg.pallet === p.id;
-                            return (
-                              <button
-                                key={p.id}
-                                type="button"
-                                onClick={() => updatePackage(pkg.id, { pallet: p.id })}
-                                className={cn(
-                                  "rounded-lg border p-3 text-right transition",
-                                  active ? "border-primary bg-primary/5" : "hover:bg-muted/40",
-                                )}
-                              >
-                                <div className="text-sm font-medium">{p.label}</div>
-                                <div className="mt-1 text-[11px] text-muted-foreground">{p.size}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                      <div className="grid grid-cols-3 gap-3">
+                        <Field label='אורך (ס"מ)' type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} placeholder="120" />
+                        <Field label='רוחב (ס"מ)' type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} placeholder="80" />
+                        <Field label='גובה (ס"מ)' type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} placeholder="14.4" />
+                      </div>
                       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label='משקל ליחידה (ק"ג)' type="number" value={pkg.unitWeight} onChange={(e) => updatePackage(pkg.id, { unitWeight: e.target.value })} />
                         <Field label="כמות (יח')" type="number" value={pkg.unitQty} onChange={(e) => updatePackage(pkg.id, { unitQty: e.target.value })} placeholder="0" />
