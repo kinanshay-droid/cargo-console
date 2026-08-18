@@ -664,35 +664,54 @@ export function NewQuoteDialog({
     );
   }, [query, customersList]);
 
-  const canContinue = useMemo(() => {
-    if (step === 1) return selectedId !== null;
+  // Same checks canContinue used to gate on, but collecting every missing
+  // field's label instead of bailing out on the first failure — lets the
+  // "המשך" hint tell the person exactly what's left, not just "something".
+  const missingFieldLabels = useMemo(() => {
+    const missing: string[] = [];
+    if (step === 1) {
+      if (selectedId === null) missing.push("בחירת לקוח");
+      return missing;
+    }
     if (step === 2) {
-      if (kind === null) return false;
-      if (kind !== "domestic" && incoterm === null) return false;
-      if (kind === "distribution" && dropType === null) return false;
-      if (shipmentTypeTags.length === 0) return false;
-      if (!pickupDateEst || !pickupTimeEst || !deliveryDateEst || !deliveryTimeEst) return false;
+      if (kind === null) missing.push("סוג משלוח");
+      if (kind !== "domestic" && incoterm === null) missing.push("Incoterm");
+      if (kind === "distribution" && dropType === null) missing.push("סוג הפצה");
+      if (shipmentTypeTags.length === 0) missing.push("סוג משלוח (תגית)");
+      if (!pickupDateEst) missing.push("תאריך איסוף משוער");
+      if (!pickupTimeEst) missing.push("שעת איסוף משוערת");
+      if (!deliveryDateEst) missing.push("תאריך מסירה משוער");
+      if (!deliveryTimeEst) missing.push("שעת מסירה משוערת");
       if (kind === "import") {
-        if (journeyMode === null) return false;
-        if (!journeyOriginPort.trim() || !journeyDestPort.trim()) return false;
-        if (journeyMode === "air" ? !airline.trim() : !journeyVesselOrFlight.trim()) return false;
-        if (!journeyNumber.trim() || !journeyCode.trim()) return false;
+        if (journeyMode === null) missing.push("סוג מסע");
+        if (!journeyOriginPort.trim()) missing.push("נמל מוצא");
+        if (!journeyDestPort.trim()) missing.push("נמל יעד");
+        if (journeyMode === "air" ? !airline.trim() : !journeyVesselOrFlight.trim()) {
+          missing.push(journeyMode === "land" ? "שם כלי שיט / טיסה" : "חברת תעופה");
+        }
+        if (!journeyNumber.trim()) missing.push("מספר מסע");
+        if (!journeyCode.trim()) missing.push("קוד מסע");
       }
-      if (!pickupAddress.trim() || !pickupContacts.some((c) => c.name.trim())) return false;
-      if (!deliveryAddress.trim() || !deliveryContacts.some((c) => c.name.trim())) return false;
-      return true;
+      if (!pickupAddress.trim()) missing.push("כתובת איסוף");
+      if (!pickupContacts.some((c) => c.name.trim())) missing.push("איש קשר לאיסוף");
+      if (!deliveryAddress.trim()) missing.push("כתובת מסירה");
+      if (!deliveryContacts.some((c) => c.name.trim())) missing.push("איש קשר למסירה");
+      return missing;
     }
     if (step === 3) {
-      if (cargoType === null) return false;
+      if (cargoType === null) missing.push("סוג מטען");
       if (cargoType === "temperature") {
-        if (!tempSeriesChosen) return false;
-        if (tempSeriesList.length > 0 && packSelections.length === 0) return false;
+        if (!tempSeriesChosen) missing.push("סדרת טמפרטורה");
+        if (tempSeriesList.length > 0 && packSelections.length === 0) missing.push("בחירת אריזה מהקטלוג");
       }
-      if (packages.some((pkg) => pkg.pallet === null)) return false;
-      return true;
+      if (packages.some((pkg) => pkg.pallet === null)) missing.push("סוג משטח/מארז");
+      return missing;
     }
-    if (step === 4) return shipmentMode !== null;
-    return true;
+    if (step === 4) {
+      if (shipmentMode === null) missing.push("אופן משלוח");
+      return missing;
+    }
+    return missing;
   }, [
     step,
     selectedId,
@@ -722,6 +741,7 @@ export function NewQuoteDialog({
     packages,
     shipmentMode,
   ]);
+  const canContinue = missingFieldLabels.length === 0;
 
   const reset = () => {
     setStep(1);
@@ -1763,8 +1783,10 @@ export function NewQuoteDialog({
                 <Plus className="h-4 w-4" /> לקוח פוטנציאלי חדש
               </Button>
             )}
-            {!canContinue && !submitting && (
-              <span className="text-xs text-muted-foreground">יש למלא את כל השדות המסומנים ב-* לפני שממשיכים</span>
+            {!canContinue && !submitting && missingFieldLabels.length > 0 && (
+              <span className="max-w-md text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">חסר למילוי:</span> {missingFieldLabels.join(" · ")}
+              </span>
             )}
           </div>
           <div className="flex gap-2">
