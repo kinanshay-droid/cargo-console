@@ -303,14 +303,11 @@ export type PackageRow = {
 };
 
 export function makePackageRow(): PackageRow {
-  // unitQty defaults to "1" (not blank) so a freshly added package —
-  // dims + weight filled in, quantity left untouched — immediately counts
-  // toward the gross/volumetric weight summary as one real item, instead of
-  // silently contributing zero until the person also remembers to type a
-  // quantity (matches unitWeight's own "1" default, for the same reason).
   // pallet is always "custom": the wizard only offers manual L/W/H entry
-  // here, no preset pallet sizes to pick from.
-  return { id: uid(), pallet: "custom", customLength: "", customWidth: "", customHeight: "", unitWeight: "1", unitQty: "1" };
+  // here, no preset pallet sizes to pick from. Every field starts fully
+  // blank — no default/example values — so the section reads as empty
+  // until the person actually types real numbers.
+  return { id: uid(), pallet: "custom", customLength: "", customWidth: "", customHeight: "", unitWeight: "", unitQty: "" };
 }
 
 // Resolves a package's L×W×H in cm, whether it came from a preset pallet or manual entry.
@@ -1498,13 +1495,13 @@ export function NewQuoteDialog({
                         </div>
                       )}
                       <div className="grid grid-cols-3 gap-3">
-                        <Field label='אורך (ס"מ)' type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} placeholder="120" />
-                        <Field label='רוחב (ס"מ)' type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} placeholder="80" />
-                        <Field label='גובה (ס"מ)' type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} placeholder="14.4" />
+                        <Field label='אורך (ס"מ)' type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} />
+                        <Field label='רוחב (ס"מ)' type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} />
+                        <Field label='גובה (ס"מ)' type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} />
                       </div>
                       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label='משקל ליחידה (ק"ג)' type="number" value={pkg.unitWeight} onChange={(e) => updatePackage(pkg.id, { unitWeight: e.target.value })} />
-                        <Field label="כמות (יח')" type="number" value={pkg.unitQty} onChange={(e) => updatePackage(pkg.id, { unitQty: e.target.value })} placeholder="0" />
+                        <Field label="כמות (יח')" type="number" value={pkg.unitQty} onChange={(e) => updatePackage(pkg.id, { unitQty: e.target.value })} />
                       </div>
                       {cargoType === "temperature" && (() => {
                         const dims = getPackageDimsCm(pkg);
