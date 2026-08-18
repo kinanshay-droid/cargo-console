@@ -1623,17 +1623,23 @@ export function NewQuoteDialog({
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {packageCalcs.map((c, idx) => (
-                        <tr key={c.id}>
-                          <td className="px-3 py-2">חבילה {idx + 1}</td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {c.dims ? `${c.dims.length} × ${c.dims.width} × ${c.dims.height}` : ""}
-                          </td>
-                          <td className="px-3 py-2">{c.qty ? c.qty : ""}</td>
-                          <td className="px-3 py-2">{c.grossWeight ? `${c.grossWeight.toLocaleString("he-IL")} ק"ג` : ""}</td>
-                          <td className="px-3 py-2">{c.volumetricWeight ? `${c.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}</td>
-                        </tr>
-                      ))}
+                      {packageCalcs.map((c, idx) => {
+                        // A package row with no dimensions entered yet (e.g. the
+                        // blank starter row) isn't real data — skip it here
+                        // instead of listing a "חבילה 1" line with nothing in it.
+                        if (!c.dims) return null;
+                        return (
+                          <tr key={c.id}>
+                            <td className="px-3 py-2">חבילה {idx + 1}</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              {`${c.dims.length} × ${c.dims.width} × ${c.dims.height}`}
+                            </td>
+                            <td className="px-3 py-2">{c.qty ? c.qty : ""}</td>
+                            <td className="px-3 py-2">{c.grossWeight ? `${c.grossWeight.toLocaleString("he-IL")} ק"ג` : ""}</td>
+                            <td className="px-3 py-2">{c.volumetricWeight ? `${c.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}</td>
+                          </tr>
+                        );
+                      })}
                       {packModelCalcs.map((c, idx) => (
                         <tr key={packSelections[idx].key}>
                           <td className="px-3 py-2">{c.label}</td>
@@ -1645,6 +1651,13 @@ export function NewQuoteDialog({
                           <td className="px-3 py-2">{c.volumetricWeight ? `${c.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}</td>
                         </tr>
                       ))}
+                      {packageCalcs.every((c) => !c.dims) && packModelCalcs.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">
+                            טרם הוזנו מידות חבילה
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
