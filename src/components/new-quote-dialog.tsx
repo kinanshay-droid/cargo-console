@@ -260,7 +260,7 @@ export const BIOTHERM_MODELS = [
 // inside the box — separate from the box's own empty tare weight — so the
 // gross-weight total reflects package + product together, not just the
 // packaging.
-export type PackSelection = { key: string; qty: number; productWeight?: number };
+export type PackSelection = { key: string; qty: number; productWeight?: number; loggerId?: string | null };
 
 // key format is "<tempSeries>:<model name>" (see the catalog tables below).
 // deepFrozen always maps to the BioTherm catalog, every other series to
@@ -502,6 +502,9 @@ export function NewQuoteDialog({
   const getPackProductWeight = (key: string) => packSelections.find((s) => s.key === key)?.productWeight ?? "";
   const setPackProductWeight = (key: string, productWeight: number) =>
     setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, productWeight } : s)));
+  const getPackLogger = (key: string) => packSelections.find((s) => s.key === key)?.loggerId ?? null;
+  const setPackLogger = (key: string, loggerId: string | null) =>
+    setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, loggerId } : s)));
   const packModelCalcs = useMemo(() => packSelections.map((sel) => getPackModelCalc(sel)), [packSelections]);
   const [packages, setPackages] = useState<PackageRow[]>([makePackageRow()]);
   const updatePackage = (id: string, patch: Partial<PackageRow>) =>
@@ -1375,6 +1378,7 @@ export function NewQuoteDialog({
                                     <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
                                     <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
                                     <th className="px-3 py-2 text-right font-medium">משך</th>
+                                    <th className="w-44 px-3 py-2 text-right font-medium">רשם טמפרטורה</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1407,6 +1411,17 @@ export function NewQuoteDialog({
                                           {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
                                         </td>
                                         <td className="px-3 py-2">{m.duration}</td>
+                                        <td className="px-3 py-2">
+                                          {qty > 0 && (
+                                            <Lookup
+                                              type="loggers"
+                                              value={getPackLogger(key)}
+                                              onChange={(item) => setPackLogger(key, item?.id ?? null)}
+                                              placeholder="בחר רשם..."
+                                              className="[&_button]:h-7 [&_button]:text-xs"
+                                            />
+                                          )}
+                                        </td>
                                       </tr>
                                     );
                                   })}
@@ -1423,6 +1438,7 @@ export function NewQuoteDialog({
                                     <th className="px-3 py-2 text-right font-medium">Tare</th>
                                     <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
                                     <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
+                                    <th className="w-44 px-3 py-2 text-right font-medium">רשם טמפרטורה</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1453,6 +1469,17 @@ export function NewQuoteDialog({
                                         </td>
                                         <td className="px-3 py-2 text-muted-foreground">
                                           {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          {qty > 0 && (
+                                            <Lookup
+                                              type="loggers"
+                                              value={getPackLogger(key)}
+                                              onChange={(item) => setPackLogger(key, item?.id ?? null)}
+                                              placeholder="בחר רשם..."
+                                              className="[&_button]:h-7 [&_button]:text-xs"
+                                            />
+                                          )}
                                         </td>
                                       </tr>
                                     );
