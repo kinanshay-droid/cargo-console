@@ -86,6 +86,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { TONE_GRADIENT } from "@/lib/theme";
 import {
@@ -252,6 +253,40 @@ export const BIOTHERM_MODELS = [
   { model: "BioTherm 14", category: "Category A / B", duration: "96 שעות", outer: "385×380×395", tare: "1.7 kg" },
   { model: "BioTherm 15", category: "Category A", duration: "96+ שעות", outer: "403×396×416", tare: "1.9 kg" },
   { model: "BioTherm 30", category: "Category A / B", duration: "96+ שעות", outer: "465×458×478", tare: "2.5 kg" },
+];
+
+// Reference catalog of temperature-recorder devices, shown in the picker
+// dialog opened once a packaging model is selected. This is a static list of
+// well-known cold-chain logger products (not organization-editable master
+// data like the other Lookup domains) — company/model naming, GPS/real-time
+// capability and pharma suitability are inherent to each device, not
+// something a customer or org would customize per-quote.
+export type TempLogger = {
+  id: string;
+  company: string;
+  model: string;
+  type: string;
+  tempRange: string;
+  gps: string;
+  pharma: string;
+};
+
+export const TEMP_LOGGERS: TempLogger[] = [
+  { id: "tive-solo-pro", company: "Tive", model: "Solo Pro", type: "Real-Time Tracker", tempRange: "-30°C עד +60°C + probes", gps: "✅ GPS + Cellular", pharma: "⭐⭐⭐⭐⭐" },
+  { id: "tive-solo-5g", company: "Tive", model: "Solo 5G", type: "Real-Time Tracker", tempRange: "-30°C עד +60°C + probes", gps: "✅ GPS + Cellular", pharma: "⭐⭐⭐⭐⭐" },
+  { id: "tive-tag", company: "Tive", model: "Tive Tag", type: "Passive / NFC", tempRange: "-30°C עד +50°C", gps: "❌", pharma: "⭐⭐⭐⭐" },
+  { id: "sensitech-temptale", company: "Sensitech", model: "TempTale Ultra / TT4", type: "Single-use / USB", tempRange: "לפי דגם", gps: "❌ / חלק מהדגמים", pharma: "⭐⭐⭐⭐⭐" },
+  { id: "elpro-libero", company: "ELPRO", model: "LIBERO CS / CB / CL", type: "Multi-use / PDF", tempRange: "לפי דגם", gps: "❌ / Cloud בדגמים מסוימים", pharma: "⭐⭐⭐⭐⭐" },
+  { id: "logtag-trix", company: "LogTag", model: "TRIX-8 / SRIC / Dry Ice", type: "Single/Multi-use", tempRange: "לפי דגם", gps: "❌", pharma: "⭐⭐⭐⭐" },
+  { id: "berlinger-qtag", company: "Berlinger", model: "Q-tag / Fridge-tag", type: "Single-use / Indicator", tempRange: "לפי דגם", gps: "❌", pharma: "⭐⭐⭐⭐⭐" },
+  { id: "testo-174", company: "Testo", model: "174 / 175 / 176", type: "Multi-use", tempRange: "לפי דגם", gps: "❌ / Bluetooth בחלק מהדגמים", pharma: "⭐⭐⭐⭐" },
+  { id: "dickson-one", company: "Dickson", model: "One / Data Loggers", type: "Multi-use / Cloud", tempRange: "לפי דגם", gps: "✅ בדגמי Cloud", pharma: "⭐⭐⭐⭐" },
+  { id: "deltatrak-flashlink", company: "DeltaTrak", model: "FlashLink / ColdTrak", type: "Single/Multi-use", tempRange: "לפי דגם", gps: "חלק מהדגמים", pharma: "⭐⭐⭐⭐" },
+  { id: "spotsee-warmmark", company: "SpotSee", model: "WarmMark / ColdMark", type: "Indicator", tempRange: "טווחים מוגדרים", gps: "❌", pharma: "⭐⭐⭐" },
+  { id: "tempmate-s1", company: "tempmate", model: "S1 / M1 / S2", type: "Single/Multi-use", tempRange: "לפי דגם", gps: "❌ / Bluetooth בחלק", pharma: "⭐⭐⭐⭐" },
+  { id: "blulog-nfc", company: "Blulog", model: "Blulog NFC / Real-Time", type: "NFC / Real-Time", tempRange: "לפי דגם", gps: "✅ בדגמי Real-Time", pharma: "⭐⭐⭐⭐" },
+  { id: "eupry-sensors", company: "Eupry", model: "Eupry Sensors", type: "Real-Time", tempRange: "לפי דגם", gps: "✅ Cloud", pharma: "⭐⭐⭐⭐" },
+  { id: "tss-weblogger", company: "TSS", model: "Weblogger", type: "Data Logger", tempRange: "לפי דגם", gps: "חלק מהמערכות", pharma: "⭐⭐⭐⭐" },
 ];
 
 // A checked packaging model from the catalog above, with a quantity attached
@@ -1413,13 +1448,7 @@ export function NewQuoteDialog({
                                         <td className="px-3 py-2">{m.duration}</td>
                                         <td className="px-3 py-2">
                                           {qty > 0 && (
-                                            <Lookup
-                                              type="loggers"
-                                              value={getPackLogger(key)}
-                                              onChange={(item) => setPackLogger(key, item?.id ?? null)}
-                                              placeholder="בחר רשם..."
-                                              className="[&_button]:h-7 [&_button]:text-xs"
-                                            />
+                                            <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />
                                           )}
                                         </td>
                                       </tr>
@@ -1472,13 +1501,7 @@ export function NewQuoteDialog({
                                         </td>
                                         <td className="px-3 py-2">
                                           {qty > 0 && (
-                                            <Lookup
-                                              type="loggers"
-                                              value={getPackLogger(key)}
-                                              onChange={(item) => setPackLogger(key, item?.id ?? null)}
-                                              placeholder="בחר רשם..."
-                                              className="[&_button]:h-7 [&_button]:text-xs"
-                                            />
+                                            <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />
                                           )}
                                         </td>
                                       </tr>
@@ -2055,6 +2078,86 @@ export function PackQtyStepper({ value, onChange }: { value: number; onChange: (
         +
       </button>
     </div>
+  );
+}
+
+// Opens a wide selection window over the TEMP_LOGGERS catalog (company,
+// model/series, type, typical temp range, GPS/real-time capability, pharma
+// suitability) so a real device can be attached to a selected packaging row.
+export function LoggerPicker({ value, onChange }: { value: string | null; onChange: (id: string | null) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = TEMP_LOGGERS.find((l) => l.id === value) ?? null;
+
+  function select(id: string) {
+    onChange(id);
+    setOpen(false);
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-7 w-full justify-between px-2 text-right text-xs font-normal"
+        >
+          <span className="truncate">
+            {selected ? `${selected.company} · ${selected.model}` : <span className="text-muted-foreground">בחר רשם...</span>}
+          </span>
+          <span className="flex items-center gap-1 shrink-0">
+            {selected && (
+              <X
+                className="h-3 w-3 opacity-50 hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onChange(null);
+                }}
+              />
+            )}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[880px] p-0" align="start">
+        <div className="border-b px-3 py-2 text-xs font-medium text-muted-foreground">בחירת רשם טמפרטורה</div>
+        <div className="max-h-[420px] overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-muted/60 text-muted-foreground">
+              <tr>
+                <th className="px-2.5 py-2 text-right font-medium">חברה</th>
+                <th className="px-2.5 py-2 text-right font-medium">דגם/סדרה</th>
+                <th className="px-2.5 py-2 text-right font-medium">סוג</th>
+                <th className="px-2.5 py-2 text-right font-medium">טווח טמפ׳ אופייני</th>
+                <th className="px-2.5 py-2 text-right font-medium">GPS / Real-Time</th>
+                <th className="px-2.5 py-2 text-right font-medium">מתאים לפארמה</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {TEMP_LOGGERS.map((l) => (
+                <tr
+                  key={l.id}
+                  onClick={() => select(l.id)}
+                  className={cn("cursor-pointer transition hover:bg-muted/40", l.id === value && "bg-primary/5")}
+                >
+                  <td className="px-2.5 py-2 font-semibold">
+                    <span className="flex items-center gap-1.5">
+                      {l.id === value && <Check className="h-3 w-3 text-primary" />}
+                      {l.company}
+                    </span>
+                  </td>
+                  <td className="px-2.5 py-2">{l.model}</td>
+                  <td className="px-2.5 py-2 text-muted-foreground">{l.type}</td>
+                  <td className="px-2.5 py-2 text-muted-foreground" dir="ltr">{l.tempRange}</td>
+                  <td className="px-2.5 py-2 text-muted-foreground">{l.gps}</td>
+                  <td className="px-2.5 py-2 text-warning">{l.pharma}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
