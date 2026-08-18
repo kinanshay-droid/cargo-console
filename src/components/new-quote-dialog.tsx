@@ -1356,28 +1356,6 @@ export function NewQuoteDialog({
                 </div>
               </Section>
 
-              <Section title="מאפייני מטען" action={<span className="text-xs text-muted-foreground">ניתן לבחור כמה שדרוש</span>}>
-                <div className="flex flex-wrap gap-2">
-                  {ATTR_OPTIONS.map((a) => {
-                    const on = attrs[a.id];
-                    return (
-                      <button
-                        key={a.id}
-                        type="button"
-                        onClick={() => setAttrs((s) => ({ ...s, [a.id]: !s[a.id] }))}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                          on ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground hover:bg-muted",
-                        )}
-                      >
-                        {on && <Check className="h-3 w-3" />}
-                        {a.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </Section>
-
               {cargoType === "temperature" && (
                 <Section title="בחר אריזה" action={<span className="text-xs text-muted-foreground">אפשר לבחור כמה סדרות טמפרטורה במקביל</span>}>
                   <div className="mb-3 flex flex-wrap gap-2">
