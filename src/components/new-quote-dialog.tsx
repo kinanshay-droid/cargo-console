@@ -330,8 +330,11 @@ export function getPackageDimsCm(pkg: PackageRow): { length: number; width: numb
 export function getPackageCalc(pkg: PackageRow) {
   const qty = parseFloat(pkg.unitQty) || 0;
   const unitWeight = parseFloat(pkg.unitWeight) || 0;
-  const grossWeight = qty * unitWeight;
   const dims = getPackageDimsCm(pkg);
+  // Without dimensions this package hasn't really been filled in yet — don't
+  // let the default qty/weight values ("1"/"1") silently count it as 1 kg
+  // in the summary. It only contributes once real dims are entered.
+  const grossWeight = dims ? qty * unitWeight : 0;
   const volumetricWeight = dims
     ? (qty * dims.length * dims.width * dims.height) / VOLUMETRIC_DIVISOR_CM3_PER_KG
     : 0;
