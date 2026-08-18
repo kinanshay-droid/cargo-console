@@ -2230,12 +2230,6 @@ export const SERVICE_LIST: { id: string; label: string }[] = [
   { id: "insurance", label: "ביטוח בסיסי ($500)" },
 ];
 
-const ALTERNATIVES = [
-  { code: "TR", name: "Turkish Cargo", days: 4, price: "USD 3,450" },
-  { code: "AE", name: "Emirates SkyCargo", days: 3, price: "USD 3,980" },
-  { code: "QA", name: "Qatar Airways Cargo", days: 4, price: "USD 3,640" },
-];
-
 type Step4Props = {
   kind: ShipKind | null;
   originPort: string; setOriginPort: (v: string) => void;
@@ -2366,32 +2360,6 @@ function Step4Logistics(p: Step4Props) {
             <Calendar className="h-3.5 w-3.5" /> הצג לוח זמנים מפורט
           </Button>
         </div>
-      </Section>
-
-      <Section title="אלטרנטיבות" action={<span className="text-xs text-muted-foreground">ניתן להוסיף חלופות למשלוח להשוואה</span>}>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          {ALTERNATIVES.map((a) => {
-            const on = !!p.compare[a.code];
-            return (
-              <div key={a.code} className={cn("rounded-lg border p-3 transition", on ? "border-primary bg-primary/5" : "hover:bg-muted/30")}>
-                <div className="flex items-center gap-2">
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold">{a.code}</span>
-                  <span className="text-sm font-medium">{a.name}</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {a.days} ימים</span>
-                  <span className="font-medium text-foreground">{a.price}</span>
-                </div>
-                <button type="button"
-                  onClick={() => p.setCompare((s) => ({ ...s, [a.code]: !s[a.code] }))}
-                  className={cn("mt-2 w-full rounded-md border py-1 text-xs transition", on ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted/40")}>
-                  {on ? "הוסר מהשוואה" : "הוסף להשוואה"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-        <button type="button" className="mt-3 text-xs text-primary hover:underline">הצג עוד חלופות ←</button>
       </Section>
 
       <Section title="שירותים כלולים" action={<Button type="button" variant="ghost" size="sm" className="h-7 text-xs">ערוך שירותים</Button>}>
