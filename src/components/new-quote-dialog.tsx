@@ -613,8 +613,11 @@ export function NewQuoteDialog({
   }, [kind]);
   const [transit, setTransit] = useState<string[]>([]);
   const [newTransit, setNewTransit] = useState("");
-  const [departDate, setDepartDate] = useState(() => addDaysISO(3));
-  const [arriveDate, setArriveDate] = useState(() => addDaysISO(5));
+  // No separate departure/arrival date fields here — step 2 already collects
+  // תאריך איסוף/מסירה משוער (pickupDateEst/deliveryDateEst), so step 4 just
+  // reuses those instead of asking for the same dates twice.
+  const departDate = pickupDateEst;
+  const arriveDate = deliveryDateEst;
   const [services, setServices] = useState<Record<string, boolean>>({
     pickup: true, air: true, exportCustoms: true, importCustoms: true,
     clearance: true, land: true, delivery: true, insurance: true,
@@ -1801,8 +1804,8 @@ export function NewQuoteDialog({
             destPort={destPort} setDestPort={setDestPort}
             transit={transit} setTransit={setTransit}
             newTransit={newTransit} setNewTransit={setNewTransit}
-            departDate={departDate} setDepartDate={setDepartDate}
-            arriveDate={arriveDate} setArriveDate={setArriveDate}
+            departDate={departDate}
+            arriveDate={arriveDate}
             services={services} setServices={setServices}
             compare={compare} setCompare={setCompare}
             agent={agent} setAgent={setAgent}
@@ -2342,8 +2345,8 @@ type Step4Props = {
   destPort: string; setDestPort: (v: string) => void;
   transit: string[]; setTransit: React.Dispatch<React.SetStateAction<string[]>>;
   newTransit: string; setNewTransit: (v: string) => void;
-  departDate: string; setDepartDate: (v: string) => void;
-  arriveDate: string; setArriveDate: (v: string) => void;
+  departDate: string;
+  arriveDate: string;
   services: Record<string, boolean>; setServices: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   compare: Record<string, boolean>; setCompare: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   agent: string; setAgent: (v: string) => void;
@@ -2449,11 +2452,6 @@ function Step4Logistics(p: Step4Props) {
             <ChevronLeft className="h-4 w-4 text-muted-foreground" />
             <span className="rounded-md bg-muted px-2 py-1">{originCode}</span>
           </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="תאריך יציאה מתוכנן" type="date" value={p.departDate} onChange={(e) => p.setDepartDate(e.target.value)} />
-          <Field label="תאריך הגעה מתוכנן" type="date" value={p.arriveDate} onChange={(e) => p.setArriveDate(e.target.value)} />
         </div>
 
         <div className="mt-4 flex items-center justify-between rounded-lg border bg-gradient-to-l from-primary/5 to-transparent p-3">
