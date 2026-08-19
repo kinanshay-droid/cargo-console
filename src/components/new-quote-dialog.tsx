@@ -234,6 +234,18 @@ export const TEMP_SERIES: { key: TempSeriesKey; label: string; range: string; ic
   { key: "ambient", label: "Ambient (CRT)", range: "+15°C עד +25°C", icon: "🏥" },
 ];
 
+// Icon + tone per series, coldest → warmest, used only for the bold card
+// picker below ("בחר אריזה") — kept separate from TEMP_SERIES.icon (a plain
+// emoji string) since that field is also rendered as inline text on three
+// other pages that don't need this heavier treatment.
+const TEMP_SERIES_VISUAL: Record<TempSeriesKey, { icon: typeof Snowflake; tone: keyof typeof TONE_GRADIENT }> = {
+  cryogenic: { icon: ThermometerSnowflake, tone: "destructive" },
+  deepFrozen: { icon: Snowflake, tone: "primary" },
+  frozen: { icon: CloudSnow, tone: "accent" },
+  chilled: { icon: Thermometer, tone: "success" },
+  ambient: { icon: Sun, tone: "warning" },
+};
+
 export const COOLGUARD_MODELS = [
   { model: "CoolGuard Advance 96L", payload: "96L", inner: "636×630×630", outer: "457×457×457", tare: "38 kg" },
   { model: "CoolGuard Advance 56L", payload: "56L", inner: "558×552×552", outer: "381×381×381", tare: "27 kg" },
@@ -1358,33 +1370,53 @@ export function NewQuoteDialog({
 
               {cargoType === "temperature" && (
                 <Section title="בחר אריזה" action={<span className="text-xs text-muted-foreground">אפשר לבחור כמה סדרות טמפרטורה במקביל</span>}>
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={toggleTempSeriesNone}
-                      className={cn("rounded-full border px-3 py-1 text-xs", tempSeriesNone ? "border-primary bg-primary/5" : "hover:bg-muted/40")}
-                    >
-                      ללא אריזה מוגדרת
-                    </button>
+                  <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                     {TEMP_SERIES.map((s) => {
                       const active = tempSeriesList.includes(s.key);
+                      const visual = TEMP_SERIES_VISUAL[s.key];
+                      const Icon = visual.icon;
                       return (
                         <button
                           key={s.key}
                           type="button"
                           onClick={() => toggleTempSeries(s.key)}
                           className={cn(
-                            "rounded-full border px-3 py-1 text-xs transition",
-                            active ? "border-primary bg-primary/5 text-foreground" : "hover:bg-muted/40 text-muted-foreground",
+                            "relative overflow-hidden rounded-xl border p-3 text-right transition",
+                            active ? "border-primary ring-2 ring-primary/20 shadow-sm" : "hover:border-primary/40 hover:bg-muted/30",
                           )}
                         >
-                          {active && <Check className="ml-1 inline h-3 w-3" />}
-                          <span className="ml-1">{s.icon}</span>
-                          <span className="font-medium text-foreground">{s.label}</span>
-                          <span className="mr-2 text-muted-foreground">{s.range}</span>
+                          <div className={cn("mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br text-white", TONE_GRADIENT[visual.tone])}>
+                            <Icon className="h-4.5 w-4.5" />
+                          </div>
+                          <div className="text-sm font-semibold">{s.label}</div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground" dir="ltr">{s.range}</div>
+                          {active && (
+                            <span className="absolute top-2 left-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                              <Check className="h-3 w-3" />
+                            </span>
+                          )}
                         </button>
                       );
                     })}
+                    <button
+                      type="button"
+                      onClick={toggleTempSeriesNone}
+                      className={cn(
+                        "relative overflow-hidden rounded-xl border p-3 text-right transition",
+                        tempSeriesNone ? "border-primary ring-2 ring-primary/20 shadow-sm" : "hover:border-primary/40 hover:bg-muted/30",
+                      )}
+                    >
+                      <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        <PackageX className="h-4.5 w-4.5" />
+                      </div>
+                      <div className="text-sm font-semibold">ללא אריזה מוגדרת</div>
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">בהתאם לצורך</div>
+                      {tempSeriesNone && (
+                        <span className="absolute top-2 left-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="h-3 w-3" />
+                        </span>
+                      )}
+                    </button>
                   </div>
 
                   {tempSeriesList.length > 0 && (
