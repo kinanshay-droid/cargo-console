@@ -347,6 +347,13 @@ export type PackageRow = {
   customHeight: string;
   unitWeight: string;
   unitQty: string;
+  // Per-package temperature requirement (same TEMP_SERIES definitions used
+  // for catalog packaging) and an optional recorder attached to this
+  // specific package — independent of the overall shipment's cargoType, so
+  // one package within an otherwise general shipment can still be flagged
+  // as cold-chain.
+  tempSeries: TempSeriesKey | null;
+  loggerId: string | null;
 };
 
 export function makePackageRow(): PackageRow {
@@ -354,7 +361,17 @@ export function makePackageRow(): PackageRow {
   // here, no preset pallet sizes to pick from. Every field starts fully
   // blank — no default/example values — so the section reads as empty
   // until the person actually types real numbers.
-  return { id: uid(), pallet: "custom", customLength: "", customWidth: "", customHeight: "", unitWeight: "", unitQty: "" };
+  return {
+    id: uid(),
+    pallet: "custom",
+    customLength: "",
+    customWidth: "",
+    customHeight: "",
+    unitWeight: "",
+    unitQty: "",
+    tempSeries: null,
+    loggerId: null,
+  };
 }
 
 // Resolves a package's L×W×H in cm, whether it came from a preset pallet or manual entry.
@@ -854,6 +871,8 @@ export function NewQuoteDialog({
                 : null,
               unitWeight: pkg.unitWeight,
               unitQty: pkg.unitQty,
+              tempSeries: pkg.tempSeries,
+              loggerId: pkg.loggerId,
             })),
             weightSummary: {
               grossWeight: packageTotals.grossWeight,
@@ -1582,6 +1601,39 @@ export function NewQuoteDialog({
                       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <Field label='משקל ליחידה (ק"ג)' type="number" value={pkg.unitWeight} onChange={(e) => updatePackage(pkg.id, { unitWeight: e.target.value })} />
                         <Field label="כמות (יח')" type="number" value={pkg.unitQty} onChange={(e) => updatePackage(pkg.id, { unitQty: e.target.value })} />
+                      </div>
+
+                      <div className="mt-4">
+                        <Label className="text-xs text-muted-foreground">טמפרטורת משלוח לחבילה זו</Label>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {TEMP_SERIES.map((s) => {
+                            const active = pkg.tempSeries === s.key;
+                            const visual = TEMP_SERIES_VISUAL[s.key];
+                            const Icon = visual.icon;
+                            return (
+                              <button
+                                key={s.key}
+                                type="button"
+                                onClick={() => updatePackage(pkg.id, { tempSeries: active ? null : s.key })}
+                                className={cn(
+                                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                                  active ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/40",
+                                )}
+                              >
+                                <Icon className="h-3.5 w-3.5" />
+                                {s.label}
+                                <span className="text-[10px] opacity-70" dir="ltr">({s.range})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 max-w-xs">
+                        <Label className="text-xs text-muted-foreground">רשם טמפרטורה לחבילה זו</Label>
+                        <div className="mt-1.5">
+                          <LoggerPicker value={pkg.loggerId} onChange={(id) => updatePackage(pkg.id, { loggerId: id })} />
+                        </div>
                       </div>
                       {cargoType === "temperature" && (() => {
                         const dims = getPackageDimsCm(pkg);

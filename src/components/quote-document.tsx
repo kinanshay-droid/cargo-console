@@ -10,6 +10,7 @@ import {
   getPackModelCalc,
   type PackageRow,
   type PackSelection,
+  type TempSeriesKey,
 } from "@/components/new-quote-dialog";
 import { TONE_BADGE, TONE_BADGE_ON_PRIMARY, type Tone } from "@/lib/theme";
 
@@ -154,6 +155,9 @@ export function parsePackages(raw: unknown): PackageRow[] {
     .filter((p): p is Record<string, unknown> => p !== null)
     .map((p) => {
       const customDims = isRecord(p.customDims) ? p.customDims : null;
+      const tempSeries = typeof p.tempSeries === "string" && TEMP_SERIES.some((t) => t.key === p.tempSeries)
+        ? (p.tempSeries as TempSeriesKey)
+        : null;
       return {
         id: str(p.id) || Math.random().toString(36).slice(2, 9),
         pallet: typeof p.pallet === "string" ? p.pallet : null,
@@ -162,6 +166,8 @@ export function parsePackages(raw: unknown): PackageRow[] {
         customHeight: str(customDims?.height),
         unitWeight: str(p.unitWeight) || "1",
         unitQty: str(p.unitQty),
+        tempSeries,
+        loggerId: typeof p.loggerId === "string" ? p.loggerId : null,
       } satisfies PackageRow;
     });
 }
