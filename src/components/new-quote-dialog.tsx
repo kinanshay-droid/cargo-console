@@ -307,7 +307,7 @@ export const TEMP_LOGGERS: TempLogger[] = [
 // inside the box — separate from the box's own empty tare weight — so the
 // gross-weight total reflects package + product together, not just the
 // packaging.
-export type PackSelection = { key: string; qty: number; productWeight?: number; loggerId?: string | null };
+export type PackSelection = { key: string; qty: number; productWeight?: number; loggerId?: string | null; dryIceQty?: number };
 
 // key format is "<tempSeries>:<model name>" (see the catalog tables below).
 // deepFrozen always maps to the BioTherm catalog, every other series to
@@ -569,6 +569,11 @@ export function NewQuoteDialog({
   const getPackLogger = (key: string) => packSelections.find((s) => s.key === key)?.loggerId ?? null;
   const setPackLogger = (key: string, loggerId: string | null) =>
     setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, loggerId } : s)));
+  // Dry-ice replenishment quantity (kg) — only meaningful for the Deep Frozen
+  // (BioTherm dry-ice) catalog, not the other temperature series.
+  const getPackDryIceQty = (key: string) => packSelections.find((s) => s.key === key)?.dryIceQty ?? "";
+  const setPackDryIceQty = (key: string, dryIceQty: number) =>
+    setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, dryIceQty } : s)));
   const packModelCalcs = useMemo(() => packSelections.map((sel) => getPackModelCalc(sel)), [packSelections]);
   const [packages, setPackages] = useState<PackageRow[]>([makePackageRow()]);
   const updatePackage = (id: string, patch: Partial<PackageRow>) =>
@@ -1462,6 +1467,7 @@ export function NewQuoteDialog({
                                     <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
                                     <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
                                     <th className="px-3 py-2 text-right font-medium">משך</th>
+                                    <th className="w-24 px-3 py-2 text-right font-medium">קרח יבש (ק״ג)</th>
                                     <th className="w-44 px-3 py-2 text-right font-medium">רשם טמפרטורה</th>
                                   </tr>
                                 </thead>
@@ -1470,6 +1476,7 @@ export function NewQuoteDialog({
                                     const key = `${series}:${m.model}`;
                                     const qty = getPackQty(key);
                                     const productWeight = getPackProductWeight(key);
+                                    const dryIceQty = getPackDryIceQty(key);
                                     const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0 }) : null;
                                     return (
                                       <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
@@ -1495,6 +1502,17 @@ export function NewQuoteDialog({
                                           {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
                                         </td>
                                         <td className="px-3 py-2">{m.duration}</td>
+                                        <td className="px-3 py-2">
+                                          <input
+                                            type="number"
+                                            min={0}
+                                            step="0.1"
+                                            disabled={qty === 0}
+                                            value={dryIceQty}
+                                            onChange={(e) => setPackDryIceQty(key, Number(e.target.value) || 0)}
+                                            className="w-20 rounded border bg-background px-2 py-1 text-sm disabled:opacity-40"
+                                          />
+                                        </td>
                                         <td className="px-3 py-2">
                                           {qty > 0 && (
                                             <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />
