@@ -319,13 +319,17 @@ export function getPackModelCalc(sel: PackSelection) {
   const catalog = isBio ? BIOTHERM_MODELS : COOLGUARD_MODELS;
   const m = catalog.find((x) => x.model === modelName);
   const productWeight = sel.productWeight ?? 0;
-  if (!m) return { label: modelName, qty: sel.qty, grossWeight: sel.qty * productWeight, volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
+  // Dry ice is real mass carried in the box — same as the product itself —
+  // so it belongs in gross weight alongside tare + productWeight, not just
+  // recorded for reference.
+  const dryIceQty = sel.dryIceQty ?? 0;
+  if (!m) return { label: modelName, qty: sel.qty, grossWeight: sel.qty * (productWeight + dryIceQty), volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
   const tare = parseFloat(m.tare) || 0;
   const [outerL, outerW, outerH] = m.outer.split("×").map((v) => parseFloat(v) || 0);
   const hasDims = !!(outerL && outerW && outerH);
   const volumetricWeight = hasDims ? (sel.qty * outerL * outerW * outerH) / 6_000_000 : 0;
   const dims = hasDims ? { length: outerL / 10, width: outerW / 10, height: outerH / 10 } : null;
-  return { label: m.model, qty: sel.qty, grossWeight: sel.qty * (tare + productWeight), volumetricWeight, dims };
+  return { label: m.model, qty: sel.qty, grossWeight: sel.qty * (tare + productWeight + dryIceQty), volumetricWeight, dims };
 }
 
 export const PALLETS = [
@@ -1477,7 +1481,7 @@ export function NewQuoteDialog({
                                     const qty = getPackQty(key);
                                     const productWeight = getPackProductWeight(key);
                                     const dryIceQty = getPackDryIceQty(key);
-                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0 }) : null;
+                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0, dryIceQty: Number(dryIceQty) || 0 }) : null;
                                     return (
                                       <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
                                         <td className="px-2 py-2">
