@@ -246,6 +246,20 @@ const TEMP_SERIES_VISUAL: Record<TempSeriesKey, { icon: typeof Snowflake; tone: 
   ambient: { icon: Sun, tone: "warning" },
 };
 
+// Icon per שיטת משלוח tag ("סוג משלוח" card grid) — the tags themselves keep
+// each their own brand color (see shipment-type-tags.ts), so only the icon
+// is picked per-value here, matched to what the tag represents.
+const SHIPMENT_TYPE_TAG_ICON: Record<string, typeof Snowflake> = {
+  "Dry Shipper": FlaskConical,
+  General: Package,
+  "15° - 25°": Sun,
+  DG: AlertTriangle,
+  "2° - 8°": Thermometer,
+  "-20°": CloudSnow,
+  "DG + Dry-Ice": ThermometerSnowflake,
+  "Dry-Ice": Snowflake,
+};
+
 export const COOLGUARD_MODELS = [
   { model: "CoolGuard Advance 96L", payload: "96L", inner: "636×630×630", outer: "457×457×457", tare: "38 kg" },
   { model: "CoolGuard Advance 56L", payload: "56L", inner: "558×552×552", outer: "381×381×381", tare: "27 kg" },
@@ -1123,9 +1137,10 @@ export function NewQuoteDialog({
                   title="סוג משלוח *"
                   action={<span className="text-xs text-muted-foreground">ניתן לבחור יותר מאחד</span>}
                 >
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                     {SHIPMENT_TYPE_TAGS.map((t) => {
                       const active = shipmentTypeTags.includes(t.value);
+                      const Icon = SHIPMENT_TYPE_TAG_ICON[t.value] ?? Tag;
                       return (
                         <button
                           key={t.value}
@@ -1135,13 +1150,25 @@ export function NewQuoteDialog({
                               active ? prev.filter((v) => v !== t.value) : [...prev, t.value],
                             )
                           }
-                          style={{ backgroundColor: t.bg, color: t.fg }}
                           className={cn(
-                            "rounded-lg px-3 py-2.5 text-center text-sm font-semibold transition",
-                            active ? "ring-2 ring-primary ring-offset-2" : "opacity-90 hover:opacity-100",
+                            "relative overflow-hidden rounded-xl border p-3 text-right transition",
+                            active ? "border-primary ring-2 ring-primary/20 shadow-sm" : "hover:border-primary/40 hover:bg-muted/30",
                           )}
                         >
-                          {t.value}
+                          <div
+                            className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-lg"
+                            style={{ backgroundColor: t.bg, color: t.fg }}
+                          >
+                            <Icon className="h-4.5 w-4.5" />
+                          </div>
+                          <div className="text-sm font-semibold" dir="ltr">
+                            {t.value}
+                          </div>
+                          {active && (
+                            <span className="absolute top-2 left-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                              <Check className="h-3 w-3" />
+                            </span>
+                          )}
                         </button>
                       );
                     })}
