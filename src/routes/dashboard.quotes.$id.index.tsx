@@ -3,16 +3,18 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { toast } from "sonner";
-import { ArrowRight, Eye, FileDown, Pencil } from "lucide-react";
+import { ArrowRight, Check, Clock, Eye, FileDown, Pencil, PauseCircle, Send, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   QuoteDocument,
   QUOTE_STATUS_BADGE_LIGHT,
   QUOTE_STATUS_LABELS,
   QUOTE_STATUS_PICKER_OPTIONS,
+  QUOTE_STATUS_TONE,
   isRecord,
   str,
 } from "@/components/quote-document";
+import { TONE_GRADIENT } from "@/lib/theme";
 import { getQuote, updateQuoteOpsStatus, type QuoteOpsStatus } from "@/lib/quotes.functions";
 import { createCaseFromQuote, listServiceReps, assignCaseRep, type CaseRep } from "@/lib/operations.functions";
 import {
@@ -35,6 +37,16 @@ const SHIPMENT_MODE_LABEL: Record<string, string> = {
   direct: "משלוח ישיר",
   console: "משלוח קונסול",
   transship: "שטעון",
+};
+
+// Icon per selectable quote status — paired with QUOTE_STATUS_TONE for the
+// bold status-picker cards (gradient icon badge, same style as the wizard's
+// SHIP_TYPES/TEMP_SERIES cards) instead of plain text pills.
+const QUOTE_STATUS_PICKER_ICON: Record<string, typeof Send> = {
+  transferred: Send,
+  pending_update: Clock,
+  cancelled: XCircle,
+  suspended: PauseCircle,
 };
 
 export const Route = createFileRoute("/dashboard/quotes/$id/")({
@@ -221,11 +233,13 @@ function QuoteDetail() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="grid grid-cols-2 gap-2">
                       {QUOTE_STATUS_PICKER_OPTIONS.map((opt) => {
                         const active = currentOpsStatus === opt.value;
                         const isTransferred = opt.value === "transferred";
                         const pending = isTransferred ? transferMutation.isPending : statusMutation.isPending;
+                        const Icon = QUOTE_STATUS_PICKER_ICON[opt.value] ?? Clock;
+                        const tone = QUOTE_STATUS_TONE[opt.value] ?? "muted";
                         return (
                           <button
                             key={opt.value}
@@ -236,13 +250,19 @@ function QuoteDetail() {
                                 ? transferMutation.mutate()
                                 : statusMutation.mutate(opt.value as QuoteOpsStatus)
                             }
-                            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
-                              active
-                                ? (QUOTE_STATUS_BADGE_LIGHT[opt.value] ?? "border-primary bg-primary/10 text-primary")
-                                : "border-border bg-background text-muted-foreground hover:bg-muted"
+                            className={`relative overflow-hidden rounded-xl border p-3 text-right transition disabled:opacity-50 ${
+                              active ? "border-primary ring-2 ring-primary/20 shadow-sm" : "hover:border-primary/40 hover:bg-muted/30"
                             }`}
                           >
-                            {opt.label}
+                            <div className={`mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br text-white ${TONE_GRADIENT[tone]}`}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="text-sm font-semibold">{opt.label}</div>
+                            {active && (
+                              <span className="absolute top-2 left-2 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                <Check className="h-2.5 w-2.5" />
+                              </span>
+                            )}
                           </button>
                         );
                       })}

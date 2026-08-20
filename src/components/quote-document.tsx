@@ -84,7 +84,7 @@ export const QUOTE_STATUS_PICKER_OPTIONS: { value: string; label: string }[] = [
 // Semantic tone per quote status — keeps every status pill (light card view and
 // on-dark hero header) grounded in the app's Navy Trust theme tokens instead of
 // arbitrary Tailwind hues.
-const QUOTE_STATUS_TONE: Record<string, Tone> = {
+export const QUOTE_STATUS_TONE: Record<string, Tone> = {
   draft: "muted",
   sent: "accent",
   approved: "success",
