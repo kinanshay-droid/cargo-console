@@ -626,17 +626,17 @@ export function NewQuoteDialog({
   const [agent, setAgent] = useState("QUICKSTAT");
   const [agents, setAgents] = useState<string[]>([]);
   const [airline, setAirline] = useState("Lufthansa Cargo");
-  // Journey mode for step 2's "ה. פרטי מסע" section — determines whether the
-  // vessel/flight-name field there is replaced by an airline picker (feeding
-  // the same `airline` state used later in step 4's "חברת תעופה מתוכננת").
-  const [journeyMode, setJourneyMode] = useState<"air" | "land" | null>(null);
+  // Journey mode for step 2's "ה. פרטי מסע" section. Land was removed as an
+  // option (import journeys are always air here), so this is always "air" —
+  // kept as a variable rather than deleted outright since it still feeds the
+  // airline picker below and the payload's `mode` field.
+  const journeyMode: "air" = "air";
   // Step 2's "ה. פרטי מסע" (import only) — kept as its own state rather than
   // reusing step 4's originPort/destPort, since these describe the specific
   // journey/flight leg, not the shipment's overall origin/destination.
   // Previously uncontrolled <Field>s, same as the ד. section above.
   const [journeyOriginPort, setJourneyOriginPort] = useState("");
   const [journeyDestPort, setJourneyDestPort] = useState("");
-  const [journeyVesselOrFlight, setJourneyVesselOrFlight] = useState("");
   const [journeyNumber, setJourneyNumber] = useState("");
   const [journeyCode, setJourneyCode] = useState("");
   const [logisticsNotes, setLogisticsNotes] = useState("");
@@ -724,12 +724,9 @@ export function NewQuoteDialog({
       if (!deliveryDateEst) missing.push("תאריך מסירה משוער");
       if (!deliveryTimeEst) missing.push("שעת מסירה משוערת");
       if (kind === "import") {
-        if (journeyMode === null) missing.push("סוג מסע");
         if (!journeyOriginPort.trim()) missing.push("נמל מוצא");
         if (!journeyDestPort.trim()) missing.push("נמל יעד");
-        if (journeyMode === "air" ? !airline.trim() : !journeyVesselOrFlight.trim()) {
-          missing.push(journeyMode === "land" ? "שם כלי שיט / טיסה" : "חברת תעופה");
-        }
+        if (!airline.trim()) missing.push("חברת תעופה");
         if (!journeyNumber.trim()) missing.push("מספר מסע");
         if (!journeyCode.trim()) missing.push("קוד מסע");
       }
@@ -764,10 +761,8 @@ export function NewQuoteDialog({
     pickupTimeEst,
     deliveryDateEst,
     deliveryTimeEst,
-    journeyMode,
     journeyOriginPort,
     journeyDestPort,
-    journeyVesselOrFlight,
     journeyNumber,
     journeyCode,
     airline,
@@ -804,10 +799,8 @@ export function NewQuoteDialog({
     setDeliveryAddress("");
     setPickupContacts([makeContactRow()]);
     setDeliveryContacts([makeContactRow()]);
-    setJourneyMode(null);
     setJourneyOriginPort("");
     setJourneyDestPort("");
-    setJourneyVesselOrFlight("");
     setJourneyNumber("");
     setJourneyCode("");
     setCargoType(null);
@@ -864,7 +857,8 @@ export function NewQuoteDialog({
                     mode: journeyMode,
                     originPort: journeyOriginPort.trim() || null,
                     destPort: journeyDestPort.trim() || null,
-                    vesselOrFlight: journeyMode === "land" ? journeyVesselOrFlight.trim() || null : null,
+                    // Land was removed as a journey mode — always air now.
+                    vesselOrFlight: null,
                     journeyNumber: journeyNumber.trim() || null,
                     journeyCode: journeyCode.trim() || null,
                   }
@@ -1234,55 +1228,22 @@ export function NewQuoteDialog({
                 </div>
               </Section>
 
-              {/* ה. פרטי מסע — ייבוא בלבד */}
+              {/* ה. פרטי מסע — ייבוא בלבד, תמיד אווירי */}
               {kind === "import" && (
                 <Section title="ה. פרטי מסע *">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <AirportCombobox label="נמל מוצא *" value={journeyOriginPort} onChange={setJourneyOriginPort} />
+                    <AirportCombobox label="נמל יעד *" value={journeyDestPort} onChange={setJourneyDestPort} />
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">סוג מסע *</Label>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setJourneyMode("air")}
-                          className={cn(
-                            "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border text-sm transition",
-                            journeyMode === "air" ? "border-primary bg-primary/10 font-medium text-primary" : "hover:bg-muted/50",
-                          )}
-                        >
-                          <Plane className="h-3.5 w-3.5" /> אווירי
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setJourneyMode("land")}
-                          className={cn(
-                            "flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border text-sm transition",
-                            journeyMode === "land" ? "border-primary bg-primary/10 font-medium text-primary" : "hover:bg-muted/50",
-                          )}
-                        >
-                          <Truck className="h-3.5 w-3.5" /> יבשתי
-                        </button>
-                      </div>
-                    </div>
-                    <Field label="נמל מוצא *" value={journeyOriginPort} onChange={(e) => setJourneyOriginPort(e.target.value)} />
-                    <Field label="נמל יעד *" value={journeyDestPort} onChange={(e) => setJourneyDestPort(e.target.value)} />
-                    {journeyMode === "air" ? (
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">חברת תעופה *</Label>
-                        <Lookup
-                          type="airlines"
-                          matchBy="code"
-                          value={airline || null}
-                          onChange={(item) => setAirline(item?.code ?? "")}
-                          placeholder="בחר חברת תעופה..."
-                        />
-                      </div>
-                    ) : (
-                      <Field
-                        label="שם כלי שיט / טיסה *"
-                        value={journeyVesselOrFlight}
-                        onChange={(e) => setJourneyVesselOrFlight(e.target.value)}
+                      <Label className="text-xs text-muted-foreground">חברת תעופה *</Label>
+                      <Lookup
+                        type="airlines"
+                        matchBy="code"
+                        value={airline || null}
+                        onChange={(item) => setAirline(item?.code ?? "")}
+                        placeholder="בחר חברת תעופה..."
                       />
-                    )}
+                    </div>
                     <Field label="מספר מסע *" value={journeyNumber} onChange={(e) => setJourneyNumber(e.target.value)} />
                     <Field label="קוד מסע *" value={journeyCode} onChange={(e) => setJourneyCode(e.target.value)} />
                   </div>
