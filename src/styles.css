@@ -127,6 +127,14 @@
 
 @layer base {
   * { border-color: var(--color-border); }
+  html {
+    /* Always reserve space for the vertical scrollbar so the page width
+       doesn't jump ~15px sideways every time navigation moves from a
+       short page (no scrollbar) to a tall one (scrollbar appears) or
+       back — that shift was moving the whole layout, including the fixed
+       sidebar, on almost every page change. */
+    scrollbar-gutter: stable;
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
