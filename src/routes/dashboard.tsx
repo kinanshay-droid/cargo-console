@@ -24,7 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { useI18n, LanguageToggle } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n-dictionary";
 
 export const Route = createFileRoute("/dashboard")({
@@ -175,11 +175,6 @@ function DashboardLayout() {
             ))}
           </nav>
 
-          {/* Language toggle */}
-          <div className="border-t border-sidebar-border/50 px-3 py-2">
-            <LanguageToggle variant="row" />
-          </div>
-
           {/* Profile footer */}
           <div className="p-3">
             <ConfirmDialog
@@ -216,7 +211,6 @@ function DashboardLayout() {
             <img src="/afik-logo-white.png" alt={t("app.name")} className="h-9 w-auto rounded-md" />
           </div>
           <div className="flex items-center gap-2">
-            <LanguageToggle />
             <ConfirmDialog
               title={t("logout.title")}
               description={t("logout.description")}
