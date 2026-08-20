@@ -31,8 +31,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { listCases, getCaseDisplayCode, isCaseArchived, type CaseStatus } from "@/lib/operations.functions";
+import {
+  listCases,
+  getCaseDisplayCode,
+  isCaseArchived,
+  CASE_PIPELINE_STATUS_META,
+  type CaseStatus,
+  type CasePipelineStatus,
+} from "@/lib/operations.functions";
 import { TONE_GRADIENT } from "@/lib/theme";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+// The DB column `status` only has 4 coarse buckets (new/in_progress/completed/
+// cancelled) — 20 of the 22 granular pipeline stages all collapse into
+// "in_progress". Showing only the coarse bucket here made it look like the
+// status "wasn't updating" even after a rep moved a case forward on the case
+// page, since e.g. "בבדיקת נתונים" → "בהכנת משלוח" are both just "בטיפול".
+// So this list shows the same granular label the case page shows.
+function getPipelineStatus(payload: unknown): CasePipelineStatus {
+  const p = isRecord(payload) ? payload : {};
+  const raw = p.pipelineStatus;
+  return typeof raw === "string" && raw in CASE_PIPELINE_STATUS_META ? (raw as CasePipelineStatus) : "new";
+}
 
 // Same four categories as step 1 of the New Quote wizard ("סוג משלוח") — a
 // case inherits its shipment_kind from the quote it was transferred from.
@@ -236,6 +259,7 @@ function ShipmentsDashboard() {
             ) : (
               filteredCases.map((c) => {
                 const meta = CASE_STATUS_META[c.status];
+                const pipelineMeta = CASE_PIPELINE_STATUS_META[getPipelineStatus(c.payload)];
                 const isHighlighted = c.id === highlightId;
                 return (
                   <TableRow
@@ -282,7 +306,7 @@ function ShipmentsDashboard() {
                       {SHIPMENT_MODE_LABEL[c.shipment_mode] ?? c.shipment_mode ?? "—"}
                     </TableCell>
                     <TableCell>
-                      <Badge className={meta.className}>{CASE_STATUS_LABEL[c.status]}</Badge>
+                      <Badge className={meta.className}>{pipelineMeta.label}</Badge>
                     </TableCell>
                     <TableCell>
                       <Button asChild size="sm" variant="outline" className="gap-2">
