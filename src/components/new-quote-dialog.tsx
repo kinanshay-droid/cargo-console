@@ -3045,9 +3045,7 @@ function Step5Pricing(p: Step5Props) {
               </select>
             }>
             <div className="space-y-2 text-sm">
-              <SumLine label="סה״כ עלויות" value={fmt(total)} />
-              <SumLine label="הוצאות נלוות" value="120.00" muted />
-              <SumLine label="סה״כ עלויות" value={fmt(total + 120)} bold />
+              <SumLine label="סה״כ עלויות" value={fmt(total)} bold />
               <div className="flex items-center justify-between rounded-md bg-muted/40 px-3 py-2">
                 <span className="text-xs text-muted-foreground">רווח מוצע (%)</span>
                 <input type="number" value={p.margin} onChange={(e) => p.setMargin(e.target.value)} className="h-8 w-16 rounded-md border bg-background px-2 text-right text-sm" />
