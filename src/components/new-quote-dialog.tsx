@@ -2796,6 +2796,12 @@ type Step5Props = {
 function Step5Pricing(p: Step5Props) {
   const [showCostGroupPicker, setShowCostGroupPicker] = useState(false);
   const [pickedCostGroupIds, setPickedCostGroupIds] = useState<string[]>([]);
+  // Manually-added items ("הוספת פריט") that have been given a real name —
+  // kept alongside the built-in catalog so they show up in "הוספת קבוצת
+  // עלויות" too, i.e. a custom line the rep names once becomes reusable
+  // for the rest of this quote instead of being a one-off, disconnected row.
+  const [customCatalogItems, setCustomCatalogItems] = useState<PricingItem[]>([]);
+  const costGroupCatalog = [...DEFAULT_PRICING_ITEMS, ...customCatalogItems];
   // Items can now each carry their own currency (see the per-row select
   // below) instead of being forced onto one shared currency, so totals are
   // computed per currency rather than as one lump sum — mixing e.g. USD and
@@ -2935,7 +2941,34 @@ function Step5Pricing(p: Step5Props) {
                             {it.stale && <AlertTriangle className="h-3.5 w-3.5 text-warning" />}
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-sm">{it.label}</td>
+                        <td className="px-3 py-2 text-sm">
+                          {it.source === "manual" ? (
+                            <input
+                              type="text"
+                              value={it.label}
+                              onChange={(e) => {
+                                const name = e.target.value;
+                                p.setItems((rows) =>
+                                  rows.map((r) => (r.id === it.id ? { ...r, label: name, group: name } : r)),
+                                );
+                                // A named manual item becomes reusable — keep a matching
+                                // custom-catalog entry in sync so it shows up next time
+                                // the rep opens "הוספת קבוצת עלויות" for this quote.
+                                setCustomCatalogItems((rows) => {
+                                  const named = name.trim().length > 0 && name !== "פריט חדש";
+                                  if (!named) return rows.filter((r) => r.id !== it.id);
+                                  const entry: PricingItem = { ...it, label: name, group: name };
+                                  const exists = rows.some((r) => r.id === it.id);
+                                  return exists ? rows.map((r) => (r.id === it.id ? entry : r)) : [...rows, entry];
+                                });
+                              }}
+                              placeholder="שם הפריט"
+                              className="h-8 w-full min-w-[120px] rounded-md border bg-background px-2 text-sm"
+                            />
+                          ) : (
+                            it.label
+                          )}
+                        </td>
                         <td className="px-2 py-2 text-muted-foreground">
                           <button
                             type="button"
@@ -2983,7 +3016,7 @@ function Step5Pricing(p: Step5Props) {
                     <div className="text-xs text-muted-foreground">בחר מהרשימה את הפריטים שברצונך להוסיף להצעת המחיר</div>
                   </div>
                   <div className="max-h-[360px] divide-y overflow-y-auto">
-                    {DEFAULT_PRICING_ITEMS.map((item) => {
+                    {costGroupCatalog.map((item) => {
                       const alreadyAdded = p.items.some((r) => r.label === item.label);
                       const picked = pickedCostGroupIds.includes(item.id);
                       return (
@@ -3034,7 +3067,7 @@ function Step5Pricing(p: Step5Props) {
                       size="sm"
                       disabled={pickedCostGroupIds.length === 0}
                       onClick={() => {
-                        const toAdd = DEFAULT_PRICING_ITEMS.filter((item) => pickedCostGroupIds.includes(item.id));
+                        const toAdd = costGroupCatalog.filter((item) => pickedCostGroupIds.includes(item.id));
                         p.setItems((rows) => [
                           ...rows,
                           // Price stays 0 (blank cell) here too — the catalog price shown
