@@ -682,6 +682,40 @@ export function NewQuoteDialog({
     setCurrency(next);
     setPricingItems((rows) => rows.map((r) => ({ ...r, currency: next })));
   };
+
+  // Keep the pricing table's "אריזה חיונית" / "בקרת טמפרטורה" rows showing
+  // what was actually picked in step 3 (packaging model + logger), instead
+  // of the catalog's generic placeholder text — matched by `group` since
+  // that's stable regardless of row order or id.
+  useEffect(() => {
+    const packagingNames = Array.from(
+      new Set(
+        packSelections
+          .filter((sel) => sel.qty > 0)
+          .map((sel) => getPackModelCalc(sel).label),
+      ),
+    );
+    const loggerIds = new Set<string>();
+    for (const sel of packSelections) if (sel.loggerId) loggerIds.add(sel.loggerId);
+    for (const pkg of packages) if (pkg.loggerId) loggerIds.add(pkg.loggerId);
+    const loggerNames = Array.from(loggerIds)
+      .map((id) => TEMP_LOGGERS.find((l) => l.id === id))
+      .filter((l): l is TempLogger => !!l)
+      .map((l) => `${l.company} ${l.model}`);
+
+    if (packagingNames.length === 0 && loggerNames.length === 0) return;
+    setPricingItems((rows) =>
+      rows.map((r) => {
+        if (r.group === "אריזה חיונית" && packagingNames.length > 0) {
+          return { ...r, sourceLabel: packagingNames.join(" · ") };
+        }
+        if (r.group === "בקרת טמפרטורה" && loggerNames.length > 0) {
+          return { ...r, sourceLabel: loggerNames.join(" · ") };
+        }
+        return r;
+      }),
+    );
+  }, [packSelections, packages]);
   // Step 6 state — סיכום
   const [discount, setDiscount] = useState<string>("0");
   const [internalNotes, setInternalNotes] = useState<string>("");
