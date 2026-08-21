@@ -2736,6 +2736,8 @@ type Step5Props = {
 };
 
 function Step5Pricing(p: Step5Props) {
+  const [showCostGroupPicker, setShowCostGroupPicker] = useState(false);
+  const [pickedCostGroupIds, setPickedCostGroupIds] = useState<string[]>([]);
   const total = p.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
   const marginPct = Number(p.margin) || 0;
   const profit = total * (marginPct / 100);
@@ -2879,9 +2881,89 @@ function Step5Pricing(p: Step5Props) {
               <Button type="button" size="sm" variant="outline" className="gap-1" onClick={addRow}>
                 <Plus className="h-4 w-4" /> הוספת פריט
               </Button>
-              <Button type="button" size="sm" variant="outline" className="gap-1">
-                <Plus className="h-4 w-4" /> הוספת קבוצת עלויות
-              </Button>
+              <Popover
+                open={showCostGroupPicker}
+                onOpenChange={(v) => {
+                  setShowCostGroupPicker(v);
+                  if (v) setPickedCostGroupIds([]);
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button type="button" size="sm" variant="outline" className="gap-1">
+                    <Plus className="h-4 w-4" /> הוספת קבוצת עלויות
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="center" className="w-[440px] p-0">
+                  <div className="border-b px-4 py-3">
+                    <div className="text-sm font-semibold">הוספת קבוצת עלויות</div>
+                    <div className="text-xs text-muted-foreground">בחר מהרשימה את הפריטים שברצונך להוסיף להצעת המחיר</div>
+                  </div>
+                  <div className="max-h-[360px] divide-y overflow-y-auto">
+                    {DEFAULT_PRICING_ITEMS.map((item) => {
+                      const alreadyAdded = p.items.some((r) => r.label === item.label);
+                      const picked = pickedCostGroupIds.includes(item.id);
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          disabled={alreadyAdded}
+                          onClick={() =>
+                            setPickedCostGroupIds((ids) =>
+                              picked ? ids.filter((id) => id !== item.id) : [...ids, item.id],
+                            )
+                          }
+                          className={cn(
+                            "flex w-full items-center justify-between gap-3 px-4 py-2.5 text-right transition",
+                            alreadyAdded ? "cursor-not-allowed opacity-50" : "hover:bg-muted/40",
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className={cn(
+                                "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
+                                picked ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/30",
+                              )}
+                            >
+                              {picked && <Check className="h-3 w-3" />}
+                            </span>
+                            <div>
+                              <div className="text-sm font-medium">{item.label}</div>
+                              <div className="text-[11px] text-muted-foreground">{item.sourceLabel}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {alreadyAdded && <span className="text-[11px] text-muted-foreground">כבר נוסף</span>}
+                            <span className="text-sm font-semibold" dir="ltr">
+                              {item.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.currency}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-4 py-2.5">
+                    <span className="text-xs text-muted-foreground">
+                      {pickedCostGroupIds.length > 0 ? `${pickedCostGroupIds.length} פריטים נבחרו` : "לא נבחרו פריטים"}
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={pickedCostGroupIds.length === 0}
+                      onClick={() => {
+                        const toAdd = DEFAULT_PRICING_ITEMS.filter((item) => pickedCostGroupIds.includes(item.id));
+                        p.setItems((rows) => [
+                          ...rows,
+                          ...toAdd.map((item) => ({ ...item, id: uid(), currency: p.currency })),
+                        ]);
+                        toast.success(`נוספו ${toAdd.length} פריטים`);
+                        setShowCostGroupPicker(false);
+                      }}
+                    >
+                      הוסף לבחירה
+                    </Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Button type="button" size="sm" variant="ghost" className="gap-1">
                 <RefreshCw className="h-4 w-4" /> רענן תעריפים
               </Button>
@@ -2994,6 +3076,7 @@ function Step5Pricing(p: Step5Props) {
           יש לתקן {alerts.filter((a) => a.tone === "rose").length} התראות קריטיות לפני המשך
         </div>
       )}
+
     </div>
   );
 }
