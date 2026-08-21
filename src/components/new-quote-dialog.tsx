@@ -1331,21 +1331,42 @@ export function NewQuoteDialog({
 
 
 
-              {/* ד. פרטי משלוח (משותף) */}
+              {/* ד. פרטי משלוח (משותף) — שני כרטיסים מחוברים בחץ, במקום שני
+                  תאריכים גנריים זה ליד זה, כדי שהזרימה איסוף → הגעה תיקרא
+                  בבירור וייצא לתאריכים מקום נוח יותר ללחיצה. */}
               <Section title="ד. פרטי משלוח *">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Field
-                    label="תאריך איסוף משוער *"
-                    type="date"
-                    value={pickupDateEst}
-                    onChange={(e) => setPickupDateEst(e.target.value)}
-                  />
-                  <Field
-                    label="תאריך הגעה משוער *"
-                    type="date"
-                    value={deliveryDateEst}
-                    onChange={(e) => setDeliveryDateEst(e.target.value)}
-                  />
+                <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+                  <div className="flex flex-1 items-center gap-3 rounded-xl border p-4">
+                    <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white", TONE_GRADIENT.primary)}>
+                      <Truck className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <label className="text-xs font-medium text-muted-foreground">תאריך איסוף משוער *</label>
+                      <input
+                        type="date"
+                        value={pickupDateEst}
+                        onChange={(e) => setPickupDateEst(e.target.value)}
+                        className="mt-1 h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <ArrowLeft className="mx-auto h-5 w-5 shrink-0 text-muted-foreground sm:mx-0" />
+
+                  <div className="flex flex-1 items-center gap-3 rounded-xl border p-4">
+                    <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white", TONE_GRADIENT.success)}>
+                      <MapPin className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <label className="text-xs font-medium text-muted-foreground">תאריך הגעה משוער *</label>
+                      <input
+                        type="date"
+                        value={deliveryDateEst}
+                        onChange={(e) => setDeliveryDateEst(e.target.value)}
+                        className="mt-1 h-10 w-full rounded-lg border bg-background px-3 text-sm"
+                      />
+                    </div>
+                  </div>
                 </div>
               </Section>
 
