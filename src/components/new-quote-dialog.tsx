@@ -668,7 +668,10 @@ export function NewQuoteDialog({
   const [currency, setCurrency] = useState<"USD" | "EUR" | "ILS">("USD");
   const [margin, setMargin] = useState<string>("15");
   const [pricingNotes, setPricingNotes] = useState("");
-  const [pricingItems, setPricingItems] = useState<PricingItem[]>(() => DEFAULT_PRICING_ITEMS.map((r) => ({ ...r })));
+  // Amounts start blank (price: 0, rendered as an empty cell — see the
+  // input's value binding below) so the rep enters every figure manually,
+  // instead of the catalog's example numbers looking like real data.
+  const [pricingItems, setPricingItems] = useState<PricingItem[]>(() => DEFAULT_PRICING_ITEMS.map((r) => ({ ...r, price: 0 })));
   const [dismissedAlerts, setDismissedAlerts] = useState<Record<string, boolean>>({});
   // Changing the currency needs to stay consistent everywhere it's shown on
   // this step — the summary panel, the items table's per-row currency, and
@@ -2837,8 +2840,9 @@ function Step5Pricing(p: Step5Props) {
                         <td className="px-2 py-2">
                           <input
                             type="number"
-                            value={it.price}
-                            onChange={(e) => p.setItems((rows) => rows.map((r) => r.id === it.id ? { ...r, price: Number(e.target.value) } : r))}
+                            value={it.price === 0 ? "" : it.price}
+                            onChange={(e) => p.setItems((rows) => rows.map((r) => r.id === it.id ? { ...r, price: Number(e.target.value) || 0 } : r))}
+                            placeholder="0"
                             className={cn("h-8 w-24 rounded-md border bg-background px-2 text-right text-sm", it.source === "missing" && "border-destructive/40 text-destructive")}
                           />
                         </td>
@@ -2953,7 +2957,9 @@ function Step5Pricing(p: Step5Props) {
                         const toAdd = DEFAULT_PRICING_ITEMS.filter((item) => pickedCostGroupIds.includes(item.id));
                         p.setItems((rows) => [
                           ...rows,
-                          ...toAdd.map((item) => ({ ...item, id: uid(), currency: p.currency })),
+                          // Price stays 0 (blank cell) here too — the catalog price shown
+                          // above is just a reference while picking, not an auto-filled value.
+                          ...toAdd.map((item) => ({ ...item, id: uid(), currency: p.currency, price: 0 })),
                         ]);
                         toast.success(`נוספו ${toAdd.length} פריטים`);
                         setShowCostGroupPicker(false);
