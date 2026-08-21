@@ -652,6 +652,20 @@ export function NewQuoteDialog({
   const [journeyDestPort, setJourneyDestPort] = useState("");
   const [journeyNumber, setJourneyNumber] = useState("");
   const [journeyCode, setJourneyCode] = useState("");
+  // In practice the rep enters the same real airports in "ה. פרטי מסע" and
+  // then again in step 4's "מסלול מוצע" for import shipments — the distinct
+  // "flight leg vs. overall route" fields above didn't hold up in real usage
+  // (the airports are the same one either way for a straightforward import),
+  // so once the rep has typed them in step 2 they should just carry through
+  // to step 4 instead of showing the unrelated defaults. Only mirrors
+  // forward (ה. → ד.), so manually editing step 4's fields afterward still
+  // works; it just gets overwritten again if the rep goes back and changes
+  // the journey ports.
+  useEffect(() => {
+    if (kind !== "import") return;
+    if (journeyOriginPort) setOriginPort(journeyOriginPort);
+    if (journeyDestPort) setDestPort(journeyDestPort);
+  }, [kind, journeyOriginPort, journeyDestPort]);
   const [logisticsNotes, setLogisticsNotes] = useState("");
   const [dropType, setDropType] = useState<DropTypeId | null>(null);
   const [stops, setStops] = useState<Stop[]>([]);
