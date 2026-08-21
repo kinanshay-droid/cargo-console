@@ -785,66 +785,6 @@ function EditQuote() {
 
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-4 text-sm font-semibold">אופי מטען</div>
-
-            <div className="mb-4">
-              <div className="mb-2 text-xs text-muted-foreground">סוג מטען</div>
-              <div className="flex flex-wrap gap-2">
-                {CARGO_TYPES.map((t) => {
-                  const on = form.cargoType === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setForm((f) => (f ? { ...f, cargoType: t.id } : f))}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        on ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
-                      )}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <div className="mb-2 text-xs text-muted-foreground">מאפיינים</div>
-              <div className="flex flex-wrap gap-2">
-                {ATTR_OPTIONS.map((a) => {
-                  const on = !!form.attrs[a.id];
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => toggleAttr(a.id)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                        on ? "border-primary bg-primary/10 text-primary" : "bg-background text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {on && <Check className="h-3 w-3" />}
-                      {a.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">דרישות מיוחדות</Label>
-                <Textarea value={form.specialReq} onChange={(e) => setForm((f) => (f ? { ...f, specialReq: e.target.value } : f))} rows={2} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">הערות נוספות</Label>
-                <Textarea value={form.extraNotes} onChange={(e) => setForm((f) => (f ? { ...f, extraNotes: e.target.value } : f))} rows={2} />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm font-semibold">מארזים ומשטחים</div>
               <Button type="button" variant="outline" size="sm" onClick={addPackage} className="gap-2">
