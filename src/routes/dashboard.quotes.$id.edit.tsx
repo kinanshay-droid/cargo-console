@@ -15,10 +15,10 @@ import { Lookup } from "@/components/lookup";
 import {
   StopsEditor,
   PackQtyStepper,
+  LoggerPicker,
   TEMP_SERIES,
   COOLGUARD_MODELS,
   BIOTHERM_MODELS,
-  PALLETS,
   CARGO_TYPES,
   ATTR_OPTIONS,
   SERVICE_LIST,
@@ -30,7 +30,10 @@ import {
   type PackSelection,
   type PackageRow,
   type AttrKey,
+  type PricingItem,
+  type PriceSource,
 } from "@/components/new-quote-dialog";
+import { SHIPMENT_TYPE_TAGS } from "@/lib/shipment-type-tags";
 import {
   DROP_TYPE_SPECS,
   isDropTypeId,
@@ -51,13 +54,46 @@ export const Route = createFileRoute("/dashboard/quotes/$id/edit")({
   component: EditQuote,
 });
 
+// Keep in sync with SHIPMENT_KIND_LABEL in quote-document.tsx — this is the
+// wizard's top-level shipment kind (export/import/domestic/distribution),
+// a fixed enum. It is NOT a "shipment_types" lookup code; the edit page used
+// to bind this field to the shipment_types Lookup by mistake, which meant it
+// always rendered empty since a value like "export" never matches a lookup
+// code in that table.
+const SHIPMENT_KIND_LABEL: Record<string, string> = {
+  export: "ייצוא",
+  import: "יבוא",
+  domestic: "מקומי",
+  distribution: "דיסטריביושן",
+};
+
+type ContactForm = { name: string; phone: string; email: string };
+
+function emptyContact(): ContactForm {
+  return { name: "", phone: "", email: "" };
+}
+
+function parseContacts(raw: unknown): ContactForm[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((c) => (isRecord(c) ? c : null))
+    .filter((c): c is Record<string, unknown> => c !== null)
+    .map((c) => ({ name: toText(c.name), phone: toText(c.phone), email: toText(c.email) }));
+}
+
 type Form = {
   customerName: string;
   customerRef: string;
   shipmentKind: string;
+  shipmentTypeTags: string[];
   incoterm: string;
   originPort: string;
   destPort: string;
+  transitPorts: string[];
+  pickupAddress: string;
+  deliveryAddress: string;
+  pickupContacts: ContactForm[];
+  deliveryContacts: ContactForm[];
   departDate: string;
   arriveDate: string;
   agent: string;
@@ -65,7 +101,7 @@ type Form = {
   currency: string;
   marginPct: string;
   total: string;
-  pricingItems: PricingItemForm[];
+  pricingItems: PricingItem[];
   pricingNotes: string;
   dropType: DropTypeId | null;
   stops: Stop[];
@@ -81,19 +117,6 @@ type Form = {
   specialReq: string;
   extraNotes: string;
 };
-
-type PricingItemForm = {
-  id: string;
-  desc: string;
-  qty: string;
-  unit: string;
-  unitPrice: string;
-  currency: string;
-  total: string;
-  note: string;
-};
-
-type PricingKey = keyof Omit<PricingItemForm, "id">;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -113,31 +136,39 @@ function firstText(...values: unknown[]): string {
   return "";
 }
 
-function makePricingRow(index: number, item?: Record<string, unknown>): PricingItemForm {
-  // Support both edit-shape ({desc, qty, unitPrice, total, note}) and
-  // dialog-shape ({label/group, price, sourceLabel}) when loading a quote.
+// Real pricing-item shape (see PricingItem in new-quote-dialog.tsx): group,
+// label, source, sourceLabel, sourceDate, currency, price. The edit page used
+// to remap this into an unrelated {desc, qty, unit, unitPrice, note} shape
+// left over from an older design — that lost the group/source/sourceLabel
+// fields on every save (silently overwriting payload.pricingItems with the
+// wrong shape) and showed empty "כמות"/"יחידה" columns that don't exist in
+// the real model. This reads both the current shape and that older shape
+// defensively, but always writes back the real one.
+const VALID_PRICE_SOURCES: PriceSource[] = ["pricelist", "rfq", "manual", "missing"];
+function parsePriceSource(raw: unknown): PriceSource {
+  return typeof raw === "string" && (VALID_PRICE_SOURCES as string[]).includes(raw) ? (raw as PriceSource) : "manual";
+}
+
+const VALID_ITEM_CURRENCIES = ["USD", "EUR", "ILS"] as const;
+type ItemCurrency = (typeof VALID_ITEM_CURRENCIES)[number];
+function parseItemCurrency(raw: unknown, fallback: ItemCurrency): ItemCurrency {
+  return typeof raw === "string" && (VALID_ITEM_CURRENCIES as readonly string[]).includes(raw)
+    ? (raw as ItemCurrency)
+    : fallback;
+}
+
+function makePricingRow(index: number, item: Record<string, unknown> | undefined, fallbackCurrency: ItemCurrency): PricingItem {
+  const label = firstText(item?.label, item?.group, item?.desc) || "פריט";
   return {
     id: toText(item?.id) || `pricing-${Date.now()}-${index}`,
-    desc: firstText(item?.desc, item?.label, item?.group),
-    qty: firstText(item?.qty),
-    unit: firstText(item?.unit),
-    unitPrice: firstText(item?.unitPrice, item?.price),
-    currency: firstText(item?.currency),
-    total: firstText(item?.total, item?.price),
-    note: firstText(item?.note, item?.sourceLabel),
+    group: firstText(item?.group, item?.label, item?.desc) || label,
+    label,
+    source: parsePriceSource(item?.source),
+    sourceLabel: firstText(item?.sourceLabel, item?.note),
+    sourceDate: firstText(item?.sourceDate),
+    currency: parseItemCurrency(item?.currency, fallbackCurrency),
+    price: Number(firstText(item?.price, item?.unitPrice, item?.total)) || 0,
   };
-}
-
-function numericOrNull(value: string): number | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function cleanText(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
 }
 
 const VALID_CARGO_TYPES: CargoType[] = ["general", "temperature", "nfo", "live", "dangerous", "other"];
@@ -191,6 +222,10 @@ function parsePackages(raw: unknown): PackageRow[] {
     .filter((p): p is Record<string, unknown> => p !== null)
     .map((p): PackageRow => {
       const customDims = isRecord(p.customDims) ? p.customDims : null;
+      const tempSeries =
+        typeof p.tempSeries === "string" && (VALID_TEMP_KEYS as string[]).includes(p.tempSeries)
+          ? (p.tempSeries as TempSeriesKey)
+          : null;
       return {
         ...makePackageRow(),
         pallet: typeof p.pallet === "string" ? p.pallet : null,
@@ -199,9 +234,26 @@ function parsePackages(raw: unknown): PackageRow[] {
         customHeight: toText(customDims?.height),
         unitWeight: toText(p.unitWeight) || "1",
         unitQty: toText(p.unitQty),
+        // These two used to be dropped both on load (always defaulting to
+        // null/none here) and on save (stripped from the payload before
+        // insert) — editing and saving any quote silently erased whichever
+        // per-package temperature/logger the rep had picked in the wizard.
+        tempSeries,
+        loggerId: typeof p.loggerId === "string" ? p.loggerId : null,
       };
     });
   return rows.length > 0 ? rows : [makePackageRow()];
+}
+
+function parseStringList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((v) => toText(v)).filter(Boolean);
+}
+
+const VALID_SHIPMENT_TAGS = SHIPMENT_TYPE_TAGS.map((t) => t.value);
+function parseShipmentTypeTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((v): v is string => typeof v === "string" && VALID_SHIPMENT_TAGS.includes(v));
 }
 
 function EditQuote() {
@@ -221,10 +273,11 @@ function EditQuote() {
   useEffect(() => {
     if (!quote) return;
     const payload = isRecord(quote.payload) ? quote.payload : {};
+    const fallbackCurrency = parseItemCurrency(quote.currency, "USD");
     const pricingItems = Array.isArray(payload.pricingItems)
       ? payload.pricingItems
-          .map((item, index) => (isRecord(item) ? makePricingRow(index, item) : null))
-          .filter((item): item is PricingItemForm => item !== null)
+          .map((item, index) => (isRecord(item) ? makePricingRow(index, item, fallbackCurrency) : null))
+          .filter((item): item is PricingItem => item !== null)
       : [];
 
     const rawDropType = payload.dropType;
@@ -263,9 +316,15 @@ function EditQuote() {
       customerName: quote.customer_name ?? "",
       customerRef: quote.customer_ref ?? "",
       shipmentKind: quote.shipment_kind ?? "",
+      shipmentTypeTags: parseShipmentTypeTags(payload.shipmentTypeTags),
       incoterm: quote.incoterm ?? "",
       originPort: quote.origin_port ?? "",
       destPort: quote.dest_port ?? "",
+      transitPorts: parseStringList(quote.transit_ports),
+      pickupAddress: toText(payload.pickupAddress),
+      deliveryAddress: toText(payload.deliveryAddress),
+      pickupContacts: parseContacts(payload.pickupContacts),
+      deliveryContacts: parseContacts(payload.deliveryContacts),
       departDate: quote.depart_date ?? "",
       arriveDate: quote.arrive_date ?? "",
       agent: quote.agent ?? "",
@@ -295,7 +354,7 @@ function EditQuote() {
     setForm((f) => (f ? { ...f, [k]: v } : f));
   }
 
-  function updatePricingItem(id: string, key: PricingKey, value: string) {
+  function updatePricingItem<K extends keyof PricingItem>(id: string, key: K, value: PricingItem[K]) {
     setForm((f) =>
       f
         ? {
@@ -313,7 +372,10 @@ function EditQuote() {
       f
         ? {
             ...f,
-            pricingItems: [...f.pricingItems, makePricingRow(f.pricingItems.length)],
+            pricingItems: [
+              ...f.pricingItems,
+              makePricingRow(f.pricingItems.length, undefined, parseItemCurrency(f.currency, "USD")),
+            ],
           }
         : f
     );
@@ -323,6 +385,47 @@ function EditQuote() {
     setForm((f) =>
       f ? { ...f, pricingItems: f.pricingItems.filter((item) => item.id !== id) } : f
     );
+  }
+
+  function toggleShipmentTag(value: string) {
+    setForm((f) =>
+      f
+        ? {
+            ...f,
+            shipmentTypeTags: f.shipmentTypeTags.includes(value)
+              ? f.shipmentTypeTags.filter((t) => t !== value)
+              : [...f.shipmentTypeTags, value],
+          }
+        : f
+    );
+  }
+
+  function updateTransitPort(index: number, value: string) {
+    setForm((f) =>
+      f ? { ...f, transitPorts: f.transitPorts.map((p, i) => (i === index ? value : p)) } : f
+    );
+  }
+
+  function addTransitPort() {
+    setForm((f) => (f ? { ...f, transitPorts: [...f.transitPorts, ""] } : f));
+  }
+
+  function removeTransitPort(index: number) {
+    setForm((f) => (f ? { ...f, transitPorts: f.transitPorts.filter((_, i) => i !== index) } : f));
+  }
+
+  function updateContact(list: "pickupContacts" | "deliveryContacts", index: number, patch: Partial<ContactForm>) {
+    setForm((f) =>
+      f ? { ...f, [list]: f[list].map((c, i) => (i === index ? { ...c, ...patch } : c)) } : f
+    );
+  }
+
+  function addContact(list: "pickupContacts" | "deliveryContacts") {
+    setForm((f) => (f ? { ...f, [list]: [...f[list], emptyContact()] } : f));
+  }
+
+  function removeContact(list: "pickupContacts" | "deliveryContacts", index: number) {
+    setForm((f) => (f ? { ...f, [list]: f[list].filter((_, i) => i !== index) } : f));
   }
 
   function updatePackage(id: string, patch: Partial<PackageRow>) {
@@ -384,30 +487,17 @@ function EditQuote() {
     setForm((f) => (f ? { ...f, services: { ...f.services, [id]: !f.services[id] } } : f));
   }
 
-  function normalizedPricingItems() {
+  // Always keep group === label (same convention used everywhere else this
+  // shape appears — DEFAULT_PRICING_ITEMS, the wizard's addRow) and drop
+  // fully-blank manual rows that were added and then never filled in.
+  function normalizedPricingItems(): PricingItem[] {
     if (!form) return [];
     return form.pricingItems
-      .map((item) => ({
-        id: item.id,
-        desc: cleanText(item.desc),
-        qty: numericOrNull(item.qty),
-        unit: cleanText(item.unit),
-        unitPrice: numericOrNull(item.unitPrice),
-        currency: cleanText(item.currency),
-        total: numericOrNull(item.total),
-        note: cleanText(item.note),
-      }))
-      .filter((item) =>
-        Boolean(
-          item.desc ||
-            item.qty != null ||
-            item.unit ||
-            item.unitPrice != null ||
-            item.currency ||
-            item.total != null ||
-            item.note
-        )
-      );
+      .map((item) => {
+        const label = item.label.trim() || "פריט";
+        return { ...item, label, group: label };
+      })
+      .filter((item) => item.label !== "פריט" || item.price !== 0 || item.sourceLabel.trim() !== "");
   }
 
   const packageCalcs = useMemo(() => (form ? form.packages.map((pkg) => getPackageCalc(pkg)) : []), [form?.packages]);
@@ -438,6 +528,7 @@ function EditQuote() {
             incoterm: form.incoterm || null,
             originPort: form.originPort || null,
             destPort: form.destPort || null,
+            transitPorts: form.transitPorts.map((p) => p.trim()).filter(Boolean),
             departDate: form.departDate || null,
             arriveDate: form.arriveDate || null,
             agent: form.agent || null,
@@ -447,6 +538,11 @@ function EditQuote() {
             total: form.total ? Number(form.total) : null,
             payload: {
               ...originalPayload,
+              shipmentTypeTags: form.shipmentTypeTags,
+              pickupAddress: form.pickupAddress.trim() || null,
+              deliveryAddress: form.deliveryAddress.trim() || null,
+              pickupContacts: form.pickupContacts.filter((c) => c.name || c.phone || c.email),
+              deliveryContacts: form.deliveryContacts.filter((c) => c.name || c.phone || c.email),
               pricingItems: normalizedPricingItems(),
               pricingNotes: form.pricingNotes.trim() || null,
               dropType: form.dropType,
@@ -469,6 +565,8 @@ function EditQuote() {
                     : null,
                 unitWeight: pkg.unitWeight,
                 unitQty: pkg.unitQty,
+                tempSeries: pkg.tempSeries,
+                loggerId: pkg.loggerId,
               })),
               weightSummary: {
                 grossWeight: packageTotals.grossWeight,
@@ -517,14 +615,50 @@ function EditQuote() {
             <Field label="שם לקוח"><Input value={form.customerName} onChange={(e) => upd("customerName", e.target.value)} /></Field>
             <Field label="Ref לקוח"><Input value={form.customerRef} onChange={(e) => upd("customerRef", e.target.value)} /></Field>
             <Field label="סוג משלוח">
-              <Lookup type="shipment_types" matchBy="code" value={form.shipmentKind || null}
-                onChange={(item) => upd("shipmentKind", item?.code ?? "")} placeholder="בחר סוג משלוח..." />
+              {/* This is the wizard's top-level export/import/domestic/distribution
+                  choice — a fixed enum, not a shipment_types lookup code. Binding it
+                  to the Lookup component (as before) meant it always rendered empty,
+                  since a value like "export" never matches a code in that table. */}
+              <select
+                value={form.shipmentKind}
+                onChange={(e) => upd("shipmentKind", e.target.value)}
+                className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="">— בחר —</option>
+                {Object.entries(SHIPMENT_KIND_LABEL).map(([k, label]) => (
+                  <option key={k} value={k}>{label}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Incoterm">
               <Lookup type="incoterms" matchBy="code" value={form.incoterm || null}
                 onChange={(item) => upd("incoterm", item?.code ?? "")} placeholder="בחר Incoterm..." />
             </Field>
           </Section>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-4 text-sm font-semibold">תגית סוג משלוח</div>
+            <div className="flex flex-wrap gap-2">
+              {SHIPMENT_TYPE_TAGS.map((t) => {
+                const active = form.shipmentTypeTags.includes(t.value);
+                return (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => toggleShipmentTag(t.value)}
+                    dir="ltr"
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                      active ? "border-primary ring-2 ring-primary/20" : "hover:bg-muted",
+                    )}
+                    style={active ? { backgroundColor: t.bg, color: t.fg, borderColor: t.bg } : undefined}
+                  >
+                    {t.value}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <Section title="מסלול ותאריכים">
             <Field label="נמל מוצא"><AirportCombobox value={form.originPort} onChange={(v) => upd("originPort", v)} /></Field>
@@ -536,10 +670,65 @@ function EditQuote() {
                 onChange={(item) => upd("agent", item?.code ?? "")} placeholder="בחר סוכן..." />
             </Field>
             <Field label="חברת תעופה">
-              <Lookup type="airlines" matchBy="code" value={form.airline || null}
-                onChange={(item) => upd("airline", item?.code ?? "")} placeholder="בחר חברת תעופה..." />
+              {/* Free text, not a Lookup: the wizard only lets the rep pick an
+                  airline via lookup code for import shipments — everywhere else
+                  it stores whatever string was in the field (e.g. the default
+                  "Lufthansa Cargo"), which isn't a lookup code and would never
+                  match here, always rendering as an empty placeholder. */}
+              <Input value={form.airline} onChange={(e) => upd("airline", e.target.value)} placeholder="שם חברת התעופה" />
             </Field>
           </Section>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm font-semibold">נמלי מעבר (Transit)</div>
+              <Button type="button" variant="outline" size="sm" onClick={addTransitPort} className="gap-2">
+                <Plus className="h-4 w-4" /> הוסף נמל מעבר
+              </Button>
+            </div>
+            {form.transitPorts.length === 0 ? (
+              <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                משלוח ישיר — ללא נמלי מעבר.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {form.transitPorts.map((port, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <AirportCombobox value={port} onChange={(v) => updateTransitPort(i, v)} />
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeTransitPort(i)} aria-label="הסר נמל מעבר">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-4 text-sm font-semibold">כתובות ואנשי קשר</div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <ContactBlock
+                title="איסוף"
+                address={form.pickupAddress}
+                onAddressChange={(v) => upd("pickupAddress", v)}
+                contacts={form.pickupContacts}
+                onAdd={() => addContact("pickupContacts")}
+                onUpdate={(i, patch) => updateContact("pickupContacts", i, patch)}
+                onRemove={(i) => removeContact("pickupContacts", i)}
+              />
+              <ContactBlock
+                title="מסירה"
+                address={form.deliveryAddress}
+                onAddressChange={(v) => upd("deliveryAddress", v)}
+                contacts={form.deliveryContacts}
+                onAdd={() => addContact("deliveryContacts")}
+                onUpdate={(i, patch) => updateContact("deliveryContacts", i, patch)}
+                onRemove={(i) => removeContact("deliveryContacts", i)}
+              />
+            </div>
+          </div>
 
           <Section title="פיננסי">
             <Field label="מטבע">
@@ -668,38 +857,56 @@ function EditQuote() {
                 const calc = getPackageCalc(pkg);
                 return (
                   <div key={pkg.id} className="rounded-lg border p-3">
-                    <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                      <Field label="סוג משטח">
-                        <select
-                          value={pkg.pallet ?? ""}
-                          onChange={(e) => updatePackage(pkg.id, { pallet: e.target.value || null })}
-                          className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-                        >
-                          <option value="">— בחר —</option>
-                          {PALLETS.map((p) => (
-                            <option key={p.id} value={p.id}>{p.label}</option>
-                          ))}
-                        </select>
+                    {/* The wizard only offers manual L/W/H entry per package
+                        now (no preset pallet sizes) — pkg.pallet is always
+                        "custom" in real data, so there's no dropdown here. */}
+                    <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                      <Field label="אורך (ס״מ)">
+                        <Input type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} />
                       </Field>
-                      {pkg.pallet === "custom" && (
-                        <>
-                          <Field label="אורך (ס״מ)">
-                            <Input type="number" value={pkg.customLength} onChange={(e) => updatePackage(pkg.id, { customLength: e.target.value })} />
-                          </Field>
-                          <Field label="רוחב (ס״מ)">
-                            <Input type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} />
-                          </Field>
-                          <Field label="גובה (ס״מ)">
-                            <Input type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} />
-                          </Field>
-                        </>
-                      )}
+                      <Field label="רוחב (ס״מ)">
+                        <Input type="number" value={pkg.customWidth} onChange={(e) => updatePackage(pkg.id, { customWidth: e.target.value })} />
+                      </Field>
+                      <Field label="גובה (ס״מ)">
+                        <Input type="number" value={pkg.customHeight} onChange={(e) => updatePackage(pkg.id, { customHeight: e.target.value })} />
+                      </Field>
                       <Field label="משקל יח' (ק״ג)">
                         <Input type="number" value={pkg.unitWeight} onChange={(e) => updatePackage(pkg.id, { unitWeight: e.target.value })} />
                       </Field>
                       <Field label="כמות">
                         <Input type="number" value={pkg.unitQty} onChange={(e) => updatePackage(pkg.id, { unitQty: e.target.value })} />
                       </Field>
+                    </div>
+
+                    <div className="mt-3">
+                      <Label className="text-xs text-muted-foreground">טמפרטורת משלוח לחבילה זו</Label>
+                      <div className="mt-1.5 flex flex-wrap gap-2">
+                        {TEMP_SERIES.map((s) => {
+                          const active = pkg.tempSeries === s.key;
+                          return (
+                            <button
+                              key={s.key}
+                              type="button"
+                              onClick={() => updatePackage(pkg.id, { tempSeries: active ? null : s.key })}
+                              className={cn(
+                                "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                                active ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/40",
+                              )}
+                            >
+                              {s.icon} {s.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-1 items-end gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label className="text-xs text-muted-foreground">רשם טמפרטורה לחבילה זו</Label>
+                        <div className="mt-1.5">
+                          <LoggerPicker value={pkg.loggerId} onChange={(loggerId) => updatePackage(pkg.id, { loggerId })} />
+                        </div>
+                      </div>
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs text-muted-foreground">
                           {calc.grossWeight > 0 && <div>משקל: {calc.grossWeight.toFixed(1)} ק״ג</div>}
@@ -854,16 +1061,15 @@ function EditQuote() {
 
             {form.pricingItems.length > 0 ? (
               <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-[920px] text-sm">
+                <table className="w-full min-w-[860px] text-sm">
                   <thead className="bg-muted/40 text-xs text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 text-right font-medium">תיאור</th>
-                      <th className="px-3 py-2 text-right font-medium">כמות</th>
-                      <th className="px-3 py-2 text-right font-medium">יחידה</th>
-                      <th className="px-3 py-2 text-right font-medium">מחיר יח'</th>
+                      <th className="px-3 py-2 text-right font-medium">מקור</th>
+                      <th className="px-3 py-2 text-right font-medium">פרטי מקור</th>
+                      <th className="px-3 py-2 text-right font-medium">תאריך</th>
+                      <th className="px-3 py-2 text-right font-medium">סכום</th>
                       <th className="px-3 py-2 text-right font-medium">מטבע</th>
-                      <th className="px-3 py-2 text-right font-medium">סה"כ</th>
-                      <th className="px-3 py-2 text-right font-medium">הערה</th>
                       <th className="w-12 px-3 py-2" />
                     </tr>
                   </thead>
@@ -871,25 +1077,42 @@ function EditQuote() {
                     {form.pricingItems.map((item) => (
                       <tr key={item.id} className="border-t align-top">
                         <td className="px-2 py-2">
-                          <Input value={item.desc} onChange={(e) => updatePricingItem(item.id, "desc", e.target.value)} />
+                          <Input value={item.label} onChange={(e) => updatePricingItem(item.id, "label", e.target.value)} />
                         </td>
                         <td className="px-2 py-2">
-                          <Input type="number" value={item.qty} onChange={(e) => updatePricingItem(item.id, "qty", e.target.value)} />
+                          <select
+                            value={item.source}
+                            onChange={(e) => updatePricingItem(item.id, "source", e.target.value as PriceSource)}
+                            className="h-9 w-full rounded-md border bg-background px-2 text-xs"
+                          >
+                            <option value="pricelist">Price List</option>
+                            <option value="rfq">RFQ</option>
+                            <option value="manual">ידני</option>
+                            <option value="missing">חסר מקור</option>
+                          </select>
                         </td>
                         <td className="px-2 py-2">
-                          <Input value={item.unit} onChange={(e) => updatePricingItem(item.id, "unit", e.target.value)} />
+                          <Input value={item.sourceLabel} onChange={(e) => updatePricingItem(item.id, "sourceLabel", e.target.value)} />
                         </td>
                         <td className="px-2 py-2">
-                          <Input type="number" value={item.unitPrice} onChange={(e) => updatePricingItem(item.id, "unitPrice", e.target.value)} />
+                          <Input type="date" value={item.sourceDate} onChange={(e) => updatePricingItem(item.id, "sourceDate", e.target.value)} />
                         </td>
                         <td className="px-2 py-2">
-                          <Input value={item.currency} onChange={(e) => updatePricingItem(item.id, "currency", e.target.value)} />
+                          <Input
+                            type="number"
+                            value={item.price === 0 ? "" : item.price}
+                            onChange={(e) => updatePricingItem(item.id, "price", Number(e.target.value) || 0)}
+                            placeholder="0"
+                          />
                         </td>
                         <td className="px-2 py-2">
-                          <Input type="number" value={item.total} onChange={(e) => updatePricingItem(item.id, "total", e.target.value)} />
-                        </td>
-                        <td className="px-2 py-2">
-                          <Input value={item.note} onChange={(e) => updatePricingItem(item.id, "note", e.target.value)} />
+                          <select
+                            value={item.currency}
+                            onChange={(e) => updatePricingItem(item.id, "currency", e.target.value as "USD" | "EUR" | "ILS")}
+                            className="h-9 rounded-md border bg-background px-2 text-xs"
+                          >
+                            <option>USD</option><option>EUR</option><option>ILS</option>
+                          </select>
                         </td>
                         <td className="px-2 py-2">
                           <Button
@@ -905,6 +1128,22 @@ function EditQuote() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    {Object.entries(
+                      form.pricingItems.reduce<Record<string, number>>((acc, it) => {
+                        acc[it.currency] = (acc[it.currency] || 0) + (Number(it.price) || 0);
+                        return acc;
+                      }, {}),
+                    ).map(([cur, sum]) => (
+                      <tr key={cur} className="border-t bg-muted/30 font-semibold">
+                        <td className="px-3 py-2" colSpan={4}>{`סה"כ (${cur})`}</td>
+                        <td className="px-3 py-2" colSpan={2} dir="ltr">
+                          {sum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td />
+                      </tr>
+                    ))}
+                  </tfoot>
                 </table>
               </div>
             ) : (
@@ -948,6 +1187,55 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="space-y-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+// Pickup/delivery address + repeatable contacts — mirrors the wizard's "ו.
+// אנשי קשר" section (step 2) and feeds the same payload keys that
+// quote-document.tsx reads for its route/shipper/consignee display. These
+// were entirely absent from the edit page before, so once a quote was
+// created there was no way to correct an address or contact on a revision.
+function ContactBlock({
+  title,
+  address,
+  onAddressChange,
+  contacts,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  title: string;
+  address: string;
+  onAddressChange: (v: string) => void;
+  contacts: { name: string; phone: string; email: string }[];
+  onAdd: () => void;
+  onUpdate: (index: number, patch: Partial<{ name: string; phone: string; email: string }>) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="mb-3 text-sm font-semibold">{title}</div>
+      <Field label={`כתובת ${title}`}>
+        <Input value={address} onChange={(e) => onAddressChange(e.target.value)} placeholder="רחוב, עיר, מדינה" />
+      </Field>
+      <div className="mt-3 space-y-2">
+        {contacts.map((c, i) => (
+          <div key={i} className="grid grid-cols-1 gap-2 rounded-md border bg-muted/20 p-2 sm:grid-cols-3">
+            <Input placeholder="שם" value={c.name} onChange={(e) => onUpdate(i, { name: e.target.value })} className="h-8 text-xs" />
+            <Input placeholder="טלפון" value={c.phone} onChange={(e) => onUpdate(i, { phone: e.target.value })} className="h-8 text-xs" />
+            <div className="flex items-center gap-1">
+              <Input placeholder="אימייל" value={c.email} onChange={(e) => onUpdate(i, { email: e.target.value })} className="h-8 flex-1 text-xs" />
+              <Button type="button" variant="ghost" size="icon" onClick={() => onRemove(i)} aria-label="הסר איש קשר" className="h-8 w-8 shrink-0">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={onAdd} className="mt-2 gap-1.5">
+        <Plus className="h-3.5 w-3.5" /> הוסף איש קשר
+      </Button>
     </div>
   );
 }

@@ -250,7 +250,7 @@ const TEMP_SERIES_VISUAL: Record<TempSeriesKey, { icon: typeof Snowflake; tone: 
 // Icon per שיטת משלוח tag ("סוג משלוח" card grid) — the tags themselves keep
 // each their own brand color (see shipment-type-tags.ts), so only the icon
 // is picked per-value here, matched to what the tag represents.
-const SHIPMENT_TYPE_TAG_ICON: Record<string, typeof Snowflake> = {
+export const SHIPMENT_TYPE_TAG_ICON: Record<string, typeof Snowflake> = {
   "Dry Shipper": FlaskConical,
   General: Package,
   "15° - 25°": Sun,
@@ -2734,7 +2734,7 @@ function Step4Logistics(p: Step4Props) {
 
 // ============ Step 5 — תמחור ============
 
-type PriceSource = "pricelist" | "rfq" | "manual" | "missing";
+export type PriceSource = "pricelist" | "rfq" | "manual" | "missing";
 export type PricingItem = {
   id: string;
   group: string;
@@ -2747,7 +2747,7 @@ export type PricingItem = {
   stale?: boolean;
 };
 
-const DEFAULT_PRICING_ITEMS: PricingItem[] = [
+export const DEFAULT_PRICING_ITEMS: PricingItem[] = [
   { id: "p1", group: "הובלה אווירית", label: "הובלה אווירית", source: "rfq", sourceLabel: "RFQ - QuickSTAT", sourceDate: "2025-05-05", currency: "USD", price: 2850 },
   { id: "p2", group: "טיפול נמל", label: "טיפול נמל", source: "pricelist", sourceLabel: "Price List", sourceDate: "2025-05-20", currency: "USD", price: 285 },
   { id: "p3", group: "דמי איסוף", label: "דמי איסוף", source: "rfq", sourceLabel: "RFQ - QuickSTAT", sourceDate: "2025-06-06", currency: "USD", price: 65 },
@@ -2763,7 +2763,7 @@ const DEFAULT_PRICING_ITEMS: PricingItem[] = [
   { id: "p13", group: "היטל דלק", label: "היטל דלק", source: "pricelist", sourceLabel: "Fuel Surcharge", sourceDate: "2025-04-08", currency: "USD", price: 60, stale: true },
 ];
 
-const SOURCE_META: Record<PriceSource, { label: string; dot: string; row: string }> = {
+export const SOURCE_META: Record<PriceSource, { label: string; dot: string; row: string }> = {
   pricelist: { label: "Price List", dot: "bg-accent", row: "" },
   rfq: { label: "RFQ", dot: "bg-success", row: "" },
   manual: { label: "ידני", dot: "bg-warning", row: "" },

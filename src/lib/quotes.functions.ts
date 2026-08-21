@@ -177,6 +177,7 @@ export type ReviseQuoteInput = {
     incoterm?: string | null;
     originPort?: string | null;
     destPort?: string | null;
+    transitPorts?: string[] | null;
     departDate?: string | null;
     arriveDate?: string | null;
     agent?: string | null;
@@ -250,7 +251,7 @@ export const reviseQuote = createServerFn({ method: "POST" })
         incoterm: e.incoterm ?? original.incoterm,
         origin_port: e.originPort ?? original.origin_port,
         dest_port: e.destPort ?? original.dest_port,
-        transit_ports: original.transit_ports ?? [],
+        transit_ports: e.transitPorts ?? original.transit_ports ?? [],
         depart_date: e.departDate ?? original.depart_date,
         arrive_date: e.arriveDate ?? original.arrive_date,
         agent: e.agent ?? original.agent,
