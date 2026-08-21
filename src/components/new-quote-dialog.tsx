@@ -793,6 +793,61 @@ export function NewQuoteDialog({
   ]);
   const canContinue = missingFieldLabels.length === 0;
 
+  // Read-only recap of everything filled in on step 2 ("פרטי המשלוח") so
+  // far, shown from the "סיכום העמוד" button in the footer — only includes
+  // fields that actually have a value, same "show what's there, skip what
+  // isn't" approach as missingFieldLabels above (its mirror image).
+  const step2SummaryLines = useMemo(() => {
+    const lines: { label: string; value: string }[] = [];
+    if (kind) lines.push({ label: "סוג משלוח", value: SHIP_TYPES.find((t) => t.id === kind)?.label ?? kind });
+    if (kind !== "domestic" && incoterm) lines.push({ label: "תנאי מכר", value: incoterm });
+    if (shipmentTypeTags.length > 0) lines.push({ label: "תגיות סוג משלוח", value: shipmentTypeTags.join(" · ") });
+    if (kind === "distribution" && dropType) lines.push({ label: "סוג הפצה", value: dropType });
+    if (pickupDateEst || pickupTimeEst) {
+      lines.push({ label: "איסוף משוער", value: [pickupDateEst, pickupTimeEst].filter(Boolean).join(" · ") });
+    }
+    if (deliveryDateEst || deliveryTimeEst) {
+      lines.push({ label: "הגעה משוערת", value: [deliveryDateEst, deliveryTimeEst].filter(Boolean).join(" · ") });
+    }
+    if (kind === "import") {
+      const journeyBits = [
+        journeyOriginPort && journeyDestPort ? `${journeyOriginPort} → ${journeyDestPort}` : journeyOriginPort || journeyDestPort,
+        airline.trim(),
+        journeyNumber.trim() && `מסע ${journeyNumber.trim()}`,
+        journeyCode.trim() && `קוד ${journeyCode.trim()}`,
+      ].filter(Boolean);
+      if (journeyBits.length > 0) lines.push({ label: "פרטי מסע", value: journeyBits.join(" · ") });
+    }
+    if (pickupAddress.trim()) lines.push({ label: "כתובת איסוף", value: pickupAddress.trim() });
+    const pickupNames = pickupContacts.map((c) => c.name.trim()).filter(Boolean);
+    if (pickupNames.length > 0) lines.push({ label: "איש קשר באיסוף", value: pickupNames.join(" · ") });
+    if (deliveryAddress.trim()) lines.push({ label: "כתובת מסירה", value: deliveryAddress.trim() });
+    const deliveryNames = deliveryContacts.map((c) => c.name.trim()).filter(Boolean);
+    if (deliveryNames.length > 0) lines.push({ label: "איש קשר במסירה", value: deliveryNames.join(" · ") });
+    if (notes.trim()) lines.push({ label: "הערות", value: notes.trim() });
+    return lines;
+  }, [
+    kind,
+    incoterm,
+    shipmentTypeTags,
+    dropType,
+    pickupDateEst,
+    pickupTimeEst,
+    deliveryDateEst,
+    deliveryTimeEst,
+    journeyOriginPort,
+    journeyDestPort,
+    airline,
+    journeyNumber,
+    journeyCode,
+    pickupAddress,
+    pickupContacts,
+    deliveryAddress,
+    deliveryContacts,
+    notes,
+  ]);
+  const [showStep2Summary, setShowStep2Summary] = useState(false);
+
   const reset = () => {
     setStep(1);
     setSelectedId(null);
@@ -824,6 +879,7 @@ export function NewQuoteDialog({
     setPackages([makePackageRow()]);
     setShipmentMode(null);
     setShowFinishOptions(false);
+    setShowStep2Summary(false);
   };
 
   async function handleFinish(action: "case" | "save" | "pdf") {
@@ -1857,6 +1913,26 @@ export function NewQuoteDialog({
               <Button variant="outline" size="sm" className="gap-1">
                 <Plus className="h-4 w-4" /> לקוח פוטנציאלי חדש
               </Button>
+            )}
+            {step === 2 && step2SummaryLines.length > 0 && (
+              <Popover open={showStep2Summary} onOpenChange={setShowStep2Summary}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <FileText className="h-3.5 w-3.5" /> סיכום פרטי העמוד
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="start" side="top" className="w-[420px] p-0">
+                  <div className="border-b px-4 py-2.5 text-sm font-semibold">סיכום פרטי המשלוח שהוזנו</div>
+                  <div className="max-h-[360px] space-y-2.5 overflow-y-auto p-4">
+                    {step2SummaryLines.map((line) => (
+                      <div key={line.label} className="text-sm">
+                        <div className="text-xs font-medium text-muted-foreground">{line.label}</div>
+                        <div className="whitespace-pre-wrap">{line.value}</div>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
             {!canContinue && !submitting && missingFieldLabels.length > 0 && (
               <span className="max-w-md text-xs text-muted-foreground">
