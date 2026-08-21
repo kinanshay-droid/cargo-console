@@ -683,7 +683,7 @@ export function NewQuoteDialog({
     setPricingItems((rows) => rows.map((r) => ({ ...r, currency: next })));
   };
 
-  // Keep the pricing table's "אריזה חיונית" / "בקרת טמפרטורה" rows showing
+  // Keep the pricing table's "אריזה חיוונית" / "רשם טמפרטורה" rows showing
   // what was actually picked in step 3 (packaging model + logger), instead
   // of the catalog's generic placeholder text — matched by `group` since
   // that's stable regardless of row order or id.
@@ -709,7 +709,7 @@ export function NewQuoteDialog({
         if (r.group === "אריזה חיוונית" && packagingNames.length > 0) {
           return { ...r, sourceLabel: packagingNames.join(" · ") };
         }
-        if (r.group === "בקרת טמפרטורה" && loggerNames.length > 0) {
+        if (r.group === "רשם טמפרטורה" && loggerNames.length > 0) {
           return { ...r, sourceLabel: loggerNames.join(" · ") };
         }
         return r;
@@ -2738,7 +2738,7 @@ const DEFAULT_PRICING_ITEMS: PricingItem[] = [
   { id: "p9", group: "דמי ניהול", label: "דמי ניהול", source: "pricelist", sourceLabel: "Price List", sourceDate: "2025-05-20", currency: "USD", price: 75 },
   { id: "p10", group: "טיפול מסמכים", label: "טיפול מסמכים", source: "pricelist", sourceLabel: "Price List", sourceDate: "2025-05-20", currency: "USD", price: 45 },
   { id: "p11", group: "אריזה חיוונית", label: "אריזה חיוונית", source: "pricelist", sourceLabel: "Packaging (CoolGuard 60L)", sourceDate: "2025-05-20", currency: "USD", price: 180 },
-  { id: "p12", group: "בקרת טמפרטורה", label: "בקרת טמפרטורה", source: "pricelist", sourceLabel: "Temperature Logger", sourceDate: "2025-05-20", currency: "USD", price: 95 },
+  { id: "p12", group: "רשם טמפרטורה", label: "רשם טמפרטורה", source: "pricelist", sourceLabel: "Temperature Logger", sourceDate: "2025-05-20", currency: "USD", price: 95 },
   { id: "p13", group: "היטל דלק", label: "היטל דלק", source: "pricelist", sourceLabel: "Fuel Surcharge", sourceDate: "2025-04-08", currency: "USD", price: 60, stale: true },
 ];
 
