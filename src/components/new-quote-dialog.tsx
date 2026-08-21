@@ -504,9 +504,7 @@ export function NewQuoteDialog({
   // nothing validated) — now real fields so "all details filled" can
   // actually be enforced before letting the user continue.
   const [pickupDateEst, setPickupDateEst] = useState("");
-  const [pickupTimeEst, setPickupTimeEst] = useState("");
   const [deliveryDateEst, setDeliveryDateEst] = useState("");
-  const [deliveryTimeEst, setDeliveryTimeEst] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [pickupContacts, setPickupContacts] = useState<ContactRow[]>([makeContactRow()]);
@@ -735,9 +733,7 @@ export function NewQuoteDialog({
       if (kind === "distribution" && dropType === null) missing.push("סוג הפצה");
       if (shipmentTypeTags.length === 0) missing.push("סוג משלוח (תגית)");
       if (!pickupDateEst) missing.push("תאריך איסוף משוער");
-      if (!pickupTimeEst) missing.push("שעת איסוף משוערת");
       if (!deliveryDateEst) missing.push("תאריך מסירה משוער");
-      if (!deliveryTimeEst) missing.push("שעת מסירה משוערת");
       if (kind === "import") {
         if (!journeyOriginPort.trim()) missing.push("נמל מוצא");
         if (!journeyDestPort.trim()) missing.push("נמל יעד");
@@ -773,9 +769,7 @@ export function NewQuoteDialog({
     dropType,
     shipmentTypeTags,
     pickupDateEst,
-    pickupTimeEst,
     deliveryDateEst,
-    deliveryTimeEst,
     journeyOriginPort,
     journeyDestPort,
     journeyNumber,
@@ -804,12 +798,8 @@ export function NewQuoteDialog({
     if (kind !== "domestic" && incoterm) lines.push({ label: "תנאי מכר", value: incoterm });
     if (shipmentTypeTags.length > 0) lines.push({ label: "תגיות סוג משלוח", value: shipmentTypeTags.join(" · ") });
     if (kind === "distribution" && dropType) lines.push({ label: "סוג הפצה", value: dropType });
-    if (pickupDateEst || pickupTimeEst) {
-      lines.push({ label: "איסוף משוער", value: [pickupDateEst, pickupTimeEst].filter(Boolean).join(" · ") });
-    }
-    if (deliveryDateEst || deliveryTimeEst) {
-      lines.push({ label: "הגעה משוערת", value: [deliveryDateEst, deliveryTimeEst].filter(Boolean).join(" · ") });
-    }
+    if (pickupDateEst) lines.push({ label: "איסוף משוער", value: pickupDateEst });
+    if (deliveryDateEst) lines.push({ label: "הגעה משוערת", value: deliveryDateEst });
     if (kind === "import") {
       const journeyBits = [
         journeyOriginPort && journeyDestPort ? `${journeyOriginPort} → ${journeyDestPort}` : journeyOriginPort || journeyDestPort,
@@ -833,9 +823,7 @@ export function NewQuoteDialog({
     shipmentTypeTags,
     dropType,
     pickupDateEst,
-    pickupTimeEst,
     deliveryDateEst,
-    deliveryTimeEst,
     journeyOriginPort,
     journeyDestPort,
     airline,
@@ -873,9 +861,7 @@ export function NewQuoteDialog({
     setGoods([{ id: uid(), item: "", sku: "", origin: "", weight: "", dims: "", qty: 1 }]);
     setNotes("");
     setPickupDateEst("");
-    setPickupTimeEst("");
     setDeliveryDateEst("");
-    setDeliveryTimeEst("");
     setPickupAddress("");
     setDeliveryAddress("");
     setPickupContacts([makeContactRow()]);
@@ -927,9 +913,7 @@ export function NewQuoteDialog({
               ? { name: currentUser.fullName || currentUser.email, email: currentUser.email }
               : null,
             pickupDateEst: pickupDateEst || null,
-            pickupTimeEst: pickupTimeEst.trim() || null,
             deliveryDateEst: deliveryDateEst || null,
-            deliveryTimeEst: deliveryTimeEst.trim() || null,
             pickupAddress: pickupAddress.trim() || null,
             deliveryAddress: deliveryAddress.trim() || null,
             pickupContacts: pickupContacts.filter((c) => c.name || c.phone || c.email),
@@ -1296,7 +1280,7 @@ export function NewQuoteDialog({
 
               {/* ד. פרטי משלוח (משותף) */}
               <Section title="ד. פרטי משלוח *">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <Field
                     label="תאריך איסוף משוער *"
                     type="date"
@@ -1304,22 +1288,10 @@ export function NewQuoteDialog({
                     onChange={(e) => setPickupDateEst(e.target.value)}
                   />
                   <Field
-                    label="שעת איסוף *"
-                    placeholder="09:00 – 12:00"
-                    value={pickupTimeEst}
-                    onChange={(e) => setPickupTimeEst(e.target.value)}
-                  />
-                  <Field
                     label="תאריך הגעה משוער *"
                     type="date"
                     value={deliveryDateEst}
                     onChange={(e) => setDeliveryDateEst(e.target.value)}
-                  />
-                  <Field
-                    label="שעת הגעה *"
-                    placeholder="14:00 – 18:00"
-                    value={deliveryTimeEst}
-                    onChange={(e) => setDeliveryTimeEst(e.target.value)}
                   />
                 </div>
               </Section>
