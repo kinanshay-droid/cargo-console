@@ -996,24 +996,11 @@ export function NewQuoteDialog({
       <DialogContent dir="rtl" className="max-w-6xl p-0 overflow-hidden">
         <div className="border-b bg-muted/30 p-6">
           <DialogHeader className="text-right">
-            <DialogTitle className="flex items-center justify-between gap-2 text-xl">
-              <span className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Building2 className="h-4 w-4" />
-                </span>
-                {step === 1 ? "בחירת לקוח" : STEPS[step - 1].label}
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Building2 className="h-4 w-4" />
               </span>
-              {step > 1 && selectedId !== null && (() => {
-                const c = customersList.find((cust) => cust.id === selectedId);
-                if (!c) return null;
-                return (
-                  <span className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-foreground">
-                    <Building2 className="h-3 w-3 text-muted-foreground" />
-                    {c.company_name}
-                    <span className="text-muted-foreground">· {c.customer_code}</span>
-                  </span>
-                );
-              })()}
+              {step === 1 ? "בחירת לקוח" : STEPS[step - 1].label}
             </DialogTitle>
             <DialogDescription>
               {step === 1
@@ -1021,6 +1008,22 @@ export function NewQuoteDialog({
                 : `שלב ${step} מתוך 6 — הצעת מחיר חדשה`}
             </DialogDescription>
           </DialogHeader>
+
+          {/* לקוח נבחר — מוצג באמצע, בכל שלב אחרי שלב 1, כדי שיישאר גלוי
+              וברור לאורך כל האשף (בעבר הופיע רק כתגית קטנה בפינה) */}
+          {step > 1 && selectedId !== null && (() => {
+            const c = customersList.find((cust) => cust.id === selectedId);
+            if (!c) return null;
+            return (
+              <div className="mt-4 flex flex-col items-center gap-1 rounded-xl border bg-card py-3 text-center">
+                <span className="flex items-center gap-2 text-base font-semibold text-foreground">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  {c.company_name}
+                </span>
+                <span className="text-xs text-muted-foreground">קוד לקוח {c.customer_code}</span>
+              </div>
+            );
+          })()}
 
           {/* Stepper */}
           <div className="mt-5 flex items-center justify-between gap-2" dir="ltr">
