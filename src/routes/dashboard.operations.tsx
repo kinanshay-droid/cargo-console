@@ -10,6 +10,8 @@ import {
   Ship,
   PackageOpen,
   Truck,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -157,6 +159,10 @@ function OperationsDashboard() {
   });
 
   const [repFilter, setRepFilter] = useState<string>(REP_FILTER_ALL);
+  // Sort direction for the ETA column in the four kind-grouped tables below —
+  // shared across all four so clicking the icon in any of them re-sorts all
+  // of them the same way. "desc" = newest ETA first, "asc" = oldest first.
+  const [etaSortDir, setEtaSortDir] = useState<"asc" | "desc">("desc");
   const filteredCases = useMemo(
     () => (repFilter === REP_FILTER_ALL ? cases : cases.filter((c) => getAssignedRep(c)?.id === repFilter)),
     [cases, repFilter],
@@ -337,7 +343,17 @@ function OperationsDashboard() {
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             {SHIP_KIND_ORDER.map((kind) => {
               const kindCases = activeShipmentsByKind.groups[kind];
-              const shown = kindCases.slice(0, 6);
+              const shown = [...kindCases]
+                .sort((a, b) => {
+                  // Cases with no ETA yet always sort to the bottom, regardless of direction.
+                  const at = a.arrive_date ? new Date(a.arrive_date).getTime() : null;
+                  const bt = b.arrive_date ? new Date(b.arrive_date).getTime() : null;
+                  if (at == null && bt == null) return 0;
+                  if (at == null) return 1;
+                  if (bt == null) return -1;
+                  return etaSortDir === "asc" ? at - bt : bt - at;
+                })
+                .slice(0, 6);
               const conf = SHIP_KIND_CONFIG[kind];
               const KindIcon = conf.icon;
               return (
@@ -359,7 +375,17 @@ function OperationsDashboard() {
                         <TableHead className="text-right">נציג מטפל</TableHead>
                         <TableHead className="text-right">מס' שטר מטען</TableHead>
                         <TableHead className="text-right">סטטוס</TableHead>
-                        <TableHead className="text-right">ETA</TableHead>
+                        <TableHead className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => setEtaSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                            className="inline-flex items-center gap-1 hover:text-foreground"
+                            title={etaSortDir === "asc" ? "ממוין: ישן ← חדש" : "ממוין: חדש ← ישן"}
+                          >
+                            ETA
+                            {etaSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                          </button>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
