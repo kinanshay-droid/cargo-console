@@ -706,7 +706,7 @@ export function NewQuoteDialog({
     if (packagingNames.length === 0 && loggerNames.length === 0) return;
     setPricingItems((rows) =>
       rows.map((r) => {
-        if (r.group === "אריזה חיונית" && packagingNames.length > 0) {
+        if (r.group === "אריזה חיוונית" && packagingNames.length > 0) {
           return { ...r, sourceLabel: packagingNames.join(" · ") };
         }
         if (r.group === "בקרת טמפרטורה" && loggerNames.length > 0) {
