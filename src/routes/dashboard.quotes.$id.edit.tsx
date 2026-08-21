@@ -187,7 +187,16 @@ function parsePackSelections(raw: unknown): PackSelection[] {
   return raw
     .map((s) => (isRecord(s) ? s : null))
     .filter((s): s is Record<string, unknown> => s !== null)
-    .map((s) => ({ key: toText(s.key), qty: Number(s.qty) || 0 }))
+    .map((s): PackSelection => ({
+      key: toText(s.key),
+      qty: Number(s.qty) || 0,
+      // These three used to be dropped on load (and so effectively wiped
+      // on the next save): product weight, an attached logger, and the
+      // Deep Frozen dry-ice replenishment qty for that specific model.
+      productWeight: s.productWeight != null ? Number(s.productWeight) || 0 : undefined,
+      loggerId: typeof s.loggerId === "string" ? s.loggerId : null,
+      dryIceQty: s.dryIceQty != null ? Number(s.dryIceQty) || 0 : undefined,
+    }))
     .filter((s) => s.key && s.qty > 0);
 }
 
@@ -458,6 +467,32 @@ function EditQuote() {
           : [...f.packSelections, { key, qty }],
       };
     });
+  }
+
+  // The catalog packaging table (CoolGuard/BioTherm) carries three more
+  // per-model fields beyond quantity — product weight, an attached
+  // temperature logger, and (Deep Frozen only) dry-ice replenishment qty.
+  // The edit page only ever read/wrote qty, so opening a quote for edit and
+  // saving it silently dropped whichever logger/product weight/dry-ice the
+  // rep had entered in the wizard, and the table looked stripped-down next
+  // to what was actually defined on the quote.
+  function getPackProductWeight(key: string) {
+    return form?.packSelections.find((s) => s.key === key)?.productWeight ?? "";
+  }
+  function setPackProductWeight(key: string, productWeight: number) {
+    setForm((f) => (f ? { ...f, packSelections: f.packSelections.map((s) => (s.key === key ? { ...s, productWeight } : s)) } : f));
+  }
+  function getPackLogger(key: string) {
+    return form?.packSelections.find((s) => s.key === key)?.loggerId ?? null;
+  }
+  function setPackLogger(key: string, loggerId: string | null) {
+    setForm((f) => (f ? { ...f, packSelections: f.packSelections.map((s) => (s.key === key ? { ...s, loggerId } : s)) } : f));
+  }
+  function getPackDryIceQty(key: string) {
+    return form?.packSelections.find((s) => s.key === key)?.dryIceQty ?? "";
+  }
+  function setPackDryIceQty(key: string, dryIceQty: number) {
+    setForm((f) => (f ? { ...f, packSelections: f.packSelections.map((s) => (s.key === key ? { ...s, dryIceQty } : s)) } : f));
   }
 
   function toggleTempSeriesNone() {
@@ -906,19 +941,27 @@ function EditQuote() {
                       <table className="w-full text-sm">
                         <thead className="bg-muted/40 text-xs text-muted-foreground">
                           <tr>
+                            <th className="w-28 px-2 py-2 text-center font-medium">כמות</th>
                             <th className="px-3 py-2 text-right font-medium">דגם</th>
                             <th className="px-3 py-2 text-right font-medium">{isBio ? "קטגוריה / משך" : "משקל נפחי ליח'"}</th>
-                            <th className="w-28 px-3 py-2 text-center font-medium">כמות</th>
+                            <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
+                            {isBio && <th className="w-24 px-3 py-2 text-right font-medium">קרח יבש (ק״ג)</th>}
+                            <th className="w-44 px-3 py-2 text-right font-medium">רשם טמפרטורה</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(isBio ? BIOTHERM_MODELS : COOLGUARD_MODELS).map((m) => {
                             const key = `${series}:${m.model}`;
                             const qty = getPackQty(key);
+                            const productWeight = getPackProductWeight(key);
+                            const dryIceQty = getPackDryIceQty(key);
                             const unitCalc = getPackModelCalc({ key, qty: 1 });
                             return (
-                              <tr key={key} className="border-t">
-                                <td className="px-3 py-2">{m.model}</td>
+                              <tr key={key} className={cn("border-t", qty > 0 && "bg-primary/5")}>
+                                <td className="px-2 py-2">
+                                  <PackQtyStepper value={qty} onChange={(v) => setPackQty(key, v)} />
+                                </td>
+                                <td className="px-3 py-2 font-medium">{m.model}</td>
                                 <td className="px-3 py-2 text-muted-foreground">
                                   {isBio
                                     ? `${(m as { category: string }).category} · ${(m as { duration: string }).duration}`
@@ -927,7 +970,33 @@ function EditQuote() {
                                       : ""}
                                 </td>
                                 <td className="px-3 py-2">
-                                  <PackQtyStepper value={qty} onChange={(v) => setPackQty(key, v)} />
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    disabled={qty === 0}
+                                    value={productWeight}
+                                    onChange={(e) => setPackProductWeight(key, Number(e.target.value) || 0)}
+                                    className="w-20 rounded border bg-background px-2 py-1 text-sm disabled:opacity-40"
+                                  />
+                                </td>
+                                {isBio && (
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step="0.1"
+                                      disabled={qty === 0}
+                                      value={dryIceQty}
+                                      onChange={(e) => setPackDryIceQty(key, Number(e.target.value) || 0)}
+                                      className="w-20 rounded border bg-background px-2 py-1 text-sm disabled:opacity-40"
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-3 py-2">
+                                  {qty > 0 && (
+                                    <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />
+                                  )}
                                 </td>
                               </tr>
                             );
