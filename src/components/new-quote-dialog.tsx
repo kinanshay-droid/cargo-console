@@ -74,6 +74,7 @@ import {
   FolderOpen,
   Save,
   FileDown,
+  Copy,
 } from "lucide-react";
 import {
   Dialog,
@@ -847,6 +848,17 @@ export function NewQuoteDialog({
     notes,
   ]);
   const [showStep2Summary, setShowStep2Summary] = useState(false);
+  const [copiedSummaryField, setCopiedSummaryField] = useState<string | null>(null);
+  async function copySummaryText(fieldKey: string, text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedSummaryField(fieldKey);
+      toast.success("הועתק");
+      setTimeout(() => setCopiedSummaryField((k) => (k === fieldKey ? null : k)), 1500);
+    } catch {
+      toast.error("ההעתקה נכשלה");
+    }
+  }
 
   const reset = () => {
     setStep(1);
@@ -880,6 +892,7 @@ export function NewQuoteDialog({
     setShipmentMode(null);
     setShowFinishOptions(false);
     setShowStep2Summary(false);
+    setCopiedSummaryField(null);
   };
 
   async function handleFinish(action: "case" | "save" | "pdf") {
@@ -1921,13 +1934,54 @@ export function NewQuoteDialog({
                     <FileText className="h-3.5 w-3.5" /> סיכום פרטי העמוד
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="start" side="top" className="w-[420px] p-0">
-                  <div className="border-b px-4 py-2.5 text-sm font-semibold">סיכום פרטי המשלוח שהוזנו</div>
-                  <div className="max-h-[360px] space-y-2.5 overflow-y-auto p-4">
+                <PopoverContent align="start" side="top" className="w-[440px] p-0 overflow-hidden">
+                  <div className="flex items-center justify-between gap-2 border-b bg-muted/40 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <FileText className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="text-sm font-semibold">סיכום פרטי המשלוח שהוזנו</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copySummaryText(
+                          "__all__",
+                          step2SummaryLines.map((line) => `${line.label}: ${line.value}`).join("\n"),
+                        )
+                      }
+                      className="flex items-center gap-1.5 rounded-md border bg-card px-2.5 py-1.5 text-xs font-medium transition hover:bg-muted"
+                    >
+                      {copiedSummaryField === "__all__" ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-success" /> הועתק
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" /> העתק הכל
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="max-h-[380px] divide-y overflow-y-auto">
                     {step2SummaryLines.map((line) => (
-                      <div key={line.label} className="text-sm">
-                        <div className="text-xs font-medium text-muted-foreground">{line.label}</div>
-                        <div className="whitespace-pre-wrap">{line.value}</div>
+                      <div key={line.label} className="group flex items-start justify-between gap-3 px-4 py-2.5">
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-muted-foreground">{line.label}</div>
+                          <div className="text-sm font-medium leading-snug whitespace-pre-wrap">{line.value}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copySummaryText(line.label, line.value)}
+                          className="shrink-0 rounded-md p-1.5 text-muted-foreground opacity-0 transition hover:bg-muted hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                          title="העתק"
+                        >
+                          {copiedSummaryField === line.label ? (
+                            <Check className="h-3.5 w-3.5 text-success" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </button>
                       </div>
                     ))}
                   </div>
