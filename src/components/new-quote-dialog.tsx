@@ -673,14 +673,14 @@ export function NewQuoteDialog({
   // instead of the catalog's example numbers looking like real data.
   const [pricingItems, setPricingItems] = useState<PricingItem[]>(() => DEFAULT_PRICING_ITEMS.map((r) => ({ ...r, price: 0 })));
   const [dismissedAlerts, setDismissedAlerts] = useState<Record<string, boolean>>({});
-  // Changing the currency needs to stay consistent everywhere it's shown on
-  // this step — the summary panel, the items table's per-row currency, and
-  // any new row added afterward. This only relabels the currency (no FX
-  // conversion, since no exchange-rate source is available); it keeps the
-  // whole page showing one currency instead of a stale mix.
+  // This is the quote's "primary" currency — it drives the profit/customer
+  // price panel and is the default for newly added rows, but no longer
+  // force-overwrites existing rows: each pricing-table row now carries its
+  // own currency (a per-row select), since costs can genuinely come in from
+  // different sources in different currencies (e.g. a USD price list next
+  // to an EUR RFQ) and forcing them all onto one label was hiding that.
   const changeCurrency = (next: "USD" | "EUR" | "ILS") => {
     setCurrency(next);
-    setPricingItems((rows) => rows.map((r) => ({ ...r, currency: next })));
   };
 
   // Keep the pricing table's "אריזה חיוונית" / "רשם טמפרטורה" rows showing
@@ -2775,7 +2775,18 @@ type Step5Props = {
 function Step5Pricing(p: Step5Props) {
   const [showCostGroupPicker, setShowCostGroupPicker] = useState(false);
   const [pickedCostGroupIds, setPickedCostGroupIds] = useState<string[]>([]);
-  const total = p.items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+  // Items can now each carry their own currency (see the per-row select
+  // below) instead of being forced onto one shared currency, so totals are
+  // computed per currency rather than as one lump sum — mixing e.g. USD and
+  // EUR amounts into a single number would be meaningless without an FX
+  // rate. The "מטבע" selector in the section header picks which currency's
+  // subtotal drives the profit/customer-price panel; the other currencies'
+  // subtotals are still shown, just not folded into that math.
+  const currencyTotals = p.items.reduce<Record<string, number>>((acc, i) => {
+    acc[i.currency] = (acc[i.currency] || 0) + (Number(i.price) || 0);
+    return acc;
+  }, {});
+  const total = currencyTotals[p.currency] ?? 0;
   const marginPct = Number(p.margin) || 0;
   const profit = total * (marginPct / 100);
   const customerPrice = total + profit;
@@ -2880,7 +2891,19 @@ function Step5Pricing(p: Step5Props) {
                             className={cn("h-8 w-24 rounded-md border bg-background px-2 text-right text-sm", it.source === "missing" && "border-destructive/40 text-destructive")}
                           />
                         </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{it.currency}</td>
+                        <td className="px-3 py-2 text-xs">
+                          <select
+                            value={it.currency}
+                            onChange={(e) =>
+                              p.setItems((rows) =>
+                                rows.map((r) => (r.id === it.id ? { ...r, currency: e.target.value as "USD" | "EUR" | "ILS" } : r)),
+                              )
+                            }
+                            className="h-7 rounded-md border bg-background px-1.5 text-xs text-muted-foreground"
+                          >
+                            <option>USD</option><option>EUR</option><option>ILS</option>
+                          </select>
+                        </td>
                         <td className="px-3 py-2 text-xs">
                           <div className="flex items-center justify-end gap-2">
                             {it.sourceDate && <span className="text-[10px] text-muted-foreground">{it.sourceDate}</span>}
@@ -2905,13 +2928,15 @@ function Step5Pricing(p: Step5Props) {
                       </tr>
                     );
                   })}
-                  <tr className="border-t bg-muted/30 font-semibold">
-                    <td></td>
-                    <td className="px-2 py-2 text-right">{fmt(total)}</td>
-                    <td className="px-3 py-2 text-xs">{p.currency}</td>
-                    <td className="px-3 py-2 text-right text-sm" colSpan={2}>סה"כ עלויות</td>
-                    <td></td>
-                  </tr>
+                  {Object.entries(currencyTotals).map(([cur, sum]) => (
+                    <tr key={cur} className="border-t bg-muted/30 font-semibold">
+                      <td></td>
+                      <td className="px-2 py-2 text-right">{fmt(sum)}</td>
+                      <td className="px-3 py-2 text-xs">{cur}</td>
+                      <td className="px-3 py-2 text-right text-sm" colSpan={2}>סה"כ עלויות</td>
+                      <td></td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -3036,6 +3061,14 @@ function Step5Pricing(p: Step5Props) {
                 <span className="text-muted-foreground">שיעור רווח</span>
                 <span className="font-semibold">{profitRate.toFixed(2)}%</span>
               </div>
+              {Object.entries(currencyTotals)
+                .filter(([cur]) => cur !== p.currency)
+                .map(([cur, sum]) => (
+                  <div key={cur} className="flex items-center justify-between border-t pt-2 text-xs text-muted-foreground">
+                    <span>סה״כ נוסף ({cur}) — לא נכלל בחישוב</span>
+                    <span>{fmt(sum)}</span>
+                  </div>
+                ))}
             </div>
           </Section>
 
@@ -3212,12 +3245,22 @@ function Step6Summary(p: Step6Props) {
   const fmtDT = (d: Date) =>
     d.toLocaleString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
-  const groups = new Map<string, number>();
+  // Rows can each carry their own currency (see step 5), so grouping just
+  // by name would silently add e.g. USD and EUR amounts together — keep
+  // currency as part of the grouping key, and drive the totals below off
+  // only the quote's primary currency (p.currency), same as step 5's panel.
+  const groups = new Map<string, { currency: string; sum: number }>();
   for (const it of p.pricingItems) {
-    const key = it.group || it.label || "אחר";
-    groups.set(key, (groups.get(key) ?? 0) + (Number(it.price) || 0));
+    const key = `${it.group || it.label || "אחר"}__${it.currency}`;
+    const existing = groups.get(key);
+    groups.set(key, { currency: it.currency, sum: (existing?.sum ?? 0) + (Number(it.price) || 0) });
   }
-  const totalCost = Array.from(groups.values()).reduce((s, v) => s + v, 0);
+  const currencyTotals = p.pricingItems.reduce<Record<string, number>>((acc, i) => {
+    acc[i.currency] = (acc[i.currency] || 0) + (Number(i.price) || 0);
+    return acc;
+  }, {});
+  const totalCost = currencyTotals[p.currency] ?? 0;
+  const otherCurrencyTotals = Object.entries(currencyTotals).filter(([cur]) => cur !== p.currency);
   const marginPct = Number(p.margin) || 0;
   const marginAmt = totalCost * (marginPct / 100);
   const beforeDiscount = totalCost + marginAmt;
@@ -3325,22 +3368,36 @@ function Step6Summary(p: Step6Props) {
               </tr>
             </thead>
             <tbody>
-              {Array.from(groups.entries()).map(([g, v]) => (
-                <tr key={g} className="border-t">
-                  <td className="px-3 py-2">{g}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{p.currency}</td>
-                  <td className="px-3 py-2 text-left font-medium">{money(v)}</td>
+              {Array.from(groups.entries()).map(([key, g]) => (
+                <tr key={key} className="border-t">
+                  <td className="px-3 py-2">{key.split("__")[0]}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{g.currency}</td>
+                  <td className="px-3 py-2 text-left font-medium">
+                    {g.sum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
                 </tr>
               ))}
               <tr className="border-t bg-muted/30">
-                <td className="px-3 py-2 font-semibold">סה"כ עלויות</td>
+                <td className="px-3 py-2 font-semibold">סה"כ עלויות ({p.currency})</td>
                 <td className="px-3 py-2" />
                 <td className="px-3 py-2 text-left font-semibold">{money(totalCost)}</td>
               </tr>
+              {otherCurrencyTotals.map(([cur, sum]) => (
+                <tr key={cur} className="border-t text-muted-foreground">
+                  <td className="px-3 py-2">סה"כ במטבע נוסף</td>
+                  <td className="px-3 py-2">{cur}</td>
+                  <td className="px-3 py-2 text-left">
+                    {sum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
         <div className="mt-2 text-[11px] text-muted-foreground">
+          * הסכומים הכוללים (רווח/הנחה/סה״כ להצעה) מחושבים על בסיס {p.currency} בלבד — פריטים במטבעות אחרים מוצגים בנפרד ואינם נכללים בחישוב
+        </div>
+        <div className="text-[11px] text-muted-foreground">
           * ההצעה אינה כוללת מע"מ אלא אם צוין אחרת
         </div>
       </div>
