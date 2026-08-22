@@ -326,7 +326,20 @@ export const TEMP_LOGGERS: TempLogger[] = [
 // inside the box — separate from the box's own empty tare weight — so the
 // gross-weight total reflects package + product together, not just the
 // packaging.
-export type PackSelection = { key: string; qty: number; productWeight?: number; loggerId?: string | null; dryIceQty?: number };
+// hasLogger/loggerDataRead are import-only: an import shipment already
+// happened at origin with whatever logger the shipper attached (if any),
+// so instead of picking a logger model from our own catalog (loggerId,
+// used for export/domestic/distribution), the rep just records whether one
+// is attached and whether its data has been read/downloaded on arrival.
+export type PackSelection = {
+  key: string;
+  qty: number;
+  productWeight?: number;
+  loggerId?: string | null;
+  dryIceQty?: number;
+  hasLogger?: boolean | null;
+  loggerDataRead?: boolean;
+};
 
 // key format is "<tempSeries>:<model name>" (see the catalog tables below).
 // deepFrozen always maps to the BioTherm catalog, every other series to
@@ -597,6 +610,69 @@ export function NewQuoteDialog({
   const getPackLogger = (key: string) => packSelections.find((s) => s.key === key)?.loggerId ?? null;
   const setPackLogger = (key: string, loggerId: string | null) =>
     setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, loggerId } : s)));
+  // Import-only counterparts to getPackLogger/setPackLogger above — see the
+  // PackSelection type comment for why import uses yes/no + "was it read"
+  // instead of picking a logger model from our catalog.
+  const getPackHasLogger = (key: string) => packSelections.find((s) => s.key === key)?.hasLogger ?? null;
+  const setPackHasLogger = (key: string, hasLogger: boolean) =>
+    setPackSelections((arr) =>
+      arr.map((s) => (s.key === key ? { ...s, hasLogger, loggerDataRead: hasLogger ? s.loggerDataRead : false } : s)),
+    );
+  const getPackLoggerDataRead = (key: string) => packSelections.find((s) => s.key === key)?.loggerDataRead ?? false;
+  const setPackLoggerDataRead = (key: string, loggerDataRead: boolean) =>
+    setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, loggerDataRead } : s)));
+  // On import shipments the goods already traveled with whatever logger the
+  // shipper attached at origin, so the catalog's own LoggerPicker (for
+  // choosing one of *our* logger models ahead of a shipment we're arranging)
+  // doesn't apply — instead just record whether one is attached and whether
+  // its data has been read on arrival. Non-import series keep LoggerPicker.
+  const renderLoggerCell = (key: string) => {
+    if (kind === "import") {
+      const hasLogger = getPackHasLogger(key);
+      return (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setPackHasLogger(key, true)}
+              className={cn(
+                "rounded-full border px-2 py-1 text-[11px] font-medium transition",
+                hasLogger === true ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/40",
+              )}
+            >
+              יש רשם
+            </button>
+            <button
+              type="button"
+              onClick={() => setPackHasLogger(key, false)}
+              className={cn(
+                "rounded-full border px-2 py-1 text-[11px] font-medium transition",
+                hasLogger === false ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted/40",
+              )}
+            >
+              אין רשם
+            </button>
+          </div>
+          {hasLogger === true && (
+            <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={getPackLoggerDataRead(key)}
+                onChange={(e) => setPackLoggerDataRead(key, e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-muted-foreground/30 accent-primary"
+              />
+              קריאת נתונים מרשם
+            </label>
+          )}
+        </div>
+      );
+    }
+    return <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />;
+  };
+  // Same "product weight" input is labeled differently for import: the
+  // goods have already left origin, so it's the actual shipment weight
+  // being confirmed, not a product weight being estimated ahead of pickup.
+  const productWeightColLabel = kind === "import" ? "משקל משלוח (ק״ג)" : "משקל מוצר (ק״ג)";
   // Dry-ice replenishment quantity (kg) — only meaningful for the Deep Frozen
   // (BioTherm dry-ice) catalog, not the other temperature series.
   const getPackDryIceQty = (key: string) => packSelections.find((s) => s.key === key)?.dryIceQty ?? "";
@@ -1640,7 +1716,7 @@ export function NewQuoteDialog({
                                     <th className="px-3 py-2 text-right font-medium">קטגוריה</th>
                                     <th className="px-3 py-2 text-right font-medium">מידות חיצוניות</th>
                                     <th className="px-3 py-2 text-right font-medium">Tare</th>
-                                    <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
+                                    <th className="w-28 px-3 py-2 text-right font-medium">{productWeightColLabel}</th>
                                     <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
                                     <th className="px-3 py-2 text-right font-medium">משך</th>
                                     <th className="w-24 px-3 py-2 text-right font-medium">קרח יבש (ק״ג)</th>
@@ -1690,9 +1766,7 @@ export function NewQuoteDialog({
                                           />
                                         </td>
                                         <td className="px-3 py-2">
-                                          {qty > 0 && (
-                                            <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />
-                                          )}
+                                          {qty > 0 && renderLoggerCell(key)}
                                         </td>
                                       </tr>
                                     );
@@ -1708,7 +1782,7 @@ export function NewQuoteDialog({
                                     <th className="px-3 py-2 text-right font-medium">Payload</th>
                                     <th className="px-3 py-2 text-right font-medium">מידות חיצוניות</th>
                                     <th className="px-3 py-2 text-right font-medium">Tare</th>
-                                    <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
+                                    <th className="w-28 px-3 py-2 text-right font-medium">{productWeightColLabel}</th>
                                     <th className="px-3 py-2 text-right font-medium">משקל נפחי</th>
                                     <th className="w-44 px-3 py-2 text-right font-medium">רשם טמפרטורה</th>
                                   </tr>
@@ -1743,9 +1817,7 @@ export function NewQuoteDialog({
                                           {calc ? `${calc.volumetricWeight.toLocaleString("he-IL", { maximumFractionDigits: 2 })} ק"ג` : ""}
                                         </td>
                                         <td className="px-3 py-2">
-                                          {qty > 0 && (
-                                            <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />
-                                          )}
+                                          {qty > 0 && renderLoggerCell(key)}
                                         </td>
                                       </tr>
                                     );
