@@ -5,6 +5,7 @@ import {
   COOLGUARD_MODELS,
   BIOTHERM_MODELS,
   ATTR_OPTIONS,
+  TEMP_LOGGERS,
   getPackageCalc,
   getPackageDimsCm,
   getPackModelCalc,
@@ -177,8 +178,32 @@ export function parsePackSelections(raw: unknown): PackSelection[] {
   return raw
     .map((s) => (isRecord(s) ? s : null))
     .filter((s): s is Record<string, unknown> => s !== null)
-    .map((s) => ({ key: str(s.key), qty: num(s.qty) }))
+    .map((s) => ({
+      key: str(s.key),
+      qty: num(s.qty),
+      // These were previously dropped here, which silently left product
+      // weight / dry ice out of the gross-weight calc on the customer quote
+      // (getPackModelCalc reads them) and meant a selected logger never
+      // showed up anywhere on the document.
+      productWeight: s.productWeight != null ? num(s.productWeight) : undefined,
+      loggerId: typeof s.loggerId === "string" ? s.loggerId : null,
+      dryIceQty: s.dryIceQty != null ? num(s.dryIceQty) : undefined,
+      hasLogger: typeof s.hasLogger === "boolean" ? s.hasLogger : null,
+      loggerDataRead: s.loggerDataRead === true,
+    }))
     .filter((s) => s.key && s.qty > 0);
+}
+
+// Resolves a package/selection's attached recorder to a display label —
+// either a real device picked from the TEMP_LOGGERS catalog, or (import
+// shipments only) the simple "יש רשם" yes/no flag with no specific device.
+function loggerLabel(loggerId: string | null | undefined, hasLogger?: boolean | null): string {
+  if (loggerId) {
+    const l = TEMP_LOGGERS.find((t) => t.id === loggerId);
+    return l ? `${l.company} ${l.model}` : "—";
+  }
+  if (hasLogger === true) return "יש רשם";
+  return "—";
 }
 
 export type PricingRow = { id: string; desc: string; qty: number; unit: string; unitPrice: number; currency: string; total: number };
@@ -567,7 +592,14 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
         )}
 
         {/* Packaging details */}
-        {v.packaging && (packageCalcs.length > 0 || modelCalcs.length > 0) && (
+        {v.packaging && (packageCalcs.length > 0 || modelCalcs.length > 0) && (() => {
+          // Only add the רשם column when a logger actually applies to at
+          // least one row — most quotes don't use one, and an all-"—" column
+          // would just be noise on the customer-facing document.
+          const showLogger =
+            packageCalcs.some(({ pkg }) => !!pkg.loggerId) ||
+            modelCalcs.some(({ sel }) => !!sel.loggerId || sel.hasLogger === true);
+          return (
           <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
             <div className="mb-3 text-sm font-semibold">פרטי אריזה</div>
             <div className="overflow-x-auto">
@@ -579,6 +611,7 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
                     <th className="py-1.5 text-right font-medium">מידות (ס״מ)</th>
                     <th className="py-1.5 text-right font-medium">משקל ברוטו</th>
                     <th className="py-1.5 text-right font-medium">נפח (CBM)</th>
+                    {showLogger && <th className="py-1.5 text-right font-medium">רשם</th>}
                     <th className="py-1.5 text-left font-medium">משקל לחיוב</th>
                   </tr>
                 </thead>
@@ -592,6 +625,7 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
                       </td>
                       <td className="py-1.5">{calc.grossWeight > 0 ? `${calc.grossWeight.toFixed(2)} ק״ג` : "—"}</td>
                       <td className="py-1.5">{cbm > 0 ? cbm.toFixed(2) : "—"}</td>
+                      {showLogger && <td className="py-1.5 text-muted-foreground">{loggerLabel(pkg.loggerId)}</td>}
                       <td className="py-1.5 text-left">{Math.max(calc.grossWeight, calc.volumetricWeight) > 0 ? `${Math.max(calc.grossWeight, calc.volumetricWeight).toFixed(2)} ק״ג` : "—"}</td>
                     </tr>
                   ))}
@@ -604,6 +638,7 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
                       </td>
                       <td className="py-1.5">{calc.grossWeight > 0 ? `${calc.grossWeight.toFixed(2)} ק״ג` : "—"}</td>
                       <td className="py-1.5">{cbm > 0 ? cbm.toFixed(2) : "—"}</td>
+                      {showLogger && <td className="py-1.5 text-muted-foreground">{loggerLabel(sel.loggerId, sel.hasLogger)}</td>}
                       <td className="py-1.5 text-left">{Math.max(calc.grossWeight, calc.volumetricWeight) > 0 ? `${Math.max(calc.grossWeight, calc.volumetricWeight).toFixed(2)} ק״ג` : "—"}</td>
                     </tr>
                   ))}
@@ -611,7 +646,7 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
                 <tfoot>
                   <tr className="border-t-2">
                     <td className="py-2 text-sm font-semibold text-primary">{totalQty}</td>
-                    <td colSpan={4} />
+                    <td colSpan={showLogger ? 5 : 4} />
                     <td className="py-2 text-left text-sm font-semibold text-primary">
                       {chargeableWeight > 0 ? `${chargeableWeight.toFixed(2)} ק״ג` : "—"}
                     </td>
@@ -620,7 +655,8 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
               </table>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* Shipper / consignee */}
         {v.shipperConsignee && (
