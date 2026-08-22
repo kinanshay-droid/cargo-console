@@ -795,7 +795,16 @@ export function NewQuoteDialog({
   useEffect(() => {
     const packagingEntries = packSelections
       .filter((sel) => sel.qty > 0)
-      .map((sel) => ({ key: sel.key, label: getPackModelCalc(sel).label }));
+      .map((sel) => {
+        // getPackModelCalc(sel).label is just the model name (e.g. "CoolGuard
+        // Advance 28L"), which is identical for two selections that differ
+        // only by temperature series — append the series so those two rows
+        // read as distinct line items instead of duplicates.
+        const seriesKey = sel.key.slice(0, sel.key.indexOf(":"));
+        const seriesLabel = TEMP_SERIES.find((t) => t.key === seriesKey)?.label;
+        const modelLabel = getPackModelCalc(sel).label;
+        return { key: sel.key, label: seriesLabel ? `${modelLabel} (${seriesLabel})` : modelLabel };
+      });
 
     const loggerEntries: { key: string; label: string }[] = [];
     for (const sel of packSelections) {
