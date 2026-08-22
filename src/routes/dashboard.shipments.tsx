@@ -15,6 +15,8 @@ import {
   Ship,
   PackageOpen,
   Truck,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -111,12 +113,6 @@ const CASE_STATUS_GRADIENT: Record<CaseStatus, string> = {
   cancelled: TONE_GRADIENT.destructive,
 };
 
-const SHIPMENT_MODE_LABEL: Record<string, string> = {
-  direct: "משלוח ישיר",
-  console: "משלוח קונסול",
-  transship: "שטעון",
-};
-
 function ShipmentsDashboard() {
   const listCasesFn = useServerFn(listCases);
   const highlightRef = useRef<HTMLTableRowElement | null>(null);
@@ -128,6 +124,10 @@ function ShipmentsDashboard() {
 
   const [kindFilter, setKindFilter] = useState<ShipKindValue | "all">("all");
   const [showArchived, setShowArchived] = useState(false);
+  // Sort direction for "תאריך אישור תיק" (the case's created_at — the
+  // moment the quote was transferred and the case opened). "desc" = newest
+  // first, matching the server's default order.
+  const [createdAtSortDir, setCreatedAtSortDir] = useState<"asc" | "desc">("desc");
 
   // Cases whose pipeline status reached "הושלם" are archived automatically
   // (see updateCasePipelineStatus) and dropped from this active work list by
@@ -151,17 +151,20 @@ function ShipmentsDashboard() {
   );
 
   // Completed shipments sink to the bottom of the table — they're done, so
-  // they shouldn't push active/newer cases further down the list. Array.sort
-  // is stable, so within each group (completed / not) the existing order is
-  // preserved.
+  // they shouldn't push active/newer cases further down the list. Within
+  // each group (completed / not), rows are sorted by "תאריך אישור תיק"
+  // (created_at), direction toggled via the column header.
   const sortedCases = useMemo(
     () =>
       [...filteredCases].sort((a, b) => {
         const aDone = a.status === "completed" ? 1 : 0;
         const bDone = b.status === "completed" ? 1 : 0;
-        return aDone - bDone;
+        if (aDone !== bDone) return aDone - bDone;
+        const at = new Date(a.created_at).getTime();
+        const bt = new Date(b.created_at).getTime();
+        return createdAtSortDir === "asc" ? at - bt : bt - at;
       }),
-    [filteredCases],
+    [filteredCases, createdAtSortDir],
   );
 
   const counts: Record<CaseStatus, number> = { new: 0, in_progress: 0, completed: 0, cancelled: 0 };
@@ -248,7 +251,17 @@ function ShipmentsDashboard() {
               <TableHead className="text-right">לקוח</TableHead>
               <TableHead className="text-right">מסלול</TableHead>
               <TableHead className="text-right">סוג משלוח</TableHead>
-              <TableHead className="text-right">שיטת שילוח</TableHead>
+              <TableHead className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setCreatedAtSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                  className="inline-flex items-center gap-1 hover:text-foreground"
+                  title={createdAtSortDir === "asc" ? "ממוין: ישן ← חדש" : "ממוין: חדש ← ישן"}
+                >
+                  תאריך אישור תיק
+                  {createdAtSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                </button>
+              </TableHead>
               <TableHead className="text-right">סטטוס</TableHead>
               <TableHead className="text-right"> </TableHead>
             </TableRow>
@@ -316,8 +329,8 @@ function ShipmentsDashboard() {
                         "—"
                       )}
                     </TableCell>
-                    <TableCell className="text-sm">
-                      {SHIPMENT_MODE_LABEL[c.shipment_mode] ?? c.shipment_mode ?? "—"}
+                    <TableCell className="text-sm text-muted-foreground">
+                      {c.created_at ? new Date(c.created_at).toLocaleDateString("he-IL") : "—"}
                     </TableCell>
                     <TableCell>
                       <Badge className={meta.className}>{pipelineMeta.label}</Badge>
