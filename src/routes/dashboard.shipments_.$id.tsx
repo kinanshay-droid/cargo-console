@@ -43,6 +43,7 @@ import {
   getPackageCalc,
   getPackModelCalc,
   LoggerPicker,
+  TEMP_LOGGERS,
   type CargoType,
   type TempSeriesKey,
   type PackSelection,
@@ -61,6 +62,8 @@ import {
 import { REVIEW_STATUS_OPTIONS, getReviewStatusStyle } from "@/lib/review-status";
 import { PackagingChecklistLauncher } from "@/components/packaging-checklist-dialog";
 import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checklist";
+import { CourierTaskReportLauncher } from "@/components/courier-task-report-dialog";
+import type { CourierTaskReportData } from "@/lib/courier-task-report";
 
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
@@ -703,6 +706,54 @@ function CaseDetail() {
       });
   }, [form]);
 
+  // Everything the courier needs to physically pick up and deliver the
+  // shipment, formatted for the printable "דוח משימה" (task report) — reuses
+  // the same packaging/weight/temp calcs used elsewhere on this page so the
+  // report always matches what's on file.
+  const courierReportData: CourierTaskReportData | null = useMemo(() => {
+    if (!form || !caseRow) return null;
+    const tempRangeLabel = form.tempSeriesNone
+      ? "ללא בקרת טמפרטורה"
+      : form.tempSeriesList
+          .map((k) => {
+            const t = TEMP_SERIES.find((s) => s.key === k);
+            return t ? `${t.label} (${t.range})` : k;
+          })
+          .join(", ");
+    const attrLabels = ATTR_OPTIONS.filter((a) => form.attrs[a.id]).map((a) => a.label);
+    const dryIceTotal = form.packSelections.reduce((sum, sel) => sum + (sel.qty > 0 ? sel.dryIceQty ?? 0 : 0), 0);
+    const loggerLabels = form.packSelections
+      .filter((sel) => sel.qty > 0 && sel.loggerId)
+      .map((sel) => {
+        const l = TEMP_LOGGERS.find((tl) => tl.id === sel.loggerId);
+        return l ? `${l.company} ${l.model}` : sel.loggerId!;
+      });
+    return {
+      caseCode: form.unifreightNumber.trim() || caseRow.case_code,
+      customerName: form.customerName,
+      customerRef: form.customerRef,
+      shipmentKindLabel: form.shipmentKind ? SHIP_KIND_LABEL_HE[form.shipmentKind] ?? form.shipmentKind : "",
+      courierName: form.critilog.courier,
+      pickupDate: form.critilog.pickupIsrael || form.departDate,
+      deliveryDate: form.arriveDate,
+      pickupAddress: form.pickupAddress,
+      pickupContacts: form.pickupContacts.filter((c) => c.name.trim() || c.phone.trim()),
+      deliveryAddress: form.deliveryAddress,
+      deliveryContacts: form.deliveryContacts.filter((c) => c.name.trim() || c.phone.trim()),
+      packagingLines: checklistBoxes.map((b) => b.label),
+      grossWeight: packageTotals.grossWeight > 0 ? `${packageTotals.grossWeight.toFixed(1)} ק״ג` : "—",
+      volumetricWeight: packageTotals.volumetricWeight > 0 ? `${packageTotals.volumetricWeight.toFixed(1)} ק״ג` : "—",
+      chargeableWeight: packageTotals.chargeableWeight > 0 ? `${packageTotals.chargeableWeight.toFixed(1)} ק״ג` : "—",
+      tempRangeLabel,
+      dryIceLabel: dryIceTotal > 0 ? `${dryIceTotal} ק״ג` : "—",
+      loggerLabels,
+      attrLabels,
+      specialInstructions: form.specialReq.trim(),
+      notes: form.extraNotes.trim(),
+      generatedAt: new Date().toLocaleString("he-IL"),
+    };
+  }, [form, caseRow, checklistBoxes, packageTotals]);
+
   async function handleSave() {
     if (!form) return;
     setSaving(true);
@@ -868,6 +919,7 @@ function CaseDetail() {
                 lockDestination={form.shipmentKind === "domestic"}
               />
             )}
+            {courierReportData && <CourierTaskReportLauncher data={courierReportData} />}
             <ActionButtonGroup onSave={handleSave} saving={saving} />
           </div>
         ) : (
