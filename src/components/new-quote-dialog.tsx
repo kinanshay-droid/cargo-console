@@ -3084,12 +3084,10 @@ function Step5Pricing(p: Step5Props) {
                               <div className="text-[11px] text-muted-foreground">{item.sourceLabel}</div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {alreadyAdded && <span className="text-[11px] text-muted-foreground">כבר נוסף</span>}
-                            <span className="text-sm font-semibold" dir="ltr">
-                              {item.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {item.currency}
-                            </span>
-                          </div>
+                          {/* Price intentionally not shown here — the catalog's reference
+                              price varies too much run to run to be a reliable preview;
+                              the rep fills in the real amount manually after adding. */}
+                          {alreadyAdded && <span className="text-[11px] text-muted-foreground">כבר נוסף</span>}
                         </button>
                       );
                     })}
