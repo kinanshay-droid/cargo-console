@@ -42,6 +42,7 @@ import {
   makePackageRow,
   getPackageCalc,
   getPackModelCalc,
+  LoggerPicker,
   type CargoType,
   type TempSeriesKey,
   type PackSelection,
@@ -83,6 +84,10 @@ type Form = {
   arriveDate: string;
   agent: string;
   airline: string;
+  pickupAddress: string;
+  deliveryAddress: string;
+  pickupContacts: ContactForm[];
+  deliveryContacts: ContactForm[];
   currency: string;
   total: string;
   blNumber: string;
@@ -225,8 +230,31 @@ function parsePackSelections(raw: unknown): PackSelection[] {
   return raw
     .map((s) => (isRecord(s) ? s : null))
     .filter((s): s is Record<string, unknown> => s !== null)
-    .map((s) => ({ key: toText(s.key), qty: Number(s.qty) || 0 }))
+    .map((s) => ({
+      key: toText(s.key),
+      qty: Number(s.qty) || 0,
+      // These were previously dropped here, which silently reset a
+      // selection's product weight / dry ice / logger back to nothing every
+      // time the case was opened for editing and saved.
+      productWeight: s.productWeight != null ? Number(s.productWeight) || 0 : undefined,
+      loggerId: typeof s.loggerId === "string" ? s.loggerId : null,
+      dryIceQty: s.dryIceQty != null ? Number(s.dryIceQty) || 0 : undefined,
+      hasLogger: typeof s.hasLogger === "boolean" ? s.hasLogger : null,
+      loggerDataRead: s.loggerDataRead === true,
+    }))
     .filter((s) => s.key && s.qty > 0);
+}
+
+type ContactForm = { name: string; phone: string; email: string };
+function emptyContact(): ContactForm {
+  return { name: "", phone: "", email: "" };
+}
+function parseContacts(raw: unknown): ContactForm[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((c) => (isRecord(c) ? c : null))
+    .filter((c): c is Record<string, unknown> => c !== null)
+    .map((c) => ({ name: toText(c.name), phone: toText(c.phone), email: toText(c.email) }));
 }
 function emptyAttrs(): Record<AttrKey, boolean> {
   return Object.fromEntries(ATTR_OPTIONS.map((a) => [a.id, false])) as Record<AttrKey, boolean>;
@@ -277,6 +305,10 @@ function parsePackages(raw: unknown): PackageRow[] {
     .filter((p): p is Record<string, unknown> => p !== null)
     .map((p): PackageRow => {
       const customDims = isRecord(p.customDims) ? p.customDims : null;
+      const tempSeries =
+        typeof p.tempSeries === "string" && (VALID_TEMP_KEYS as string[]).includes(p.tempSeries)
+          ? (p.tempSeries as TempSeriesKey)
+          : null;
       return {
         ...makePackageRow(),
         pallet: typeof p.pallet === "string" ? p.pallet : null,
@@ -285,6 +317,10 @@ function parsePackages(raw: unknown): PackageRow[] {
         customHeight: toText(customDims?.height),
         unitWeight: toText(p.unitWeight) || "1",
         unitQty: toText(p.unitQty),
+        // Previously dropped — a package's own temperature requirement and
+        // attached logger were silently reset every time the case was saved.
+        tempSeries,
+        loggerId: typeof p.loggerId === "string" ? p.loggerId : null,
       };
     });
   return rows.length > 0 ? rows : [makePackageRow()];
@@ -428,6 +464,16 @@ function CaseDetail() {
       arriveDate: caseRow.arrive_date ?? "",
       agent: caseRow.agent ?? "",
       airline: caseRow.airline ?? "",
+      // Absent entirely from this page before — a rep who set the pickup/
+      // delivery address and contacts on the quote had no way to see or
+      // correct them once the case was opened, which is exactly the "no
+      // connection" gap most visible on domestic shipments (no ports/agent/
+      // airline there, so the address+contacts are the only "where does
+      // this go" info there is).
+      pickupAddress: toText(payload.pickupAddress),
+      deliveryAddress: toText(payload.deliveryAddress),
+      pickupContacts: parseContacts(payload.pickupContacts),
+      deliveryContacts: parseContacts(payload.deliveryContacts),
       currency: caseRow.currency ?? "",
       total: caseRow.total != null ? String(caseRow.total) : "",
       blNumber: toText(payload.blNumber),
@@ -500,6 +546,35 @@ function CaseDetail() {
           : [...f.packSelections, { key, qty }],
       };
     });
+  }
+  // Same three per-model fields the catalog table needs beyond qty — see
+  // parsePackSelections above for why these previously got silently reset.
+  function getPackProductWeight(key: string) {
+    return form?.packSelections.find((s) => s.key === key)?.productWeight ?? "";
+  }
+  function setPackProductWeight(key: string, productWeight: number) {
+    setForm((f) => (f ? { ...f, packSelections: f.packSelections.map((s) => (s.key === key ? { ...s, productWeight } : s)) } : f));
+  }
+  function getPackLogger(key: string) {
+    return form?.packSelections.find((s) => s.key === key)?.loggerId ?? null;
+  }
+  function setPackLogger(key: string, loggerId: string | null) {
+    setForm((f) => (f ? { ...f, packSelections: f.packSelections.map((s) => (s.key === key ? { ...s, loggerId } : s)) } : f));
+  }
+  function getPackDryIceQty(key: string) {
+    return form?.packSelections.find((s) => s.key === key)?.dryIceQty ?? "";
+  }
+  function setPackDryIceQty(key: string, dryIceQty: number) {
+    setForm((f) => (f ? { ...f, packSelections: f.packSelections.map((s) => (s.key === key ? { ...s, dryIceQty } : s)) } : f));
+  }
+  function updateContact(list: "pickupContacts" | "deliveryContacts", index: number, patch: Partial<ContactForm>) {
+    setForm((f) => (f ? { ...f, [list]: f[list].map((c, i) => (i === index ? { ...c, ...patch } : c)) } : f));
+  }
+  function addContact(list: "pickupContacts" | "deliveryContacts") {
+    setForm((f) => (f ? { ...f, [list]: [...f[list], emptyContact()] } : f));
+  }
+  function removeContact(list: "pickupContacts" | "deliveryContacts", index: number) {
+    setForm((f) => (f ? { ...f, [list]: f[list].filter((_, i) => i !== index) } : f));
   }
   function toggleTempSeriesNone() {
     setForm((f) => (f ? { ...f, tempSeriesNone: true, tempSeriesList: [], packSelections: [] } : f));
@@ -647,6 +722,10 @@ function CaseDetail() {
             total: form.total ? Number(form.total) : null,
             payload: {
               ...originalPayload,
+              pickupAddress: form.pickupAddress.trim() || null,
+              deliveryAddress: form.deliveryAddress.trim() || null,
+              pickupContacts: form.pickupContacts.filter((c) => c.name || c.phone || c.email),
+              deliveryContacts: form.deliveryContacts.filter((c) => c.name || c.phone || c.email),
               blNumber: form.blNumber.trim() || null,
               houseBlNumber: form.houseBlNumber.trim() || null,
               unifreightNumber: form.unifreightNumber.trim() || null,
@@ -693,6 +772,8 @@ function CaseDetail() {
                     : null,
                 unitWeight: pkg.unitWeight,
                 unitQty: pkg.unitQty,
+                tempSeries: pkg.tempSeries,
+                loggerId: pkg.loggerId,
               })),
               weightSummary: {
                 grossWeight: packageTotals.grossWeight,
@@ -917,10 +998,12 @@ function CaseDetail() {
               <Lookup type="shipment_types" matchBy="code" value={form.shipmentKind || null}
                 onChange={(item) => upd("shipmentKind", item?.code ?? "")} placeholder="בחר סוג משלוח..." />
             </Field>
-            <Field label="Incoterm">
-              <Lookup type="incoterms" matchBy="code" value={form.incoterm || null}
-                onChange={(item) => upd("incoterm", item?.code ?? "")} placeholder="בחר Incoterm..." />
-            </Field>
+            {form.shipmentKind !== "domestic" && (
+              <Field label="Incoterm">
+                <Lookup type="incoterms" matchBy="code" value={form.incoterm || null}
+                  onChange={(item) => upd("incoterm", item?.code ?? "")} placeholder="בחר Incoterm..." />
+              </Field>
+            )}
           </Section>
 
           <Section title="מסלול ותאריכים">
@@ -945,6 +1028,30 @@ function CaseDetail() {
               </>
             )}
           </Section>
+
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-4 text-sm font-semibold">כתובות ואנשי קשר</div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <ContactBlock
+                title="איסוף"
+                address={form.pickupAddress}
+                onAddressChange={(v) => upd("pickupAddress", v)}
+                contacts={form.pickupContacts}
+                onAdd={() => addContact("pickupContacts")}
+                onUpdate={(i, patch) => updateContact("pickupContacts", i, patch)}
+                onRemove={(i) => removeContact("pickupContacts", i)}
+              />
+              <ContactBlock
+                title="מסירה"
+                address={form.deliveryAddress}
+                onAddressChange={(v) => upd("deliveryAddress", v)}
+                contacts={form.deliveryContacts}
+                onAdd={() => addContact("deliveryContacts")}
+                onUpdate={(i, patch) => updateContact("deliveryContacts", i, patch)}
+                onRemove={(i) => removeContact("deliveryContacts", i)}
+              />
+            </div>
+          </div>
 
           <Section title="מעקב">
             <Field label="כיסוי">
@@ -975,18 +1082,22 @@ function CaseDetail() {
             <Field label="איש שירות">
               <Input value={form.critilog.serviceRep} onChange={(e) => updCl("serviceRep", e.target.value)} />
             </Field>
-            <Field label="שטר מטען">
-              <Input value={form.critilog.blNumber} onChange={(e) => updCl("blNumber", e.target.value)} />
-            </Field>
+            {form.shipmentKind !== "domestic" && (
+              <Field label="שטר מטען">
+                <Input value={form.critilog.blNumber} onChange={(e) => updCl("blNumber", e.target.value)} />
+              </Field>
+            )}
             <Field label="לקוח">
               <Input value={form.critilog.customer} onChange={(e) => updCl("customer", e.target.value)} />
             </Field>
             <Field label="REF">
               <Input value={form.critilog.ref} onChange={(e) => updCl("ref", e.target.value)} />
             </Field>
-            <Field label="ניתוב">
-              <Input value={form.critilog.route} onChange={(e) => updCl("route", e.target.value)} placeholder="לדוגמה: YYZ-TLV" />
-            </Field>
+            {form.shipmentKind !== "domestic" && (
+              <Field label="ניתוב">
+                <Input value={form.critilog.route} onChange={(e) => updCl("route", e.target.value)} placeholder="לדוגמה: YYZ-TLV" />
+              </Field>
+            )}
             <Field label="סוג">
               <Input value={form.critilog.type} onChange={(e) => updCl("type", e.target.value)} />
             </Field>
@@ -1011,9 +1122,11 @@ function CaseDetail() {
             <Field label="איסוף/מסירה בישראל" hint="הזנת תאריך מקשרת את התיק למסך איסוף/הפצה">
               <Input type="date" value={form.critilog.pickupIsrael} onChange={(e) => updCl("pickupIsrael", e.target.value)} />
             </Field>
-            <Field label="איסוף/מסירה בחול">
-              <Input type="date" value={form.critilog.pickupAbroad} onChange={(e) => updCl("pickupAbroad", e.target.value)} />
-            </Field>
+            {form.shipmentKind !== "domestic" && (
+              <Field label="איסוף/מסירה בחול">
+                <Input type="date" value={form.critilog.pickupAbroad} onChange={(e) => updCl("pickupAbroad", e.target.value)} />
+              </Field>
+            )}
             <Field label="בלדר">
               <Input value={form.critilog.courier} onChange={(e) => updCl("courier", e.target.value)} />
             </Field>
@@ -1176,19 +1289,27 @@ function CaseDetail() {
                       <table className="w-full text-sm">
                         <thead className="bg-muted/40 text-xs text-muted-foreground">
                           <tr>
+                            <th className="w-28 px-2 py-2 text-center font-medium">כמות</th>
                             <th className="px-3 py-2 text-right font-medium">דגם</th>
                             <th className="px-3 py-2 text-right font-medium">{isBio ? "קטגוריה / משך" : "משקל נפחי ליח'"}</th>
-                            <th className="w-28 px-3 py-2 text-center font-medium">כמות</th>
+                            <th className="w-28 px-3 py-2 text-right font-medium">משקל מוצר (ק״ג)</th>
+                            {isBio && <th className="w-24 px-3 py-2 text-right font-medium">קרח יבש (ק״ג)</th>}
+                            <th className="w-44 px-3 py-2 text-right font-medium">רשם טמפרטורה</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(isBio ? BIOTHERM_MODELS : COOLGUARD_MODELS).map((m) => {
                             const key = `${series}:${m.model}`;
                             const qty = getPackQty(key);
+                            const productWeight = getPackProductWeight(key);
+                            const dryIceQty = getPackDryIceQty(key);
                             const unitCalc = getPackModelCalc({ key, qty: 1 });
                             return (
-                              <tr key={key} className="border-t">
-                                <td className="px-3 py-2">{m.model}</td>
+                              <tr key={key} className={cn("border-t", qty > 0 && "bg-primary/5")}>
+                                <td className="px-2 py-2">
+                                  <PackQtyStepper value={qty} onChange={(v) => setPackQty(key, v)} />
+                                </td>
+                                <td className="px-3 py-2 font-medium">{m.model}</td>
                                 <td className="px-3 py-2 text-muted-foreground">
                                   {isBio
                                     ? `${(m as { category: string }).category} · ${(m as { duration: string }).duration}`
@@ -1197,7 +1318,33 @@ function CaseDetail() {
                                       : ""}
                                 </td>
                                 <td className="px-3 py-2">
-                                  <PackQtyStepper value={qty} onChange={(v) => setPackQty(key, v)} />
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step="0.1"
+                                    disabled={qty === 0}
+                                    value={productWeight}
+                                    onChange={(e) => setPackProductWeight(key, Number(e.target.value) || 0)}
+                                    className="w-20 rounded border bg-background px-2 py-1 text-sm disabled:opacity-40"
+                                  />
+                                </td>
+                                {isBio && (
+                                  <td className="px-3 py-2">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step="0.1"
+                                      disabled={qty === 0}
+                                      value={dryIceQty}
+                                      onChange={(e) => setPackDryIceQty(key, Number(e.target.value) || 0)}
+                                      className="w-20 rounded border bg-background px-2 py-1 text-sm disabled:opacity-40"
+                                    />
+                                  </td>
+                                )}
+                                <td className="px-3 py-2">
+                                  {qty > 0 && (
+                                    <LoggerPicker value={getPackLogger(key)} onChange={(id) => setPackLogger(key, id)} />
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -1222,7 +1369,10 @@ function CaseDetail() {
             <div className="mb-4">
               <div className="mb-2 text-xs text-muted-foreground">שירותים כלולים</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {SERVICE_LIST.map((s) => {
+                {SERVICE_LIST.filter((s) =>
+                  form.shipmentKind !== "domestic" ||
+                  !["air", "exportCustoms", "importCustoms", "clearance"].includes(s.id),
+                ).map((s) => {
                   const on = !!form.services[s.id];
                   return (
                     <button
@@ -1368,6 +1518,54 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
       {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+// Pickup/delivery address + repeatable contacts — mirrors the wizard's step
+// 2 and the quote edit page's version. Was entirely absent from this case
+// page before, so once a case was opened there was no way to see or correct
+// an address/contact that had been entered on the quote.
+function ContactBlock({
+  title,
+  address,
+  onAddressChange,
+  contacts,
+  onAdd,
+  onUpdate,
+  onRemove,
+}: {
+  title: string;
+  address: string;
+  onAddressChange: (v: string) => void;
+  contacts: { name: string; phone: string; email: string }[];
+  onAdd: () => void;
+  onUpdate: (index: number, patch: Partial<{ name: string; phone: string; email: string }>) => void;
+  onRemove: (index: number) => void;
+}) {
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="mb-3 text-sm font-semibold">{title}</div>
+      <Field label={`כתובת ${title}`}>
+        <Input value={address} onChange={(e) => onAddressChange(e.target.value)} placeholder="רחוב, עיר, מדינה" />
+      </Field>
+      <div className="mt-3 space-y-2">
+        {contacts.map((c, i) => (
+          <div key={i} className="grid grid-cols-1 gap-2 rounded-md border bg-muted/20 p-2 sm:grid-cols-3">
+            <Input placeholder="שם" value={c.name} onChange={(e) => onUpdate(i, { name: e.target.value })} className="h-8 text-xs" />
+            <Input placeholder="טלפון" value={c.phone} onChange={(e) => onUpdate(i, { phone: e.target.value })} className="h-8 text-xs" />
+            <div className="flex items-center gap-1">
+              <Input placeholder="אימייל" value={c.email} onChange={(e) => onUpdate(i, { email: e.target.value })} className="h-8 flex-1 text-xs" />
+              <Button type="button" variant="ghost" size="icon" onClick={() => onRemove(i)} aria-label="הסר איש קשר" className="h-8 w-8 shrink-0">
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="outline" size="sm" onClick={onAdd} className="mt-2 gap-1.5">
+        <Plus className="h-3.5 w-3.5" /> הוסף איש קשר
+      </Button>
     </div>
   );
 }
