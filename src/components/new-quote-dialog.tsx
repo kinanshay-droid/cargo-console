@@ -786,37 +786,61 @@ export function NewQuoteDialog({
   };
 
   // Keep the pricing table's "אריזה חיוונית" / "רשם טמפרטורה" rows showing
-  // what was actually picked in step 3 (packaging model + logger), instead
-  // of the catalog's generic placeholder text — matched by `group` since
-  // that's stable regardless of row order or id.
+  // what was actually picked in step 3 (packaging model + logger). Each
+  // selected packaging entry and each attached logger gets its own row
+  // (matched by a stable id derived from the selection/package it came
+  // from) instead of joining every name into a single row's label — two
+  // different packages with two different loggers are two separate line
+  // items, not one row saying "Logger A · Logger B".
   useEffect(() => {
-    const packagingNames = Array.from(
-      new Set(
-        packSelections
-          .filter((sel) => sel.qty > 0)
-          .map((sel) => getPackModelCalc(sel).label),
-      ),
-    );
-    const loggerIds = new Set<string>();
-    for (const sel of packSelections) if (sel.loggerId) loggerIds.add(sel.loggerId);
-    for (const pkg of packages) if (pkg.loggerId) loggerIds.add(pkg.loggerId);
-    const loggerNames = Array.from(loggerIds)
-      .map((id) => TEMP_LOGGERS.find((l) => l.id === id))
-      .filter((l): l is TempLogger => !!l)
-      .map((l) => `${l.company} ${l.model}`);
+    const packagingEntries = packSelections
+      .filter((sel) => sel.qty > 0)
+      .map((sel) => ({ key: sel.key, label: getPackModelCalc(sel).label }));
 
-    if (packagingNames.length === 0 && loggerNames.length === 0) return;
-    setPricingItems((rows) =>
-      rows.map((r) => {
-        if (r.group === "אריזה חיוונית" && packagingNames.length > 0) {
-          return { ...r, sourceLabel: packagingNames.join(" · ") };
-        }
-        if (r.group === "רשם טמפרטורה" && loggerNames.length > 0) {
-          return { ...r, sourceLabel: loggerNames.join(" · ") };
-        }
-        return r;
-      }),
-    );
+    const loggerEntries: { key: string; label: string }[] = [];
+    for (const sel of packSelections) {
+      if (!sel.loggerId) continue;
+      const l = TEMP_LOGGERS.find((t) => t.id === sel.loggerId);
+      if (l) loggerEntries.push({ key: `sel-${sel.key}`, label: `${l.company} ${l.model}` });
+    }
+    for (const pkg of packages) {
+      if (!pkg.loggerId) continue;
+      const l = TEMP_LOGGERS.find((t) => t.id === pkg.loggerId);
+      if (l) loggerEntries.push({ key: `pkg-${pkg.id}`, label: `${l.company} ${l.model}` });
+    }
+
+    if (packagingEntries.length === 0 && loggerEntries.length === 0) return;
+
+    // Rebuilds one group's rows from `entries`, reusing an existing row
+    // (and whatever price the rep already typed into it) whenever its id
+    // still matches a current entry, dropping rows for entries that are no
+    // longer selected, and inserting fresh blank-price rows for new ones —
+    // all in the group's original position in the table.
+    const syncGroup = (
+      rows: PricingItem[],
+      group: string,
+      idPrefix: string,
+      entries: { key: string; label: string }[],
+    ): PricingItem[] => {
+      if (entries.length === 0) return rows;
+      const byId = new Map(rows.map((r) => [r.id, r] as const));
+      const template = rows.find((r) => r.group === group) ?? DEFAULT_PRICING_ITEMS.find((r) => r.group === group)!;
+      const insertAt = rows.findIndex((r) => r.group === group);
+      const groupRows = entries.map((e) => {
+        const id = `${idPrefix}${e.key}`;
+        const existing = byId.get(id);
+        return existing ? { ...existing, sourceLabel: e.label } : { ...template, id, sourceLabel: e.label, price: 0 };
+      });
+      const withoutGroup = rows.filter((r) => r.group !== group);
+      const at = insertAt === -1 ? withoutGroup.length : Math.min(insertAt, withoutGroup.length);
+      return [...withoutGroup.slice(0, at), ...groupRows, ...withoutGroup.slice(at)];
+    };
+
+    setPricingItems((rows) => {
+      let next = syncGroup(rows, "אריזה חיוונית", "pkg-", packagingEntries);
+      next = syncGroup(next, "רשם טמפרטורה", "logger-", loggerEntries);
+      return next;
+    });
   }, [packSelections, packages]);
   // Step 6 state — סיכום
   const [discount, setDiscount] = useState<string>("0");
