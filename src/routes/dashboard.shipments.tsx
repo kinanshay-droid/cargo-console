@@ -123,7 +123,12 @@ function ShipmentsDashboard() {
   });
 
   const [kindFilter, setKindFilter] = useState<ShipKindValue | "all">("all");
-  const [showArchived, setShowArchived] = useState(false);
+  // Completed cases are auto-archived (payload.archived) so they don't
+  // clutter the customer's active list, but on the main Shipments table
+  // that meant they vanished from view entirely instead of just sinking to
+  // the bottom (the behavior added right above) — the table defaults to
+  // showing them now; the switch still lets someone hide them again.
+  const [showArchived, setShowArchived] = useState(true);
   // Sort direction for "תאריך אישור תיק" (the case's created_at — the
   // moment the quote was transferred and the case opened). "desc" = newest
   // first, matching the server's default order.
