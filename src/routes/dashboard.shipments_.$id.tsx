@@ -132,6 +132,15 @@ type CritiLogForm = {
   pickupAbroad: string;
 };
 
+// Same four shipment-kind categories used across the wizard/Operations/
+// Pickup-Distribution — used below to default the CritiLog "סוג" field.
+const SHIP_KIND_LABEL_HE: Record<string, string> = {
+  import: "ייבוא",
+  export: "ייצוא",
+  distribution: "דרופ",
+  domestic: "פנים ארצי",
+};
+
 const EMPTY_CRITILOG: CritiLogForm = {
   name: "",
   serviceRep: "",
@@ -388,6 +397,25 @@ function CaseDetail() {
       if (stops.length === 0) stops = seedStopsForDropType(dropType);
     }
 
+    // The CritiLog tracking fields are their own free-editable log (an ops
+    // team may retype values differently from the quote), but they should
+    // still start out matching what's already on record for the case
+    // instead of loading blank — only fall back to the case's own data when
+    // the field hasn't been filled in on the log itself yet.
+    const parsedCritiLog = parseCritiLog(payload.critilog);
+    const critiLogBlNumber = toText(payload.blNumber);
+    const critiLogRoute = [caseRow.origin_port, caseRow.dest_port].filter(Boolean).join("-");
+    const critiLogType = caseRow.shipment_kind ? SHIP_KIND_LABEL_HE[caseRow.shipment_kind] ?? caseRow.shipment_kind : "";
+    const critilog: CritiLogForm = {
+      ...parsedCritiLog,
+      serviceRep: parsedCritiLog.serviceRep || (assignedRep?.name ?? ""),
+      blNumber: parsedCritiLog.blNumber || critiLogBlNumber,
+      customer: parsedCritiLog.customer || (caseRow.customer_name ?? ""),
+      ref: parsedCritiLog.ref || (caseRow.customer_ref ?? ""),
+      route: parsedCritiLog.route || critiLogRoute,
+      type: parsedCritiLog.type || critiLogType,
+    };
+
     setOriginalPayload(payload);
     setForm({
       customerName: caseRow.customer_name ?? "",
@@ -423,7 +451,7 @@ function CaseDetail() {
       logisticsNotes: toText(payload.logisticsNotes),
       specialReq: toText(payload.specialReq),
       extraNotes: toText(payload.extraNotes),
-      critilog: parseCritiLog(payload.critilog),
+      critilog,
     });
   }, [caseRow]);
 
