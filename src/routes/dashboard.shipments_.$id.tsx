@@ -63,7 +63,7 @@ import { REVIEW_STATUS_OPTIONS, getReviewStatusStyle } from "@/lib/review-status
 import { PackagingChecklistLauncher } from "@/components/packaging-checklist-dialog";
 import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checklist";
 import { CourierTaskReportLauncher } from "@/components/courier-task-report-dialog";
-import type { CourierTaskReportData } from "@/lib/courier-task-report";
+import type { CourierTaskReportData, CourierTaskReportPoint } from "@/lib/courier-task-report";
 
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
@@ -728,6 +728,42 @@ function CaseDetail() {
         const l = TEMP_LOGGERS.find((tl) => tl.id === sel.loggerId);
         return l ? `${l.company} ${l.model}` : sel.loggerId!;
       });
+
+    // Multi-stop drop shipments (Multi Pickup / Multi Drop / Milk Run etc.)
+    // carry several pickup/delivery points, each with its own address and
+    // contact, on form.stops — use those when present instead of the single
+    // pickup/delivery address+contacts fields.
+    const hasStops = form.dropType != null && form.stops.length > 0;
+    function stopToPoint(s: Stop, label?: string): CourierTaskReportPoint {
+      const contactName = s.contact?.trim() || s.company?.trim() || "";
+      return {
+        label,
+        address: [s.company, s.address].filter(Boolean).join(" — ") || s.address || "",
+        contacts: contactName || s.phone ? [{ name: contactName, phone: s.phone ?? "" }] : [],
+        plannedTime: s.plannedTime,
+        notes: s.notes,
+      };
+    }
+    const pickupPoints: CourierTaskReportPoint[] = hasStops
+      ? form.stops.filter((s) => s.kind === "Pickup").map((s, i, arr) => stopToPoint(s, arr.length > 1 ? `נקודת איסוף ${i + 1}` : undefined))
+      : [
+          {
+            address: form.pickupAddress,
+            contacts: form.pickupContacts.filter((c) => c.name.trim() || c.phone.trim()),
+          },
+        ];
+    const deliveryPoints: CourierTaskReportPoint[] = hasStops
+      ? form.stops.filter((s) => s.kind === "Drop").map((s, i, arr) => stopToPoint(s, arr.length > 1 ? `נקודת מסירה ${i + 1}` : undefined))
+      : [
+          {
+            address: form.deliveryAddress,
+            contacts: form.deliveryContacts.filter((c) => c.name.trim() || c.phone.trim()),
+          },
+        ];
+    const hubPoints: CourierTaskReportPoint[] = hasStops
+      ? form.stops.filter((s) => s.kind === "Hub").map((s, i, arr) => stopToPoint(s, arr.length > 1 ? `תחנת מעבר ${i + 1}` : undefined))
+      : [];
+
     return {
       caseCode: form.unifreightNumber.trim() || caseRow.case_code,
       customerName: form.customerName,
@@ -736,10 +772,9 @@ function CaseDetail() {
       courierName: form.critilog.courier,
       pickupDate: form.critilog.pickupIsrael || form.departDate,
       deliveryDate: form.arriveDate,
-      pickupAddress: form.pickupAddress,
-      pickupContacts: form.pickupContacts.filter((c) => c.name.trim() || c.phone.trim()),
-      deliveryAddress: form.deliveryAddress,
-      deliveryContacts: form.deliveryContacts.filter((c) => c.name.trim() || c.phone.trim()),
+      pickupPoints,
+      deliveryPoints,
+      hubPoints,
       packagingLines: checklistBoxes.map((b) => b.label),
       grossWeight: packageTotals.grossWeight > 0 ? `${packageTotals.grossWeight.toFixed(1)} ק״ג` : "—",
       volumetricWeight: packageTotals.volumetricWeight > 0 ? `${packageTotals.volumetricWeight.toFixed(1)} ק״ג` : "—",

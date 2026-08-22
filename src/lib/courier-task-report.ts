@@ -6,6 +6,18 @@
 
 export type CourierTaskReportContact = { name: string; phone: string };
 
+// One physical pickup or delivery point. Most shipments have exactly one of
+// each, but drop-shipments (Multi Pickup / Multi Drop / Milk Run etc.) can
+// have several — each with its own address and contact — so the report
+// always works off a list rather than a single address+contact pair.
+export type CourierTaskReportPoint = {
+  label?: string;
+  address: string;
+  contacts: CourierTaskReportContact[];
+  plannedTime?: string;
+  notes?: string;
+};
+
 export type CourierTaskReportData = {
   caseCode: string;
   customerName: string;
@@ -14,10 +26,9 @@ export type CourierTaskReportData = {
   courierName: string;
   pickupDate: string;
   deliveryDate: string;
-  pickupAddress: string;
-  pickupContacts: CourierTaskReportContact[];
-  deliveryAddress: string;
-  deliveryContacts: CourierTaskReportContact[];
+  pickupPoints: CourierTaskReportPoint[];
+  deliveryPoints: CourierTaskReportPoint[];
+  hubPoints: CourierTaskReportPoint[];
   packagingLines: string[];
   grossWeight: string;
   volumetricWeight: string;
@@ -46,6 +57,34 @@ function listOrDash(items: string[]): string {
   return items.length ? items.map((i) => `<div>${esc(i)}</div>`).join("") : "—";
 }
 
+// Renders one column of stacked point-boxes (all pickups, or all deliveries).
+// When there's more than one point, each box is numbered so the courier can
+// tell them apart at a glance.
+function pointColumn(title: string, points: CourierTaskReportPoint[]): string {
+  if (points.length === 0) {
+    return `<div class="point-col">
+      <div class="box-title">${esc(title)}</div>
+      <div class="point-box"><div class="address">—</div><div class="muted">— אין פרטי כתובת —</div></div>
+    </div>`;
+  }
+  const boxes = points
+    .map((p, i) => {
+      const numberLabel = points.length > 1 ? ` ${i + 1}` : "";
+      return `<div class="point-box">
+        ${points.length > 1 || p.label ? `<div class="point-label">${esc(p.label || `נקודה${numberLabel}`)}</div>` : ""}
+        <div class="address">${esc(p.address) || "—"}</div>
+        ${contactLines(p.contacts)}
+        ${p.plannedTime ? `<div class="contact-line muted">חלון זמן: ${esc(p.plannedTime)}</div>` : ""}
+        ${p.notes ? `<div class="contact-line muted">${esc(p.notes)}</div>` : ""}
+      </div>`;
+    })
+    .join("");
+  return `<div class="point-col">
+    <div class="box-title">${esc(title)}${points.length > 1 ? ` (${points.length})` : ""}</div>
+    ${boxes}
+  </div>`;
+}
+
 export function buildCourierTaskReportHtml(data: CourierTaskReportData): string {
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -67,10 +106,13 @@ export function buildCourierTaskReportHtml(data: CourierTaskReportData): string 
   .meta-bar .label { font-size: 10px; color: #666; }
   .meta-bar .value { font-size: 13px; font-weight: 700; margin-top: 2px; }
   .boxes { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #999; }
-  .box { padding: 12px 16px; border-left: 1px solid #ccc; }
-  .box:last-child { border-left: none; }
-  .box .box-title { font-size: 12px; font-weight: 700; color: #0f2d52; margin-bottom: 6px; text-transform: uppercase; }
-  .box .address { font-size: 13px; margin-bottom: 8px; min-height: 18px; }
+  .point-col { padding: 12px 16px; border-left: 1px solid #ccc; }
+  .point-col:last-child { border-left: none; }
+  .box-title { font-size: 12px; font-weight: 700; color: #0f2d52; margin-bottom: 6px; text-transform: uppercase; }
+  .point-box { margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #ddd; }
+  .point-box:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .point-label { font-size: 11px; font-weight: 700; color: #555; margin-bottom: 2px; }
+  .address { font-size: 13px; margin-bottom: 4px; min-height: 18px; }
   .contact-line { font-size: 12px; margin-top: 2px; }
   .muted { font-size: 12px; color: #888; }
   .section { padding: 12px 16px; border-bottom: 1px solid #999; }
@@ -116,17 +158,17 @@ export function buildCourierTaskReportHtml(data: CourierTaskReportData): string 
     </div>
 
     <div class="boxes">
-      <div class="box">
-        <div class="box-title">איסוף מ־</div>
-        <div class="address">${esc(data.pickupAddress) || "—"}</div>
-        ${contactLines(data.pickupContacts)}
-      </div>
-      <div class="box">
-        <div class="box-title">מסירה ל־</div>
-        <div class="address">${esc(data.deliveryAddress) || "—"}</div>
-        ${contactLines(data.deliveryContacts)}
-      </div>
+      ${pointColumn("איסוף מ־", data.pickupPoints)}
+      ${pointColumn("מסירה ל־", data.deliveryPoints)}
     </div>
+
+    ${
+      data.hubPoints.length > 0
+        ? `<div class="boxes" style="grid-template-columns: 1fr;">
+      ${pointColumn("תחנת מעבר", data.hubPoints)}
+    </div>`
+        : ""
+    }
 
     <div class="section">
       <div class="section-title">פרטי מטען</div>
