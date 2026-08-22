@@ -3258,6 +3258,21 @@ function Step5Pricing(p: Step5Props) {
               <Button type="button" size="sm" variant="ghost" className="gap-1">
                 <RefreshCw className="h-4 w-4" /> רענן תעריפים
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={p.items.length === 0}
+                className="gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => {
+                  if (p.items.length === 0) return;
+                  if (!window.confirm("למחוק את כל שורות העלויות מהטבלה? לא ניתן לשחזר לאחר השמירה.")) return;
+                  p.setItems([]);
+                  toast.success("טבלת העלויות נוקתה");
+                }}
+              >
+                <Trash2 className="h-4 w-4" /> מחק עלויות
+              </Button>
             </div>
           </Section>
         </div>
