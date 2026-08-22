@@ -695,24 +695,26 @@ function EditQuote() {
             </div>
           </div>
 
-          <Section title="מסלול ותאריכים">
-            <Field label="נמל מוצא"><AirportCombobox value={form.originPort} onChange={(v) => upd("originPort", v)} /></Field>
-            <Field label="נמל יעד"><AirportCombobox value={form.destPort} onChange={(v) => upd("destPort", v)} /></Field>
-            <Field label="תאריך יציאה"><Input type="date" value={form.departDate} onChange={(e) => upd("departDate", e.target.value)} /></Field>
-            <Field label="תאריך הגעה"><Input type="date" value={form.arriveDate} onChange={(e) => upd("arriveDate", e.target.value)} /></Field>
-            <Field label="סוכן">
-              <Lookup type="agents" matchBy="code" value={form.agent || null}
-                onChange={(item) => upd("agent", item?.code ?? "")} placeholder="בחר סוכן..." />
-            </Field>
-            <Field label="חברת תעופה">
-              {/* Free text, not a Lookup: the wizard only lets the rep pick an
-                  airline via lookup code for import shipments — everywhere else
-                  it stores whatever string was in the field (e.g. the default
-                  "Lufthansa Cargo"), which isn't a lookup code and would never
-                  match here, always rendering as an empty placeholder. */}
-              <Input value={form.airline} onChange={(e) => upd("airline", e.target.value)} placeholder="שם חברת התעופה" />
-            </Field>
-          </Section>
+          {form.shipmentKind !== "domestic" && (
+            <Section title="מסלול ותאריכים">
+              <Field label="נמל מוצא"><AirportCombobox value={form.originPort} onChange={(v) => upd("originPort", v)} /></Field>
+              <Field label="נמל יעד"><AirportCombobox value={form.destPort} onChange={(v) => upd("destPort", v)} /></Field>
+              <Field label="תאריך יציאה"><Input type="date" value={form.departDate} onChange={(e) => upd("departDate", e.target.value)} /></Field>
+              <Field label="תאריך הגעה"><Input type="date" value={form.arriveDate} onChange={(e) => upd("arriveDate", e.target.value)} /></Field>
+              <Field label="סוכן">
+                <Lookup type="agents" matchBy="code" value={form.agent || null}
+                  onChange={(item) => upd("agent", item?.code ?? "")} placeholder="בחר סוכן..." />
+              </Field>
+              <Field label="חברת תעופה">
+                {/* Free text, not a Lookup: the wizard only lets the rep pick an
+                    airline via lookup code for import shipments — everywhere else
+                    it stores whatever string was in the field (e.g. the default
+                    "Lufthansa Cargo"), which isn't a lookup code and would never
+                    match here, always rendering as an empty placeholder. */}
+                <Input value={form.airline} onChange={(e) => upd("airline", e.target.value)} placeholder="שם חברת התעופה" />
+              </Field>
+            </Section>
+          )}
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
