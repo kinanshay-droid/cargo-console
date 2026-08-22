@@ -366,7 +366,6 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
   const modelCalcs = v.packageIds ? modelCalcsAll.filter((c) => v.packageIds!.includes(c.sel.key)) : modelCalcsAll;
 
   const attrs = isRecord(payload.attrs) ? payload.attrs : {};
-  const services = isRecord(payload.services) ? payload.services : {};
   const cargoType = str(payload.cargoType);
 
   const pricingItemsAll = parsePricingItems(payload.pricingItems, currency);
@@ -545,11 +544,6 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
             ) : (
               <div className="text-sm text-muted-foreground">אין שורות תמחור להצעה זו.</div>
             )}
-            <div className="mt-3 space-y-1 text-xs text-muted-foreground">
-              <div className="flex justify-between"><span>ביטוח</span><span>{bool(services.insurance) ? "כלול" : "לא כלול"}</span></div>
-              <div className="flex justify-between"><span>עמילות מכס ביעד</span><span>{bool(services.clearance) ? "כלול" : "לא כלול"}</span></div>
-              <div className="flex justify-between"><span>אחסון ודמי המתנה ביעד</span><span>לא כלול</span></div>
-            </div>
           </div>
           )}
 
