@@ -505,6 +505,13 @@ export function NewQuoteDialog({
   // actually be enforced before letting the user continue.
   const [pickupDateEst, setPickupDateEst] = useState("");
   const [deliveryDateEst, setDeliveryDateEst] = useState("");
+  // Same field names/labels as "מסמכי משלוח" on the case detail page
+  // (dashboard.shipments_.$id.tsx) — blNumber ("מספר שטר מטען", MAWB/MBL)
+  // and houseBlNumber ("מספר שטר מטען פנימי", HAWB/HBL). Capturing them
+  // here means they ride along in payload and are already filled in once
+  // a quote is transferred into a case, instead of the rep re-typing them.
+  const [blNumber, setBlNumber] = useState("");
+  const [houseBlNumber, setHouseBlNumber] = useState("");
   const [pickupAddress, setPickupAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [pickupContacts, setPickupContacts] = useState<ContactRow[]>([makeContactRow()]);
@@ -851,6 +858,8 @@ export function NewQuoteDialog({
     if (kind === "distribution" && dropType) lines.push({ label: "סוג הפצה", value: dropType });
     if (pickupDateEst) lines.push({ label: "איסוף משוער", value: pickupDateEst });
     if (deliveryDateEst) lines.push({ label: "הגעה משוערת", value: deliveryDateEst });
+    if (blNumber.trim()) lines.push({ label: "מספר שטר מטען", value: blNumber.trim() });
+    if (houseBlNumber.trim()) lines.push({ label: "מספר שטר מטען פנימי", value: houseBlNumber.trim() });
     if (kind === "import") {
       const journeyBits = [
         journeyOriginPort && journeyDestPort ? `${journeyOriginPort} → ${journeyDestPort}` : journeyOriginPort || journeyDestPort,
@@ -875,6 +884,8 @@ export function NewQuoteDialog({
     dropType,
     pickupDateEst,
     deliveryDateEst,
+    blNumber,
+    houseBlNumber,
     journeyOriginPort,
     journeyDestPort,
     airline,
@@ -913,6 +924,8 @@ export function NewQuoteDialog({
     setNotes("");
     setPickupDateEst("");
     setDeliveryDateEst("");
+    setBlNumber("");
+    setHouseBlNumber("");
     setPickupAddress("");
     setDeliveryAddress("");
     setPickupContacts([makeContactRow()]);
@@ -965,6 +978,8 @@ export function NewQuoteDialog({
               : null,
             pickupDateEst: pickupDateEst || null,
             deliveryDateEst: deliveryDateEst || null,
+            blNumber: blNumber.trim() || null,
+            houseBlNumber: houseBlNumber.trim() || null,
             pickupAddress: pickupAddress.trim() || null,
             deliveryAddress: deliveryAddress.trim() || null,
             pickupContacts: pickupContacts.filter((c) => c.name || c.phone || c.email),
@@ -1382,6 +1397,13 @@ export function NewQuoteDialog({
                     </div>
                   </div>
                 </div>
+
+                {kind !== "domestic" && (
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <Field label="מספר שטר מטען" value={blNumber} onChange={(e) => setBlNumber(e.target.value)} placeholder="MAWB / MBL..." />
+                    <Field label="מספר שטר מטען פנימי" value={houseBlNumber} onChange={(e) => setHouseBlNumber(e.target.value)} placeholder="HAWB / HBL..." />
+                  </div>
+                )}
               </Section>
 
               {/* ה. פרטי מסע — ייבוא בלבד, תמיד אווירי */}
