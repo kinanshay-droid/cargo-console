@@ -317,29 +317,31 @@ function QuoteDetail() {
           <div className="space-y-6 min-w-0">
             <QuoteDocument quote={quote} />
 
-            <div className="rounded-2xl border bg-card p-5 shadow-sm print:hidden">
-              <div className="mb-4 text-sm font-semibold">מסלול ותאריכים (פנימי)</div>
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                <Field label="נמל מוצא" value={quote.origin_port} />
-                <Field label="נמל יעד" value={quote.dest_port} />
-                <Field
-                  label="נמלי מעבר"
-                  value={
-                    Array.isArray(quote.transit_ports) && quote.transit_ports.length > 0
-                      ? quote.transit_ports.join(", ")
-                      : "—"
-                  }
-                />
-                <Field label="סוכן" value={quote.agent} />
-                <Field label="חברת תעופה" value={quote.airline} />
-                <Field label="תאריך יציאה" value={quote.depart_date} />
-                <Field label="תאריך הגעה" value={quote.arrive_date} />
+            {quote.shipment_kind !== "domestic" && (
+              <div className="rounded-2xl border bg-card p-5 shadow-sm print:hidden">
+                <div className="mb-4 text-sm font-semibold">מסלול ותאריכים (פנימי)</div>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <Field label="נמל מוצא" value={quote.origin_port} />
+                  <Field label="נמל יעד" value={quote.dest_port} />
+                  <Field
+                    label="נמלי מעבר"
+                    value={
+                      Array.isArray(quote.transit_ports) && quote.transit_ports.length > 0
+                        ? quote.transit_ports.join(", ")
+                        : "—"
+                    }
+                  />
+                  <Field label="סוכן" value={quote.agent} />
+                  <Field label="חברת תעופה" value={quote.airline} />
+                  <Field label="תאריך יציאה" value={quote.depart_date} />
+                  <Field label="תאריך הגעה" value={quote.arrive_date} />
+                </div>
               </div>
-            </div>
+            )}
 
             {quote.payload && Object.keys(quote.payload as object).length > 0 && (
               <div className="print:hidden">
-                <PayloadSections payload={quote.payload as Record<string, unknown>} />
+                <PayloadSections payload={quote.payload as Record<string, unknown>} kind={quote.shipment_kind} />
               </div>
             )}
           </div>
@@ -513,7 +515,7 @@ function firstValue(...values: unknown[]): unknown {
   return null;
 }
 
-function PayloadSections({ payload }: { payload: Record<string, unknown> }) {
+function PayloadSections({ payload, kind }: { payload: Record<string, unknown>; kind?: string | null }) {
   const {
     cargoType,
     attrs,
@@ -541,8 +543,11 @@ function PayloadSections({ payload }: { payload: Record<string, unknown> }) {
     ? (stops as Array<Record<string, unknown>>).filter((s) => s && typeof s === "object")
     : [];
 
+  const isDomestic = kind === "domestic";
+
   return (
     <div className="space-y-6">
+      {!isDomestic && (
       <PayloadCard title="אופי מטען">
         <KVGrid
           items={[
@@ -561,7 +566,9 @@ function PayloadSections({ payload }: { payload: Record<string, unknown> }) {
           {renderAttrs(attrs)}
         </div>
       </PayloadCard>
+      )}
 
+      {!isDomestic && (
       <PayloadCard title="לוגיסטיקה">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="space-y-1 md:col-span-2">
@@ -605,6 +612,7 @@ function PayloadSections({ payload }: { payload: Record<string, unknown> }) {
           </div>
         )}
       </PayloadCard>
+      )}
 
       {dropTypeId && (
         <PayloadCard title={`משלוחי דרופ · ${dropTypeId}`}>
