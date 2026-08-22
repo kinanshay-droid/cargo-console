@@ -145,9 +145,13 @@ const INCOTERMS = [
 type CargoRow = { id: string; sku: string; description: string; packaging: string; weight: string; notes: string };
 type ContainerRow = { id: string; type: string; sku: string; destination: string; weight: string };
 type GoodsRow = { id: string; item: string; sku: string; origin: string; weight: string; dims: string; qty: number };
-type ContactRow = { id: string; name: string; phone: string; email: string };
+// customerId is optional and only used by delivery contacts on import
+// shipments — one registered customer sometimes orders on behalf of a
+// different one (the actual consignee), so the delivery contact needs to be
+// linkable to that other customer record, not just a free-text name.
+type ContactRow = { id: string; name: string; phone: string; email: string; customerId?: string | null };
 function makeContactRow(): ContactRow {
-  return { id: uid(), name: "", phone: "", email: "" };
+  return { id: uid(), name: "", phone: "", email: "", customerId: null };
 }
 
 // -------- Step 3: אופי המשלוח --------
@@ -1479,6 +1483,32 @@ export function NewQuoteDialog({
                             >
                               <Trash2 className="h-3.5 w-3.5" /> הסר
                             </button>
+                          </div>
+                        )}
+                        {kind === "import" && (
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">
+                              לקוח רשום (כאשר המזמין שולח עבור לקוח אחר)
+                            </Label>
+                            <select
+                              value={c.customerId ?? ""}
+                              onChange={(e) => {
+                                const custId = e.target.value || null;
+                                const cust = customersList.find((cu) => cu.id === custId);
+                                updateDeliveryContact(c.id, {
+                                  customerId: custId,
+                                  name: cust ? cust.company_name : c.name,
+                                });
+                              }}
+                              className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                            >
+                              <option value="">— הזנה ידנית —</option>
+                              {customersList.map((cu) => (
+                                <option key={cu.id} value={cu.id}>
+                                  {cu.company_name} · {cu.customer_code}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         )}
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
