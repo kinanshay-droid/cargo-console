@@ -547,7 +547,7 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
           </div>
           )}
 
-          {(v.otherServices || v.attrs) && (
+          {!isDomestic && (v.otherServices || v.attrs) && (
           <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
             <div className="mb-3 text-sm font-semibold">מאפייני משלוח</div>
             {v.otherServices && (
