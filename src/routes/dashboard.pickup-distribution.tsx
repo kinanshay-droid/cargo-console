@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck, CalendarRange, ListChecks } from "lucide-react";
+import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck, CalendarRange, ListChecks, ArrowUp, ArrowDown } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -160,6 +160,9 @@ function PickupDistributionPage() {
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  // Sort direction for the "מועד לביצוע" column — shared across all four
+  // kind-grouped tables. "asc" = closest due date first, "desc" = furthest first.
+  const [dueDateSortDir, setDueDateSortDir] = useState<"asc" | "desc">("asc");
 
   const dateRange = useMemo(
     () => resolveDateRange(dateFilter, customFrom, customTo),
@@ -184,9 +187,9 @@ function PickupDistributionPage() {
     for (const c of dateFilteredCases) {
       if (isShipKind(c.shipment_kind)) groups[c.shipment_kind].push(c);
     }
-    // Sort each kind's rows by "מועד לביצוע" (the CritiLog pickup date),
-    // soonest first — rows with no due date set yet sink to the bottom
-    // rather than being sorted arbitrarily.
+    // Sort each kind's rows by "מועד לביצוע" (the CritiLog pickup date) —
+    // direction toggled via the column header icon. Rows with no due date
+    // set yet always sink to the bottom regardless of direction.
     for (const k of SHIP_KIND_ORDER) {
       groups[k].sort((a, b) => {
         const da = getPickupIsraelDate(a.payload);
@@ -194,11 +197,13 @@ function PickupDistributionPage() {
         if (!da && !db) return 0;
         if (!da) return 1;
         if (!db) return -1;
-        return new Date(da).getTime() - new Date(db).getTime();
+        const ta = new Date(da).getTime();
+        const tb = new Date(db).getTime();
+        return dueDateSortDir === "asc" ? ta - tb : tb - ta;
       });
     }
     return groups;
-  }, [dateFilteredCases]);
+  }, [dateFilteredCases, dueDateSortDir]);
 
   return (
     <div dir="rtl" className="space-y-6">
@@ -294,7 +299,17 @@ function PickupDistributionPage() {
                       <TableHead className="text-right">נציג מטפל</TableHead>
                       <TableHead className="text-right">מס' שטר מטען</TableHead>
                       <TableHead className="text-right">סטטוס</TableHead>
-                      <TableHead className="text-right">מועד לביצוע</TableHead>
+                      <TableHead className="text-right">
+                        <button
+                          type="button"
+                          onClick={() => setDueDateSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                          title={dueDateSortDir === "asc" ? "ממוין: קרוב ← רחוק" : "ממוין: רחוק ← קרוב"}
+                        >
+                          מועד לביצוע
+                          {dueDateSortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                        </button>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
