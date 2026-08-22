@@ -41,6 +41,15 @@ const MODE_BADGE: Record<string, string> = {
   transship: TONE_BADGE.success,
 };
 
+// Same four shipment-kind categories used across the New Quote wizard,
+// Operations dashboard and Pickup/Distribution page.
+const SHIP_KIND_LABEL: Record<string, string> = {
+  import: "ייבוא",
+  export: "ייצוא",
+  distribution: "דרופ",
+  domestic: "פנים ארצי",
+};
+
 export const Route = createFileRoute("/dashboard/quotes/")({
   head: () => ({
     meta: [
@@ -81,7 +90,7 @@ function QuotesManagement() {
   });
 
   const [search, setSearch] = useState("");
-  const [mode, setMode] = useState<string>("all");
+  const [kind, setKind] = useState<string>("all");
   const [incoterm, setIncoterm] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("activity");
 
@@ -93,27 +102,28 @@ function QuotesManagement() {
 
   const resetFilters = () => {
     setSearch("");
-    setMode("all");
+    setKind("all");
     setIncoterm("all");
     setSort("activity");
   };
 
   const activeFilterCount =
-    (search ? 1 : 0) + (mode !== "all" ? 1 : 0) + (incoterm !== "all" ? 1 : 0);
+    (search ? 1 : 0) + (kind !== "all" ? 1 : 0) + (incoterm !== "all" ? 1 : 0);
 
   const filteredQuotes = useMemo(() => {
     const q = search.trim().toLowerCase();
     return quotes.filter((row) => {
-      if (mode !== "all" && row.shipment_mode !== mode) return false;
+      if (kind !== "all" && row.shipment_kind !== kind) return false;
       if (incoterm !== "all" && row.incoterm !== incoterm) return false;
       if (!q) return true;
       const name = (row.customer_name ?? "").toLowerCase();
       const code = (row.quote_code ?? "").toLowerCase();
       const route = `${row.origin_port ?? ""} ${row.dest_port ?? ""}`.toLowerCase();
       const modeLbl = (SHIPMENT_MODE_LABEL[row.shipment_mode] ?? row.shipment_mode ?? "").toLowerCase();
-      return name.includes(q) || code.includes(q) || route.includes(q) || modeLbl.includes(q);
+      const kindLbl = (row.shipment_kind ? SHIP_KIND_LABEL[row.shipment_kind] ?? row.shipment_kind : "").toLowerCase();
+      return name.includes(q) || code.includes(q) || route.includes(q) || modeLbl.includes(q) || kindLbl.includes(q);
     });
-  }, [quotes, search, mode, incoterm]);
+  }, [quotes, search, kind, incoterm]);
 
   const groups = useMemo(() => {
     const map = new Map<string, { name: string; items: QuoteRow[]; total: number; currency: string | null }>();
@@ -150,7 +160,7 @@ function QuotesManagement() {
   }, [filteredQuotes, sort]);
 
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const isSearching = search.trim().length > 0 || mode !== "all" || incoterm !== "all";
+  const isSearching = search.trim().length > 0 || kind !== "all" || incoterm !== "all";
   const effectiveOpen = isSearching ? "__all__" : (openKey ?? groups[0]?.name ?? null);
 
   const fmt = (n: number, cur?: string | null) =>
@@ -202,52 +212,52 @@ function QuotesManagement() {
                 {activeFilterCount > 0 ? ` · ${activeFilterCount} פילטרים פעילים` : ""}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative w-full md:w-80">
-                <Search className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="חיפוש לפי לקוח, מס' הצעה, מסלול..."
-                  className="w-full rounded-2xl border-none bg-muted py-2.5 pr-10 pl-9 text-sm text-primary placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/20"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted"
-                    aria-label="נקה חיפוש"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-              {activeFilterCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={resetFilters}
-                  className="gap-1.5 rounded-xl text-muted-foreground hover:text-primary"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" /> נקה
-                </Button>
-              )}
-            </div>
+            {activeFilterCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={resetFilters}
+                className="gap-1.5 self-start rounded-xl text-muted-foreground hover:text-primary md:self-auto"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> נקה
+              </Button>
+            )}
+          </div>
+
+          <div className="relative mx-auto w-full max-w-xl">
+            <Search className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="חיפוש לפי לקוח, מס' הצעה, מסלול..."
+              className="w-full rounded-2xl border-none bg-muted py-2.5 pr-10 pl-9 text-sm text-primary placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary/20"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute left-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted"
+                aria-label="נקה חיפוש"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
             <div className="col-span-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground md:col-span-1">
               <Filter className="h-3.5 w-3.5" /> סינון ומיון
             </div>
-            <Select value={mode} onValueChange={setMode}>
+            <Select value={kind} onValueChange={setKind}>
               <SelectTrigger className="h-9 rounded-xl border-border bg-card text-xs">
-                <SelectValue placeholder="אופי משלוח" />
+                <SelectValue placeholder="סוג משלוח" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">כל אופי המשלוח</SelectItem>
-                <SelectItem value="direct">משלוח ישיר</SelectItem>
-                <SelectItem value="console">משלוח קונסול</SelectItem>
-                <SelectItem value="transship">שטעון</SelectItem>
+                <SelectItem value="all">כל סוגי המשלוח</SelectItem>
+                <SelectItem value="import">ייבוא</SelectItem>
+                <SelectItem value="export">ייצוא</SelectItem>
+                <SelectItem value="distribution">דרופ</SelectItem>
+                <SelectItem value="domestic">פנים ארצי</SelectItem>
               </SelectContent>
             </Select>
             <Select value={incoterm} onValueChange={setIncoterm}>
