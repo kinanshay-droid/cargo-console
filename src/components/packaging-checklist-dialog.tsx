@@ -44,6 +44,7 @@ type FormDialogProps = {
   existing: unknown;
   defaults: { shipmentNumber?: string; customer?: string; destination?: string };
   caseSnapshot?: ChecklistCaseSnapshot;
+  lockDestination?: boolean;
 };
 
 // Controlled fillable checklist for a single box — used directly when the
@@ -58,6 +59,7 @@ function PackagingChecklistFormDialog({
   existing,
   defaults,
   caseSnapshot,
+  lockDestination,
 }: FormDialogProps) {
   const [data, setData] = useState<ChecklistData>(emptyChecklistData);
   const queryClient = useQueryClient();
@@ -70,12 +72,12 @@ function PackagingChecklistFormDialog({
     const hasContent = parsed.savedAt != null;
     setData(
       hasContent
-        ? parsed
+        ? { ...parsed, destination: lockDestination ? "ישראל" : parsed.destination }
         : {
             ...parsed,
             shipmentNumber: defaults.shipmentNumber ?? "",
             customer: defaults.customer ?? "",
-            destination: defaults.destination ?? "",
+            destination: lockDestination ? "ישראל" : defaults.destination ?? "",
             date: todayISO(),
           },
     );
@@ -141,7 +143,11 @@ function PackagingChecklistFormDialog({
           )}
           <div className="space-y-1.5">
             <Label className="text-xs">יעד</Label>
-            <Input value={data.destination} onChange={(e) => setData((d) => ({ ...d, destination: e.target.value }))} />
+            {lockDestination ? (
+              <Input value="ישראל" disabled className="bg-muted/50 font-medium text-foreground disabled:opacity-100" />
+            ) : (
+              <Input value={data.destination} onChange={(e) => setData((d) => ({ ...d, destination: e.target.value }))} />
+            )}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">תאריך</Label>
@@ -242,13 +248,14 @@ type LauncherProps = {
   existingChecklists: Record<string, unknown>;
   baseSnapshot: ChecklistCaseSnapshot;
   defaults: { shipmentNumber?: string; customer?: string; destination?: string };
+  lockDestination?: boolean;
 };
 
 // Decides how the checklist button behaves: a case usually ships in one box,
 // so clicking it opens the checklist directly. If more than one box/model
 // was selected on the case, it opens a small picker first so each box gets
 // its own independently-saved checklist instead of one shared form.
-export function PackagingChecklistLauncher({ caseId, boxes, existingChecklists, baseSnapshot, defaults }: LauncherProps) {
+export function PackagingChecklistLauncher({ caseId, boxes, existingChecklists, baseSnapshot, defaults, lockDestination }: LauncherProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [activeBoxId, setActiveBoxId] = useState<string | null>(null);
 
@@ -318,6 +325,7 @@ export function PackagingChecklistLauncher({ caseId, boxes, existingChecklists, 
           existing={existingChecklists[activeBox.id]}
           defaults={defaults}
           caseSnapshot={activeSnapshot}
+          lockDestination={lockDestination}
         />
       )}
     </>

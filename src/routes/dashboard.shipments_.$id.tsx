@@ -658,7 +658,7 @@ function CaseDetail() {
     return {
       shipmentNumber: form.unifreightNumber.trim() || caseRow?.case_code,
       tempRange,
-      destination: form.destPort || undefined,
+      destination: form.shipmentKind === "domestic" ? "ישראל" : form.destPort || undefined,
       transitTime,
       productType,
       specialInstructions,
@@ -857,8 +857,9 @@ function CaseDetail() {
                 defaults={{
                   shipmentNumber: form.unifreightNumber.trim() || caseRow.case_code,
                   customer: form.customerName,
-                  destination: form.destPort,
+                  destination: form.shipmentKind === "domestic" ? "ישראל" : form.destPort,
                 }}
+                lockDestination={form.shipmentKind === "domestic"}
               />
             )}
             <ActionButtonGroup onSave={handleSave} saving={saving} />
