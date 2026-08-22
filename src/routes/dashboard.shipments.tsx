@@ -150,6 +150,20 @@ function ShipmentsDashboard() {
     [visibleCases, kindFilter],
   );
 
+  // Completed shipments sink to the bottom of the table — they're done, so
+  // they shouldn't push active/newer cases further down the list. Array.sort
+  // is stable, so within each group (completed / not) the existing order is
+  // preserved.
+  const sortedCases = useMemo(
+    () =>
+      [...filteredCases].sort((a, b) => {
+        const aDone = a.status === "completed" ? 1 : 0;
+        const bDone = b.status === "completed" ? 1 : 0;
+        return aDone - bDone;
+      }),
+    [filteredCases],
+  );
+
   const counts: Record<CaseStatus, number> = { new: 0, in_progress: 0, completed: 0, cancelled: 0 };
   for (const c of filteredCases) counts[c.status]++;
 
@@ -246,7 +260,7 @@ function ShipmentsDashboard() {
                   טוען...
                 </TableCell>
               </TableRow>
-            ) : filteredCases.length === 0 ? (
+            ) : sortedCases.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="py-12 text-center">
                   <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
@@ -257,7 +271,7 @@ function ShipmentsDashboard() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredCases.map((c) => {
+              sortedCases.map((c) => {
                 const meta = CASE_STATUS_META[c.status];
                 const pipelineMeta = CASE_PIPELINE_STATUS_META[getPipelineStatus(c.payload)];
                 const isHighlighted = c.id === highlightId;
