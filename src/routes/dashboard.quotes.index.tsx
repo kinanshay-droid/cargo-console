@@ -91,30 +91,30 @@ function QuotesManagement() {
 
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<string>("all");
-  const [incoterm, setIncoterm] = useState<string>("all");
+  const [dest, setDest] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("activity");
 
   const uniq = (vals: (string | null | undefined)[]) =>
     Array.from(new Set(vals.filter((v): v is string => !!v && v.trim().length > 0))).sort((a, b) =>
       a.localeCompare(b, "he"),
     );
-  const incotermOptions = useMemo(() => uniq(quotes.map((q) => q.incoterm)), [quotes]);
+  const destOptions = useMemo(() => uniq(quotes.map((q) => q.dest_port)), [quotes]);
 
   const resetFilters = () => {
     setSearch("");
     setKind("all");
-    setIncoterm("all");
+    setDest("all");
     setSort("activity");
   };
 
   const activeFilterCount =
-    (search ? 1 : 0) + (kind !== "all" ? 1 : 0) + (incoterm !== "all" ? 1 : 0);
+    (search ? 1 : 0) + (kind !== "all" ? 1 : 0) + (dest !== "all" ? 1 : 0);
 
   const filteredQuotes = useMemo(() => {
     const q = search.trim().toLowerCase();
     return quotes.filter((row) => {
       if (kind !== "all" && row.shipment_kind !== kind) return false;
-      if (incoterm !== "all" && row.incoterm !== incoterm) return false;
+      if (dest !== "all" && row.dest_port !== dest) return false;
       if (!q) return true;
       const name = (row.customer_name ?? "").toLowerCase();
       const code = (row.quote_code ?? "").toLowerCase();
@@ -123,7 +123,7 @@ function QuotesManagement() {
       const kindLbl = (row.shipment_kind ? SHIP_KIND_LABEL[row.shipment_kind] ?? row.shipment_kind : "").toLowerCase();
       return name.includes(q) || code.includes(q) || route.includes(q) || modeLbl.includes(q) || kindLbl.includes(q);
     });
-  }, [quotes, search, kind, incoterm]);
+  }, [quotes, search, kind, dest]);
 
   const groups = useMemo(() => {
     const map = new Map<string, { name: string; items: QuoteRow[]; total: number; currency: string | null }>();
@@ -160,7 +160,7 @@ function QuotesManagement() {
   }, [filteredQuotes, sort]);
 
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const isSearching = search.trim().length > 0 || kind !== "all" || incoterm !== "all";
+  const isSearching = search.trim().length > 0 || kind !== "all" || dest !== "all";
   const effectiveOpen = isSearching ? "__all__" : (openKey ?? groups[0]?.name ?? null);
 
   const fmt = (n: number, cur?: string | null) =>
@@ -244,12 +244,12 @@ function QuotesManagement() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-            <div className="col-span-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground md:col-span-1">
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
               <Filter className="h-3.5 w-3.5" /> סינון ומיון
             </div>
             <Select value={kind} onValueChange={setKind}>
-              <SelectTrigger className="h-9 rounded-xl border-border bg-card text-xs">
+              <SelectTrigger className="h-9 w-full rounded-xl border-border bg-card text-xs sm:w-44">
                 <SelectValue placeholder="סוג משלוח" />
               </SelectTrigger>
               <SelectContent>
@@ -260,13 +260,13 @@ function QuotesManagement() {
                 <SelectItem value="domestic">פנים ארצי</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={incoterm} onValueChange={setIncoterm}>
-              <SelectTrigger className="h-9 rounded-xl border-border bg-card text-xs">
-                <SelectValue placeholder="Incoterm" />
+            <Select value={dest} onValueChange={setDest}>
+              <SelectTrigger className="h-9 w-full rounded-xl border-border bg-card text-xs sm:w-44">
+                <SelectValue placeholder="יעד" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">כל ה-Incoterms</SelectItem>
-                {incotermOptions.map((c) => (
+                <SelectItem value="all">כל היעדים</SelectItem>
+                {destOptions.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>
@@ -274,7 +274,7 @@ function QuotesManagement() {
               </SelectContent>
             </Select>
             <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-              <SelectTrigger className="h-9 rounded-xl border-border bg-card text-xs">
+              <SelectTrigger className="h-9 w-full rounded-xl border-border bg-card text-xs sm:w-44">
                 <SelectValue placeholder="מיון" />
               </SelectTrigger>
               <SelectContent>
