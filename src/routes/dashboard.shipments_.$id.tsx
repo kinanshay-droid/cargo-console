@@ -492,7 +492,10 @@ function CaseDetail() {
       tempSeriesNone: payload.tempSeriesNone === true,
       packages: parsePackages(payload.packages),
       packSelections: parsePackSelections(payload.packSelections),
-      services: parseServices(payload.services),
+      services:
+        caseRow.shipment_kind === "domestic"
+          ? { ...parseServices(payload.services), pickup: true, land: true, delivery: true, insurance: false }
+          : parseServices(payload.services),
       routeApproved: payload.routeApproved === true,
       logisticsNotes: toText(payload.logisticsNotes),
       specialReq: toText(payload.specialReq),
@@ -741,7 +744,10 @@ function CaseDetail() {
               tempSeriesList: form.tempSeriesList,
               tempSeriesNone: form.tempSeriesNone,
               packSelections: form.packSelections,
-              services: form.services,
+              services:
+                form.shipmentKind === "domestic"
+                  ? { ...form.services, pickup: true, land: true, delivery: true, insurance: false }
+                  : form.services,
               routeApproved: form.routeApproved,
               logisticsNotes: form.logisticsNotes.trim() || null,
               specialReq: form.specialReq.trim() || null,
@@ -1375,14 +1381,17 @@ function CaseDetail() {
                   !["air", "exportCustoms", "importCustoms", "clearance"].includes(s.id),
                 ).map((s) => {
                   const on = !!form.services[s.id];
+                  const locked = form.shipmentKind === "domestic";
                   return (
                     <button
                       key={s.id}
                       type="button"
+                      disabled={locked}
                       onClick={() => toggleService(s.id)}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border px-3 py-2 text-right text-xs transition",
                         on ? "border-primary bg-primary/5" : "text-muted-foreground hover:bg-muted/30",
+                        locked && "cursor-default opacity-90 hover:bg-transparent",
                       )}
                     >
                       <div className={cn("flex h-4 w-4 items-center justify-center rounded border", on ? "border-primary bg-primary" : "border-muted-foreground/30")}>
