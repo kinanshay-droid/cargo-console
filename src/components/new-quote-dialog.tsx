@@ -3262,12 +3262,18 @@ function Step5Pricing(p: Step5Props) {
                 type="button"
                 size="sm"
                 variant="ghost"
-                disabled={p.items.length === 0}
+                disabled={p.items.every((r) => r.group === "אריזה חיוונית" || r.group === "רשם טמפרטורה")}
                 className="gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => {
-                  if (p.items.length === 0) return;
-                  if (!window.confirm("למחוק את כל שורות העלויות מהטבלה? לא ניתן לשחזר לאחר השמירה.")) return;
-                  p.setItems([]);
+                  // "אריזה חיוונית" / "רשם טמפרטורה" rows are kept — they're
+                  // driven by real packaging/logger selections made back in
+                  // step 3, not manually added cost items, so wiping them
+                  // here would just make the sync effect's job disappear
+                  // until something in step 3 changes again to bring it back.
+                  const clearable = p.items.filter((r) => r.group !== "אריזה חיוונית" && r.group !== "רשם טמפרטורה");
+                  if (clearable.length === 0) return;
+                  if (!window.confirm("למחוק את שורות העלויות מהטבלה (מלבד אריזה ורשם שנבחרו בשלב 3)? לא ניתן לשחזר לאחר השמירה.")) return;
+                  p.setItems((rows) => rows.filter((r) => r.group === "אריזה חיוונית" || r.group === "רשם טמפרטורה"));
                   toast.success("טבלת העלויות נוקתה");
                 }}
               >
