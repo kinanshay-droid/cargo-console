@@ -940,6 +940,8 @@ function CaseDetail() {
         </div>
         {form && caseRow ? (
           <div className="flex flex-wrap items-center gap-2">
+            <ActionButtonGroup onSave={handleSave} saving={saving} />
+            {courierReportData && <CourierTaskReportLauncher data={courierReportData} />}
             {form.critilog.pickupIsrael && (
               <PackagingChecklistLauncher
                 caseId={id}
@@ -954,8 +956,11 @@ function CaseDetail() {
                 lockDestination={form.shipmentKind === "domestic"}
               />
             )}
-            {courierReportData && <CourierTaskReportLauncher data={courierReportData} />}
-            <ActionButtonGroup onSave={handleSave} saving={saving} />
+            <Button asChild variant="ghost" className="gap-2 text-muted-foreground">
+              <Link to="/dashboard/shipments">
+                <ArrowRight className="h-4 w-4" /> חזרה למשלוחים
+              </Link>
+            </Button>
           </div>
         ) : (
           <Button asChild variant="outline" className="gap-2">
@@ -1570,6 +1575,11 @@ function CaseDetail() {
 // Shared button group so the same actions (primary save first, then cancel,
 // then a plain back-to-list link) appear identically at both the top and
 // bottom of the page.
+// שמור שינויים is the primary action for this page, so it always renders
+// first (rightmost in RTL) with solid styling; ביטול sits right beside it as
+// its natural pair. Secondary/utility actions (documents, back navigation)
+// render after this group and recede visually (outline/ghost), so the save
+// action isn't crowded out of the most prominent spot in the row.
 function ActionButtonGroup({ onSave, saving }: { onSave: () => void; saving: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -1579,11 +1589,6 @@ function ActionButtonGroup({ onSave, saving }: { onSave: () => void; saving: boo
       </Button>
       <Button asChild variant="outline">
         <Link to="/dashboard/shipments">ביטול</Link>
-      </Button>
-      <Button asChild variant="outline" className="gap-2">
-        <Link to="/dashboard/shipments">
-          <ArrowRight className="h-4 w-4" /> חזרה למשלוחים
-        </Link>
       </Button>
     </div>
   );
