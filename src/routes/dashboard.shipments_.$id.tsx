@@ -64,8 +64,6 @@ import { PackagingChecklistLauncher } from "@/components/packaging-checklist-dia
 import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checklist";
 import { CourierTaskReportLauncher } from "@/components/courier-task-report-dialog";
 import type { CourierTaskReportData, CourierTaskReportPoint } from "@/lib/courier-task-report";
-import { AwbDocumentLauncher } from "@/components/awb-document-dialog";
-import type { AwbFillData } from "@/lib/awb-fill";
 
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
@@ -144,18 +142,6 @@ type CritiLogForm = {
 
 // Same four shipment-kind categories used across the wizard/Operations/
 // Pickup-Distribution — used below to default the CritiLog "סוג" field.
-// Short (AWB-column-width) English commodity labels — the full CARGO_TYPES
-// English labels (e.g. "Temperature Controlled") are too wide for the AWB's
-// narrow "Rate Class / Commodity Item No." column.
-const AWB_COMMODITY_LABEL: Record<string, string> = {
-  general: "General",
-  temperature: "Temp Ctrl",
-  nfo: "NFO",
-  live: "Live Animals",
-  dangerous: "Dangerous",
-  other: "Other",
-};
-
 const SHIP_KIND_LABEL_HE: Record<string, string> = {
   import: "ייבוא",
   export: "ייצוא",
@@ -803,44 +789,6 @@ function CaseDetail() {
     };
   }, [form, caseRow, checklistBoxes, packageTotals]);
 
-  // Best-effort AWB (Air Waybill) autofill for export/distribution cases —
-  // only maps fields we can confidently source from the case; anything with
-  // no reliable source (declared value, charges, IATA agent codes, etc.) is
-  // left blank on the template for manual completion.
-  const awbData: AwbFillData | null = useMemo(() => {
-    if (!form) return null;
-    const pickupContact = form.pickupContacts.find((c) => c.name.trim() || c.phone.trim());
-    const deliveryContact = form.deliveryContacts.find((c) => c.name.trim() || c.phone.trim());
-    const goodsLines = checklistBoxes.map((b) => {
-      const dims = b.boxSize ? ` (${b.boxSize.replace(/\s*ס״מ\s*$/, "")})` : "";
-      return `${b.label}${dims}`;
-    });
-    const totalPieces = form.packSelections.some((s) => s.qty > 0)
-      ? form.packSelections.reduce((sum, s) => sum + (s.qty > 0 ? s.qty : 0), 0)
-      : form.packages.reduce((sum, p) => sum + (p.pallet && Number(p.unitQty) > 0 ? Number(p.unitQty) : 0), 0);
-    return {
-      shipperName: form.customerName,
-      shipperAddress: form.pickupAddress,
-      shipperContactLine: pickupContact ? [pickupContact.name, pickupContact.phone].filter(Boolean).join(" · ") : "",
-      consigneeName: deliveryContact?.name || form.customerName,
-      consigneeAddress: form.deliveryAddress,
-      consigneeContactLine: deliveryContact ? [deliveryContact.name, deliveryContact.phone].filter(Boolean).join(" · ") : "",
-      issuedBy: form.airline || "AFIK Logistics Ltd.",
-      originPort: form.originPort,
-      destPort: form.destPort,
-      referenceNumber: form.customerRef,
-      flightAndDate: [form.airline, form.departDate].filter(Boolean).join(" / "),
-      handlingInfo: form.specialReq.trim(),
-      pieces: totalPieces > 0 ? String(totalPieces) : "",
-      grossWeight: packageTotals.grossWeight > 0 ? packageTotals.grossWeight.toFixed(1) : "",
-      commodityLabel: form.cargoType ? AWB_COMMODITY_LABEL[form.cargoType] ?? "" : "",
-      chargeableWeight: packageTotals.chargeableWeight > 0 ? packageTotals.chargeableWeight.toFixed(1) : "",
-      goodsLines,
-      executedDate: new Date().toISOString().slice(0, 10),
-      executedPlace: "Tel Aviv, Israel",
-    };
-  }, [form, checklistBoxes, packageTotals]);
-
   async function handleSave() {
     if (!form) return;
     setSaving(true);
@@ -1007,9 +955,6 @@ function CaseDetail() {
               />
             )}
             {courierReportData && <CourierTaskReportLauncher data={courierReportData} />}
-            {awbData && (form.shipmentKind === "export" || form.shipmentKind === "distribution") && (
-              <AwbDocumentLauncher data={awbData} />
-            )}
             <ActionButtonGroup onSave={handleSave} saving={saving} />
           </div>
         ) : (
