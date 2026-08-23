@@ -290,19 +290,6 @@ function RouteStop({
   );
 }
 
-function YesNoBadge({ on }: { on: boolean }) {
-  return (
-    <span
-      className={
-        "rounded-full border px-2 py-0.5 text-[11px] font-semibold " +
-        (on ? TONE_BADGE.success : "border-muted-foreground/20 text-muted-foreground")
-      }
-    >
-      {on ? "כן" : "לא"}
-    </span>
-  );
-}
-
 // Controls what a given render of the document shows. `null` for an
 // item-id list means "show all of them"; omitting `visibility` entirely
 // (the internal/admin usage) is equivalent to every section being on and
@@ -409,17 +396,6 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
 
   const accountManager = isRecord(payload.accountManager) ? payload.accountManager : null;
 
-  const otherServices: { label: string; on: boolean }[] = [
-    { label: "מטען מסוכן", on: bool(attrs.dangerous) },
-    { label: "מטוס מטען ייעודי (Freighter)", on: bool(attrs.charter) },
-    { label: "בקרת טמפרטורה", on: cargoType === "temperature" },
-    { label: "משלוח דחוף (Express)", on: bool(attrs.nfo) || bool(attrs.timeCritical) },
-    { label: "ניתן לערימה (Stackable)", on: !bool(attrs.noStack) },
-  ];
-
-  const checkedAttrsAll = ATTR_OPTIONS.filter((a) => bool(attrs[a.id]));
-  const checkedAttrs = v.attrIds ? checkedAttrsAll.filter((a) => v.attrIds!.includes(a.id)) : checkedAttrsAll;
-
   const originIcon = <Truck className="h-3 w-3" />;
   const gatewayIcon = <Plane className="h-3 w-3" />;
 
@@ -506,9 +482,9 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
           </div>
         )}
 
-        {/* Costs + other services */}
-        {(v.costs || v.otherServices || v.attrs) && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]">
+        {/* Costs */}
+        {v.costs && (
+        <div className="grid grid-cols-1 gap-4">
           {v.costs && (
           <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
             <div className="mb-3 text-sm font-semibold">עלות שירותים</div>
@@ -547,33 +523,6 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
           </div>
           )}
 
-          {!isDomestic && (v.otherServices || v.attrs) && (
-          <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
-            <div className="mb-3 text-sm font-semibold">מאפייני משלוח</div>
-            {v.otherServices && (
-            <div className="space-y-2">
-              {otherServices.map((s) => (
-                <div key={s.label} className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{s.label}</span>
-                  <YesNoBadge on={s.on} />
-                </div>
-              ))}
-            </div>
-            )}
-            {v.attrs && checkedAttrs.length > 0 && (
-              <div className="mt-3 border-t pt-3">
-                <div className="mb-1.5 text-xs text-muted-foreground">מאפיינים נוספים</div>
-                <div className="flex flex-wrap gap-1">
-                  {checkedAttrs.map((a) => (
-                    <span key={a.id} className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                      {a.label}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          )}
         </div>
         )}
 

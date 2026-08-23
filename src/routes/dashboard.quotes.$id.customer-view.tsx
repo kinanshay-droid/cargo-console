@@ -159,23 +159,6 @@ function CustomerQuoteView() {
                   )}
                 </div>
 
-                <SectionToggle
-                  label="מאפייני משלוח (מסוכן/קירור/עמיד לערימה)"
-                  checked={visibility.otherServices}
-                  onChange={(v) => toggleSection("otherServices", v)}
-                />
-
-                <div>
-                  <SectionToggle label="מאפיינים נוספים" checked={visibility.attrs} onChange={(v) => toggleSection("attrs", v)} />
-                  {visibility.attrs && (
-                    <ItemChecklist
-                      items={checkedAttrsAll.map((a) => ({ id: a.id, label: a.label }))}
-                      selected={visibility.attrIds ?? []}
-                      onChange={(ids) => toggleSection("attrIds", ids)}
-                    />
-                  )}
-                </div>
-
                 <div>
                   <SectionToggle label="פרטי אריזה" checked={visibility.packaging} onChange={(v) => toggleSection("packaging", v)} />
                   {visibility.packaging && (
