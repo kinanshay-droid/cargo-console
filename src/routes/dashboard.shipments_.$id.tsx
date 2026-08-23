@@ -811,7 +811,10 @@ function CaseDetail() {
     if (!form) return null;
     const pickupContact = form.pickupContacts.find((c) => c.name.trim() || c.phone.trim());
     const deliveryContact = form.deliveryContacts.find((c) => c.name.trim() || c.phone.trim());
-    const goodsLines = checklistBoxes.flatMap((b) => [b.label, b.boxSize ? `(${b.boxSize})` : ""]).filter(Boolean);
+    const goodsLines = checklistBoxes.map((b) => {
+      const dims = b.boxSize ? ` (${b.boxSize.replace(/\s*ס״מ\s*$/, "")})` : "";
+      return `${b.label}${dims}`;
+    });
     const totalPieces = form.packSelections.some((s) => s.qty > 0)
       ? form.packSelections.reduce((sum, s) => sum + (s.qty > 0 ? s.qty : 0), 0)
       : form.packages.reduce((sum, p) => sum + (p.pallet && Number(p.unitQty) > 0 ? Number(p.unitQty) : 0), 0);

@@ -42,11 +42,23 @@ function textEl({ x, y, text, size = 3 }: TextSpec): string {
   return `<text x="${x}" y="${y}" style="font-family:Arial;font-size:${size}px;fill:#c0392b;">${esc(text)}</text>`;
 }
 
-function multiLine(x: number, startY: number, lines: string[], lineHeight = 4): string {
+function multiLine(x: number, startY: number, lines: string[], lineHeight = 4, size = 3): string {
   return lines
     .filter(Boolean)
-    .map((t, i) => textEl({ x, y: startY + i * lineHeight, text: t }))
+    .map((t, i) => textEl({ x, y: startY + i * lineHeight, text: t, size }))
     .join("\n");
+}
+
+// The "Nature and Quantity of Goods" cell has a fixed height (~40mm) before
+// running into the charges table below it — pack as many packaging lines as
+// will fit at a slightly smaller size, and collapse anything beyond that
+// into a "+N more" summary line instead of letting it spill past the cell.
+const GOODS_MAX_LINES = 10;
+function goodsColumn(x: number, startY: number, lines: string[]): string {
+  const shown = lines.length > GOODS_MAX_LINES ? lines.slice(0, GOODS_MAX_LINES - 1) : lines;
+  const remainder = lines.length > GOODS_MAX_LINES ? lines.length - shown.length : 0;
+  const finalLines = remainder > 0 ? [...shown, `+${remainder} נוספים`] : shown;
+  return multiLine(x, startY, finalLines, 3.3, 2.3);
 }
 
 export function buildAwbOverlaySvg(templateSvg: string, data: AwbFillData): string {
@@ -75,7 +87,7 @@ export function buildAwbOverlaySvg(templateSvg: string, data: AwbFillData): stri
     textEl({ x: 33, y: 165, text: data.grossWeight }),
     textEl({ x: 49, y: 165, text: data.commodityLabel }),
     textEl({ x: 68, y: 165, text: data.chargeableWeight }),
-    multiLine(145, 165, data.goodsLines),
+    goodsColumn(145, 165, data.goodsLines),
     // Executed on (date) / at (place) — bottom signature block
     textEl({ x: 96, y: 270.5, text: data.executedDate }),
     textEl({ x: 130, y: 270.5, text: data.executedPlace }),
