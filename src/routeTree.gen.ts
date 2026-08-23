@@ -25,10 +25,12 @@ import { Route as DashboardCustomersRouteImport } from './routes/dashboard.custo
 import { Route as DashboardOperationsRouteImport } from './routes/dashboard.operations'
 import { Route as DashboardOrganizationRouteImport } from './routes/dashboard.organization'
 import { Route as DashboardOverviewRouteImport } from './routes/dashboard.overview'
+import { Route as DashboardPickupDistributionRouteImport } from './routes/dashboard.pickup-distribution'
 import { Route as DashboardPricelistsRouteImport } from './routes/dashboard.pricelists'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardShipmentsRouteImport } from './routes/dashboard.shipments'
 import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
+import { Route as DashboardPickupDistributionTodayRouteImport } from './routes/dashboard.pickup-distribution_.today'
 import { Route as DashboardCustomersIndexRouteImport } from './routes/dashboard.customers.index'
 import { Route as DashboardCustomersIdRouteImport } from './routes/dashboard.customers.$id'
 import { Route as DashboardLeadsIndexRouteImport } from './routes/dashboard.leads.index'
@@ -82,7 +84,7 @@ const PortalRoute = PortalRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortalDashboardRoute = PortalDashboardRouteImport.update({
-  id: '/portal_/dashboard',
+  id: '/portal/dashboard',
   path: '/portal/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
@@ -121,6 +123,12 @@ const DashboardOverviewRoute = DashboardOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPickupDistributionRoute =
+  DashboardPickupDistributionRouteImport.update({
+    id: '/pickup-distribution',
+    path: '/pickup-distribution',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardPricelistsRoute = DashboardPricelistsRouteImport.update({
   id: '/pricelists',
   path: '/pricelists',
@@ -181,6 +189,12 @@ const DashboardShipmentsIdRoute = DashboardShipmentsIdRouteImport.update({
   path: '/shipments/$id',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardPickupDistributionTodayRoute =
+  DashboardPickupDistributionTodayRouteImport.update({
+    id: '/pickup-distribution/today',
+    path: '/pickup-distribution/today',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardQuotesIdIndexRoute = DashboardQuotesIdIndexRouteImport.update({
   id: '/quotes/$id/',
   path: '/quotes/$id/',
@@ -215,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
+  '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
   '/dashboard/roles': typeof DashboardRolesRouteWithChildren
   '/dashboard/shipments': typeof DashboardShipmentsRoute
@@ -224,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
   '/dashboard/shipments/$id': typeof DashboardShipmentsIdRoute
+  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/customers/': typeof DashboardCustomersIndexRoute
   '/dashboard/leads/': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
@@ -247,6 +263,7 @@ export interface FileRoutesByTo {
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
+  '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
   '/dashboard/roles': typeof DashboardRolesRouteWithChildren
   '/dashboard/shipments': typeof DashboardShipmentsRoute
@@ -256,6 +273,7 @@ export interface FileRoutesByTo {
   '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
   '/dashboard/shipments/$id': typeof DashboardShipmentsIdRoute
+  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/customers': typeof DashboardCustomersIndexRoute
   '/dashboard/leads': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes': typeof DashboardQuotesIndexRoute
@@ -273,7 +291,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/presentation': typeof PresentationRoute
   '/portal': typeof PortalRoute
-  '/portal_/dashboard': typeof PortalDashboardRoute
+  '/portal/dashboard': typeof PortalDashboardRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -281,6 +299,7 @@ export interface FileRoutesById {
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
+  '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
   '/dashboard/roles': typeof DashboardRolesRouteWithChildren
   '/dashboard/shipments': typeof DashboardShipmentsRoute
@@ -290,6 +309,7 @@ export interface FileRoutesById {
   '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
   '/dashboard/shipments_/$id': typeof DashboardShipmentsIdRoute
+  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/customers/': typeof DashboardCustomersIndexRoute
   '/dashboard/leads/': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
@@ -316,6 +336,7 @@ export interface FileRouteTypes {
     | '/dashboard/operations'
     | '/dashboard/organization'
     | '/dashboard/overview'
+    | '/dashboard/pickup-distribution'
     | '/dashboard/pricelists'
     | '/dashboard/roles'
     | '/dashboard/shipments'
@@ -325,6 +346,7 @@ export interface FileRouteTypes {
     | '/dashboard/operations/$id'
     | '/dashboard/roles/$id'
     | '/dashboard/shipments/$id'
+    | '/dashboard/pickup-distribution/today'
     | '/dashboard/customers/'
     | '/dashboard/leads/'
     | '/dashboard/quotes/'
@@ -348,6 +370,7 @@ export interface FileRouteTypes {
     | '/dashboard/operations'
     | '/dashboard/organization'
     | '/dashboard/overview'
+    | '/dashboard/pickup-distribution'
     | '/dashboard/pricelists'
     | '/dashboard/roles'
     | '/dashboard/shipments'
@@ -357,6 +380,7 @@ export interface FileRouteTypes {
     | '/dashboard/operations/$id'
     | '/dashboard/roles/$id'
     | '/dashboard/shipments/$id'
+    | '/dashboard/pickup-distribution/today'
     | '/dashboard/customers'
     | '/dashboard/leads'
     | '/dashboard/quotes'
@@ -373,7 +397,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/presentation'
     | '/portal'
-    | '/portal_/dashboard'
+    | '/portal/dashboard'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -381,6 +405,7 @@ export interface FileRouteTypes {
     | '/dashboard/operations'
     | '/dashboard/organization'
     | '/dashboard/overview'
+    | '/dashboard/pickup-distribution'
     | '/dashboard/pricelists'
     | '/dashboard/roles'
     | '/dashboard/shipments'
@@ -390,6 +415,7 @@ export interface FileRouteTypes {
     | '/dashboard/operations/$id'
     | '/dashboard/roles/$id'
     | '/dashboard/shipments_/$id'
+    | '/dashboard/pickup-distribution/today'
     | '/dashboard/customers/'
     | '/dashboard/leads/'
     | '/dashboard/quotes/'
@@ -468,8 +494,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portal_/dashboard': {
-      id: '/portal_/dashboard'
+    '/portal/dashboard': {
+      id: '/portal/dashboard'
       path: '/portal/dashboard'
       fullPath: '/portal/dashboard'
       preLoaderRoute: typeof PortalDashboardRouteImport
@@ -522,6 +548,13 @@ declare module '@tanstack/react-router' {
       path: '/overview'
       fullPath: '/dashboard/overview'
       preLoaderRoute: typeof DashboardOverviewRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/pickup-distribution': {
+      id: '/dashboard/pickup-distribution'
+      path: '/pickup-distribution'
+      fullPath: '/dashboard/pickup-distribution'
+      preLoaderRoute: typeof DashboardPickupDistributionRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/pricelists': {
@@ -608,6 +641,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardShipmentsIdRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/pickup-distribution/today': {
+      id: '/dashboard/pickup-distribution/today'
+      path: '/pickup-distribution/today'
+      fullPath: '/dashboard/pickup-distribution/today'
+      preLoaderRoute: typeof DashboardPickupDistributionTodayRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/quotes/$id/': {
       id: '/dashboard/quotes/$id/'
       path: '/quotes/$id'
@@ -676,12 +716,14 @@ interface DashboardRouteChildren {
   DashboardOperationsRoute: typeof DashboardOperationsRouteWithChildren
   DashboardOrganizationRoute: typeof DashboardOrganizationRoute
   DashboardOverviewRoute: typeof DashboardOverviewRoute
+  DashboardPickupDistributionRoute: typeof DashboardPickupDistributionRoute
   DashboardPricelistsRoute: typeof DashboardPricelistsRoute
   DashboardRolesRoute: typeof DashboardRolesRouteWithChildren
   DashboardShipmentsRoute: typeof DashboardShipmentsRoute
   DashboardUsersRoute: typeof DashboardUsersRoute
   DashboardLeadsNewRoute: typeof DashboardLeadsNewRoute
   DashboardShipmentsIdRoute: typeof DashboardShipmentsIdRoute
+  DashboardPickupDistributionTodayRoute: typeof DashboardPickupDistributionTodayRoute
   DashboardLeadsIndexRoute: typeof DashboardLeadsIndexRoute
   DashboardQuotesIndexRoute: typeof DashboardQuotesIndexRoute
   DashboardQuotesIdCustomerViewRoute: typeof DashboardQuotesIdCustomerViewRoute
@@ -697,12 +739,14 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardOperationsRoute: DashboardOperationsRouteWithChildren,
   DashboardOrganizationRoute: DashboardOrganizationRoute,
   DashboardOverviewRoute: DashboardOverviewRoute,
+  DashboardPickupDistributionRoute: DashboardPickupDistributionRoute,
   DashboardPricelistsRoute: DashboardPricelistsRoute,
   DashboardRolesRoute: DashboardRolesRouteWithChildren,
   DashboardShipmentsRoute: DashboardShipmentsRoute,
   DashboardUsersRoute: DashboardUsersRoute,
   DashboardLeadsNewRoute: DashboardLeadsNewRoute,
   DashboardShipmentsIdRoute: DashboardShipmentsIdRoute,
+  DashboardPickupDistributionTodayRoute: DashboardPickupDistributionTodayRoute,
   DashboardLeadsIndexRoute: DashboardLeadsIndexRoute,
   DashboardQuotesIndexRoute: DashboardQuotesIndexRoute,
   DashboardQuotesIdCustomerViewRoute: DashboardQuotesIdCustomerViewRoute,
