@@ -345,7 +345,14 @@ export type PackSelection = {
 // deepFrozen always maps to the BioTherm catalog, every other series to
 // CoolGuard — both catalogs share the same outer/tare shape, so one
 // calculation covers them both.
-export function getPackModelCalc(sel: PackSelection) {
+//
+// isImportShipment: for import shipments the "productWeight" field is
+// actually labeled "משקל משלוח" (shipment weight) and already represents the
+// full weight of the shipment including its packaging — it is NOT the bare
+// goods weight like it is for export/domestic/distribution. So for imports
+// the box's own tare must not be added on top of it (that would double-count
+// the packaging weight); for every other kind, tare is added as before.
+export function getPackModelCalc(sel: PackSelection, isImportShipment = false) {
   const modelName = sel.key.slice(sel.key.indexOf(":") + 1);
   const isBio = sel.key.startsWith("deepFrozen:");
   const catalog = isBio ? BIOTHERM_MODELS : COOLGUARD_MODELS;
@@ -356,7 +363,7 @@ export function getPackModelCalc(sel: PackSelection) {
   // recorded for reference.
   const dryIceQty = sel.dryIceQty ?? 0;
   if (!m) return { label: modelName, qty: sel.qty, grossWeight: sel.qty * (productWeight + dryIceQty), volumetricWeight: 0, dims: null as { length: number; width: number; height: number } | null };
-  const tare = parseFloat(m.tare) || 0;
+  const tare = isImportShipment ? 0 : parseFloat(m.tare) || 0;
   const [outerL, outerW, outerH] = m.outer.split("×").map((v) => parseFloat(v) || 0);
   const hasDims = !!(outerL && outerW && outerH);
   const volumetricWeight = hasDims ? (sel.qty * outerL * outerW * outerH) / 6_000_000 : 0;
@@ -679,7 +686,10 @@ export function NewQuoteDialog({
   const getPackDryIceQty = (key: string) => packSelections.find((s) => s.key === key)?.dryIceQty ?? "";
   const setPackDryIceQty = (key: string, dryIceQty: number) =>
     setPackSelections((arr) => arr.map((s) => (s.key === key ? { ...s, dryIceQty } : s)));
-  const packModelCalcs = useMemo(() => packSelections.map((sel) => getPackModelCalc(sel)), [packSelections]);
+  const packModelCalcs = useMemo(
+    () => packSelections.map((sel) => getPackModelCalc(sel, kind === "import")),
+    [packSelections, kind],
+  );
   const [packages, setPackages] = useState<PackageRow[]>([makePackageRow()]);
   const updatePackage = (id: string, patch: Partial<PackageRow>) =>
     setPackages((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
@@ -1769,7 +1779,7 @@ export function NewQuoteDialog({
                                     const qty = getPackQty(key);
                                     const productWeight = getPackProductWeight(key);
                                     const dryIceQty = getPackDryIceQty(key);
-                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0, dryIceQty: Number(dryIceQty) || 0 }) : null;
+                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0, dryIceQty: Number(dryIceQty) || 0 }, kind === "import") : null;
                                     return (
                                       <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
                                         <td className="px-2 py-2">
@@ -1832,7 +1842,7 @@ export function NewQuoteDialog({
                                     const key = `${series}:${m.model}`;
                                     const qty = getPackQty(key);
                                     const productWeight = getPackProductWeight(key);
-                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0 }) : null;
+                                    const calc = qty > 0 ? getPackModelCalc({ key, qty, productWeight: Number(productWeight) || 0 }, kind === "import") : null;
                                     return (
                                       <tr key={m.model} className={cn("border-t transition", qty > 0 && "bg-primary/5")}>
                                         <td className="px-2 py-2">

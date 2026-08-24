@@ -659,8 +659,8 @@ function CaseDetail() {
 
   const packageCalcs = useMemo(() => (form ? form.packages.map((pkg) => getPackageCalc(pkg)) : []), [form?.packages]);
   const packModelCalcs = useMemo(
-    () => (form ? form.packSelections.map((sel) => getPackModelCalc(sel)) : []),
-    [form?.packSelections],
+    () => (form ? form.packSelections.map((sel) => getPackModelCalc(sel, form.shipmentKind === "import")) : []),
+    [form?.packSelections, form?.shipmentKind],
   );
   const packageTotals = useMemo(() => {
     const grossWeight =

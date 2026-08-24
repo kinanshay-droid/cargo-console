@@ -338,7 +338,11 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
   const packages = parsePackages(payload.packages);
   const packSelections = parsePackSelections(payload.packSelections);
   const packageCalcsAll = packages.map((pkg) => ({ pkg, calc: getPackageCalc(pkg), cbm: packageVolumeCbm(pkg) }));
-  const modelCalcsAll = packSelections.map((sel) => ({ sel, calc: getPackModelCalc(sel), cbm: selectionVolumeCbm(sel) }));
+  const modelCalcsAll = packSelections.map((sel) => ({
+    sel,
+    calc: getPackModelCalc(sel, str(q.shipment_kind) === "import"),
+    cbm: selectionVolumeCbm(sel),
+  }));
 
   const totalQty = packageCalcsAll.reduce((s, c) => s + c.calc.qty, 0) + modelCalcsAll.reduce((s, c) => s + c.sel.qty, 0);
   const grossWeight = packageCalcsAll.reduce((s, c) => s + c.calc.grossWeight, 0) + modelCalcsAll.reduce((s, c) => s + c.calc.grossWeight, 0);
