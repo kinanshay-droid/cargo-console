@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck, CalendarRange, ListChecks, ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowLeftRight, Plane, Ship, PackageOpen, Truck, CalendarRange, CalendarCheck2, ListChecks, ArrowUp, ArrowDown } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -105,6 +105,12 @@ const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
   { value: "custom", label: "טווח מותאם אישית" },
 ];
 
+function isToday(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
 function startOfDay(d: Date): Date {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
@@ -205,6 +211,34 @@ function PickupDistributionPage() {
     return groups;
   }, [dateFilteredCases, dueDateSortDir]);
 
+  // Cases whose "מועד לביצוע" (CritiLog pickup/delivery date) falls on
+  // today — shown as a focused strip above the full kind-by-kind
+  // breakdown, independent of the date-filter selector above, so a rep
+  // can see just what's due today at a glance. Grouped by shipment kind
+  // (export first, per SHIP_KIND_ORDER), then by due time within each kind.
+  const todayCases = useMemo(
+    () =>
+      pickupCases
+        .filter((c) => {
+          const due = getPickupIsraelDate(c.payload);
+          return !!due && isToday(due);
+        })
+        .sort((a, b) => {
+          const ai = isShipKind(a.shipment_kind) ? SHIP_KIND_ORDER.indexOf(a.shipment_kind) : SHIP_KIND_ORDER.length;
+          const bi = isShipKind(b.shipment_kind) ? SHIP_KIND_ORDER.indexOf(b.shipment_kind) : SHIP_KIND_ORDER.length;
+          if (ai !== bi) return ai - bi;
+          const ta = new Date(getPickupIsraelDate(a.payload)!).getTime();
+          const tb = new Date(getPickupIsraelDate(b.payload)!).getTime();
+          return ta - tb;
+        }),
+    [pickupCases],
+  );
+
+  const todayLabel = useMemo(
+    () => new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+    [],
+  );
+
   return (
     <div dir="rtl" className="space-y-6">
       <PageHeader
@@ -275,7 +309,85 @@ function PickupDistributionPage() {
       {isLoading ? (
         <div className="rounded-2xl border bg-card py-10 text-center text-muted-foreground">טוען...</div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <>
+          {/* Today's cases — kind-agnostic focused view, placed above the
+              full kind-by-kind breakdown so a rep can see only what's due
+              for pickup/delivery today at a glance. */}
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <div className={cn("flex items-center gap-3 bg-gradient-to-br p-4 text-white", TONE_GRADIENT.accent)}>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
+                <CalendarCheck2 className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="text-sm/6 opacity-90">תיקים של היום · {todayLabel}</div>
+                <div className="text-2xl font-bold">{todayCases.length}</div>
+              </div>
+            </div>
+            {todayCases.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">אין תיקים עם מועד לביצוע להיום</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">סוג</TableHead>
+                    <TableHead className="text-right">לקוח</TableHead>
+                    <TableHead className="text-right">מס' תיק</TableHead>
+                    <TableHead className="text-right">נציג מטפל</TableHead>
+                    <TableHead className="text-right">מס' שטר מטען</TableHead>
+                    <TableHead className="text-right">סטטוס</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todayCases.map((c) => {
+                    const rep = getAssignedRep(c.payload);
+                    const blNumber = getBlNumber(c.payload);
+                    const conf = isShipKind(c.shipment_kind) ? SHIP_KIND_CONFIG[c.shipment_kind] : null;
+                    const KindIcon = conf?.icon;
+                    return (
+                      <TableRow
+                        key={c.id}
+                        onClick={() => navigate({ to: "/dashboard/shipments/$id", params: { id: c.id } })}
+                        className="cursor-pointer hover:bg-muted/40"
+                      >
+                        <TableCell>
+                          {conf && KindIcon ? (
+                            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium", conf.badgeClass)}>
+                              <KindIcon className="h-3 w-3" /> {conf.label}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <div className="font-medium">{c.customer_name ?? "—"}</div>
+                          {c.customer_ref ? (
+                            <div className="text-[11px] text-muted-foreground">{c.customer_ref}</div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          <Link
+                            to="/dashboard/shipments/$id"
+                            params={{ id: c.id }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-primary hover:underline"
+                          >
+                            {getCaseDisplayCode(c.payload, c.case_code)}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-accent/15 text-accent">{CASE_PIPELINE_STATUS_META[getPipelineStatus(c.payload)].label}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {SHIP_KIND_ORDER.map((kind) => {
             const kindCases = pickupCasesByKind[kind];
             const conf = SHIP_KIND_CONFIG[kind];
@@ -368,7 +480,8 @@ function PickupDistributionPage() {
               </div>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );
