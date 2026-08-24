@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -151,6 +151,7 @@ function initials(name: string | null): string {
 }
 
 function OperationsDashboard() {
+  const navigate = useNavigate();
   const listCasesFn = useServerFn(listCases);
   const listMyQuotesFn = useServerFn(listMyQuotes);
 
@@ -397,7 +398,11 @@ function OperationsDashboard() {
                     const conf = isShipKind(c.shipment_kind) ? SHIP_KIND_CONFIG[c.shipment_kind] : null;
                     const KindIcon = conf?.icon;
                     return (
-                      <TableRow key={c.id}>
+                      <TableRow
+                        key={c.id}
+                        onClick={() => navigate({ to: "/dashboard/shipments/$id", params: { id: c.id } })}
+                        className="cursor-pointer hover:bg-muted/40"
+                      >
                         <TableCell>
                           {conf && KindIcon ? (
                             <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium", conf.badgeClass)}>
@@ -416,7 +421,12 @@ function OperationsDashboard() {
                           </div>
                         </TableCell>
                         <TableCell className="font-mono text-xs">
-                          <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
+                          <Link
+                            to="/dashboard/shipments/$id"
+                            params={{ id: c.id }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-primary hover:underline"
+                          >
                             {getCaseDisplayCode(c.payload, c.case_code)}
                           </Link>
                         </TableCell>
@@ -495,7 +505,11 @@ function OperationsDashboard() {
                           const rep = getAssignedRep(c);
                           const blNumber = getBlNumber(c);
                           return (
-                            <TableRow key={c.id}>
+                            <TableRow
+                              key={c.id}
+                              onClick={() => navigate({ to: "/dashboard/shipments/$id", params: { id: c.id } })}
+                              className="cursor-pointer hover:bg-muted/40"
+                            >
                               <TableCell className="text-xs">
                                 <div className="flex items-center gap-2">
                                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
@@ -505,7 +519,12 @@ function OperationsDashboard() {
                                 </div>
                               </TableCell>
                               <TableCell className="font-mono text-xs">
-                                <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
+                                <Link
+                                  to="/dashboard/shipments/$id"
+                                  params={{ id: c.id }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-primary hover:underline"
+                                >
                                   {getCaseDisplayCode(c.payload, c.case_code)}
                                 </Link>
                               </TableCell>
