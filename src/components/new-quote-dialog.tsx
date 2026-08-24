@@ -726,6 +726,10 @@ export function NewQuoteDialog({
   const [compare, setCompare] = useState<Record<string, boolean>>({});
   const [agent, setAgent] = useState("QUICKSTAT");
   const [agents, setAgents] = useState<string[]>([]);
+  // Role of the first agent in a drop shipment's multi-agent list — lets the
+  // rep mark whether that agent handles the pickup leg or the delivery leg
+  // (per the field's own hint: "pickup from one agent, delivery to another").
+  const [agentFirstRole, setAgentFirstRole] = useState<"pickup" | "delivery">("pickup");
   const [airline, setAirline] = useState("Lufthansa Cargo");
   // Journey mode for step 2's "ה. פרטי מסע" section. Land was removed as an
   // option (import journeys are always air here), so this is always "air" —
@@ -1117,6 +1121,7 @@ export function NewQuoteDialog({
             tempSeriesNone,
             packSelections,
             agents: kind === "distribution" ? agents : [],
+            agentFirstRole: kind === "distribution" ? agentFirstRole : null,
             packages: packages.map((pkg) => ({
               pallet: pkg.pallet,
               customDims: pkg.pallet === "custom"
@@ -2087,6 +2092,7 @@ export function NewQuoteDialog({
             compare={compare} setCompare={setCompare}
             agent={agent} setAgent={setAgent}
             agents={agents} setAgents={setAgents}
+            agentFirstRole={agentFirstRole} setAgentFirstRole={setAgentFirstRole}
             airline={airline} setAirline={setAirline}
             logisticsNotes={logisticsNotes} setLogisticsNotes={setLogisticsNotes}
             routeApproved={routeApproved} setRouteApproved={setRouteApproved}
@@ -2689,6 +2695,7 @@ type Step4Props = {
   compare: Record<string, boolean>; setCompare: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   agent: string; setAgent: (v: string) => void;
   agents: string[]; setAgents: React.Dispatch<React.SetStateAction<string[]>>;
+  agentFirstRole: "pickup" | "delivery"; setAgentFirstRole: React.Dispatch<React.SetStateAction<"pickup" | "delivery">>;
   airline: string; setAirline: (v: string) => void;
   logisticsNotes: string; setLogisticsNotes: (v: string) => void;
   routeApproved: boolean; setRouteApproved: (v: boolean) => void;
@@ -2840,8 +2847,8 @@ function Step4Logistics(p: Step4Props) {
                 }}
               />
               {selectedAgentItems.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {selectedAgentItems.map((item) => (
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  {selectedAgentItems.map((item, idx) => (
                     <span key={item.id} className="flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pr-1 pl-2.5 text-xs">
                       <button
                         type="button"
@@ -2851,6 +2858,30 @@ function Step4Logistics(p: Step4Props) {
                         <X className="h-3 w-3" />
                       </button>
                       <span className="font-medium">{item.name}</span>
+                      {idx === 0 && (
+                        <span className="flex items-center gap-0.5 rounded-full border bg-background p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => p.setAgentFirstRole("pickup")}
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
+                              p.agentFirstRole === "pickup" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                            )}
+                          >
+                            איסוף
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => p.setAgentFirstRole("delivery")}
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors",
+                              p.agentFirstRole === "delivery" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                            )}
+                          >
+                            הפצה
+                          </button>
+                        </span>
+                      )}
                     </span>
                   ))}
                 </div>
