@@ -279,14 +279,29 @@ export function PackagingChecklistLauncher({ caseId, boxes, existingChecklists, 
   return (
     <>
       {effectiveBoxes.length === 1 ? (
-        <Button type="button" variant="outline" className="gap-2" onClick={() => openBox(effectiveBoxes[0].id)}>
-          <ClipboardCheck className="h-4 w-4" /> צ'קליסט למשלוח
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
+          onClick={() => openBox(effectiveBoxes[0].id)}
+        >
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/15">
+            <ClipboardCheck className="h-3 w-3" />
+          </span>
+          צ'קליסט למשלוח
         </Button>
       ) : (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="gap-2">
-              <ClipboardCheck className="h-4 w-4" /> צ'קליסט למשלוח ({effectiveBoxes.length} מארזים)
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 border-primary/30 text-primary hover:bg-primary/5 hover:text-primary"
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/15">
+                <ClipboardCheck className="h-3 w-3" />
+              </span>
+              צ'קליסט למשלוח ({effectiveBoxes.length} מארזים)
               <ChevronDown className="h-3.5 w-3.5" />
             </Button>
           </PopoverTrigger>

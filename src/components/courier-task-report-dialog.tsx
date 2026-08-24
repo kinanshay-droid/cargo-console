@@ -15,8 +15,16 @@ export function CourierTaskReportLauncher({ data }: { data: CourierTaskReportDat
 
   return (
     <>
-      <Button type="button" variant="outline" className="gap-2" onClick={() => setOpen(true)}>
-        <ClipboardList className="h-4 w-4" /> דוח משימה
+      <Button
+        type="button"
+        variant="outline"
+        className="gap-2 border-success/30 text-success hover:bg-success/5 hover:text-success"
+        onClick={() => setOpen(true)}
+      >
+        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-success/15">
+          <ClipboardList className="h-3 w-3" />
+        </span>
+        דוח משימה
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent dir="rtl" className="max-h-[90vh] max-w-3xl overflow-y-auto text-right sm:text-right">

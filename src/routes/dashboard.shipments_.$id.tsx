@@ -9,6 +9,7 @@ import {
   Save,
   Trash2,
   UserRound,
+  X,
   Info,
   FileText,
   Receipt,
@@ -1623,8 +1624,17 @@ function ActionButtonGroup({ onSave, saving }: { onSave: () => void; saving: boo
         <Save className="h-4 w-4" />
         {saving ? "שומר..." : "שמור שינויים"}
       </Button>
-      <Button asChild variant="outline">
-        <Link to="/dashboard/shipments">ביטול</Link>
+      <Button
+        asChild
+        variant="outline"
+        className="gap-2 border-warning/30 text-warning hover:bg-warning/5 hover:text-warning"
+      >
+        <Link to="/dashboard/shipments">
+          <span className="flex h-5 w-5 items-center justify-center rounded-md bg-warning/15">
+            <X className="h-3 w-3" />
+          </span>
+          ביטול
+        </Link>
       </Button>
     </div>
   );
