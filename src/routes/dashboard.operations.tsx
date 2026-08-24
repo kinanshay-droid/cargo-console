@@ -12,6 +12,7 @@ import {
   Truck,
   ArrowUp,
   ArrowDown,
+  CalendarCheck2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -137,6 +138,12 @@ function timeHHMM(iso: string): string {
   return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
 
+function isToday(dateStr: string): boolean {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+}
+
 function initials(name: string | null): string {
   if (!name) return "—";
   const parts = name.trim().split(/\s+/);
@@ -221,6 +228,22 @@ function OperationsDashboard() {
     }
     return { groups, other };
   }, [activeShipments]);
+
+  // Cases whose ETA falls on today — shown as a focused strip above the
+  // full kind-by-kind breakdown so a rep can see just what's due today
+  // without scanning all four cards.
+  const todayCases = useMemo(
+    () =>
+      activeCases
+        .filter((c) => !!c.arrive_date && isToday(c.arrive_date))
+        .sort((a, b) => new Date(a.arrive_date!).getTime() - new Date(b.arrive_date!).getTime()),
+    [activeCases],
+  );
+
+  const todayLabel = useMemo(
+    () => new Date().toLocaleDateString("he-IL", { weekday: "long", day: "numeric", month: "long", year: "numeric" }),
+    [],
+  );
 
   return (
     <div dir="rtl" className="space-y-6">
@@ -337,6 +360,77 @@ function OperationsDashboard() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Today's cases — kind-agnostic focused view, placed above the
+              full kind-by-kind breakdown so a rep can see only what's due
+              today at a glance. */}
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <div className={cn("flex items-center gap-3 bg-gradient-to-br p-4 text-white", TONE_GRADIENT.accent)}>
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
+                <CalendarCheck2 className="h-5 w-5" />
+              </span>
+              <div>
+                <div className="text-sm/6 opacity-90">תיקים של היום · {todayLabel}</div>
+                <div className="text-2xl font-bold">{todayCases.length}</div>
+              </div>
+            </div>
+            {todayCases.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">אין תיקים עם ETA להיום</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="text-right">סוג</TableHead>
+                    <TableHead className="text-right">לקוח</TableHead>
+                    <TableHead className="text-right">מס' תיק</TableHead>
+                    <TableHead className="text-right">נציג מטפל</TableHead>
+                    <TableHead className="text-right">מס' שטר מטען</TableHead>
+                    <TableHead className="text-right">סטטוס</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {todayCases.map((c) => {
+                    const meta = CASE_PIPELINE_STATUS_META[getPipelineStatus(c)];
+                    const rep = getAssignedRep(c);
+                    const blNumber = getBlNumber(c);
+                    const conf = isShipKind(c.shipment_kind) ? SHIP_KIND_CONFIG[c.shipment_kind] : null;
+                    const KindIcon = conf?.icon;
+                    return (
+                      <TableRow key={c.id}>
+                        <TableCell>
+                          {conf && KindIcon ? (
+                            <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium", conf.badgeClass)}>
+                              <KindIcon className="h-3 w-3" /> {conf.label}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                              {initials(c.customer_name)}
+                            </span>
+                            <span className="truncate font-medium">{c.customer_name ?? "—"}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-xs">
+                          <Link to="/dashboard/shipments/$id" params={{ id: c.id }} className="text-primary hover:underline">
+                            {getCaseDisplayCode(c.payload, c.case_code)}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{rep?.name || "—"}</TableCell>
+                        <TableCell className="font-mono text-xs text-muted-foreground">{blNumber ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge className={STATUS_BADGE_CLASS[c.status]}>{meta.label}</Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
           </div>
 
           {/* Active shipments, split by shipment kind */}
