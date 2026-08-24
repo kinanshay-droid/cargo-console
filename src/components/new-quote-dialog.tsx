@@ -3668,11 +3668,11 @@ function Step6Summary(p: Step6Props) {
                 <td className="px-3 py-2 text-left font-semibold">{money(totalCost)}</td>
               </tr>
               {otherCurrencyTotals.map(([cur, sum]) => (
-                <tr key={cur} className="border-t text-muted-foreground">
-                  <td className="px-3 py-2">סה"כ במטבע נוסף</td>
-                  <td className="px-3 py-2">{cur}</td>
-                  <td className="px-3 py-2 text-left">
-                    {sum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <tr key={cur} className="border-t bg-muted/30">
+                  <td className="px-3 py-2 font-semibold">סה"כ עלויות ({cur})</td>
+                  <td className="px-3 py-2" />
+                  <td className="px-3 py-2 text-left font-semibold">
+                    {cur} {sum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                 </tr>
               ))}
