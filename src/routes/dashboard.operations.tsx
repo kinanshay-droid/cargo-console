@@ -232,12 +232,19 @@ function OperationsDashboard() {
 
   // Cases whose ETA falls on today — shown as a focused strip above the
   // full kind-by-kind breakdown so a rep can see just what's due today
-  // without scanning all four cards.
+  // without scanning all four cards. Grouped by shipment kind (export
+  // first, per SHIP_KIND_ORDER) so same-kind rows sit together, then by
+  // ETA within each kind.
   const todayCases = useMemo(
     () =>
       activeCases
         .filter((c) => !!c.arrive_date && isToday(c.arrive_date))
-        .sort((a, b) => new Date(a.arrive_date!).getTime() - new Date(b.arrive_date!).getTime()),
+        .sort((a, b) => {
+          const ai = isShipKind(a.shipment_kind) ? SHIP_KIND_ORDER.indexOf(a.shipment_kind) : SHIP_KIND_ORDER.length;
+          const bi = isShipKind(b.shipment_kind) ? SHIP_KIND_ORDER.indexOf(b.shipment_kind) : SHIP_KIND_ORDER.length;
+          if (ai !== bi) return ai - bi;
+          return new Date(a.arrive_date!).getTime() - new Date(b.arrive_date!).getTime();
+        }),
     [activeCases],
   );
 
