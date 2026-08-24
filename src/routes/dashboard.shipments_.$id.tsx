@@ -2,7 +2,29 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, Plus, Save, Trash2, UserRound } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  Plus,
+  Save,
+  Trash2,
+  UserRound,
+  Info,
+  FileText,
+  Receipt,
+  Building2,
+  Route as RouteIcon,
+  MapPin,
+  ClipboardList,
+  StickyNote,
+  Wallet,
+  Waypoints,
+  Boxes,
+  Thermometer,
+  Truck,
+  Calculator,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -386,6 +408,15 @@ function CaseDetail() {
   )
     ? (pipelineStatusRaw as CasePipelineStatus)
     : "new";
+
+  // Coarse-status → badge tone, mirrors the Operations dashboard's
+  // STATUS_BADGE_CLASS so the same status reads the same color everywhere.
+  const COARSE_BADGE_CLASS: Record<string, string> = {
+    new: "bg-primary/10 text-primary",
+    in_progress: "bg-accent/15 text-accent",
+    completed: "bg-success/15 text-success",
+    cancelled: "bg-destructive/15 text-destructive",
+  };
 
   const [form, setForm] = useState<Form | null>(null);
   const [originalPayload, setOriginalPayload] = useState<Record<string, unknown>>({});
@@ -891,9 +922,16 @@ function CaseDetail() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="text-sm text-muted-foreground">משלוחים · תיק</div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight md:text-3xl">
-            תיק {(form?.unifreightNumber.trim() || caseRow?.case_code) ?? ""}
-          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+              תיק {(form?.unifreightNumber.trim() || caseRow?.case_code) ?? ""}
+            </h1>
+            {caseRow && (
+              <Badge className={COARSE_BADGE_CLASS[CASE_PIPELINE_STATUS_META[currentPipelineStatus].coarse]}>
+                {CASE_PIPELINE_STATUS_META[currentPipelineStatus].label}
+              </Badge>
+            )}
+          </div>
           {caseRow?.quote_id && (
             <p className="mt-1 text-sm text-muted-foreground">
               נפתח מהצעה{" "}
@@ -978,7 +1016,7 @@ function CaseDetail() {
       ) : (
         <div className="space-y-6">
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-3 text-sm font-semibold">סטטוס תיק</div>
+            <SectionHeading icon={Info} tone="primary" title="סטטוס תיק" className="mb-3" />
             <Select
               value={currentPipelineStatus}
               onValueChange={(v) => statusMutation.mutate({ status: v as CasePipelineStatus })}
@@ -1006,7 +1044,7 @@ function CaseDetail() {
           </div>
 
           {form.shipmentKind !== "domestic" && (
-            <Section title="מסמכי משלוח">
+            <Section title="מסמכי משלוח" icon={FileText} tone="accent">
               <Field label="מספר שטר מטען">
                 <Input
                   value={form.blNumber}
@@ -1025,7 +1063,7 @@ function CaseDetail() {
           )}
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-3 text-sm font-semibold">פרטי חשבונית ורפרנס</div>
+            <SectionHeading icon={Receipt} tone="warning" title="פרטי חשבונית ורפרנס" className="mb-3" />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="מספר חשבונית">
                 <Input
@@ -1053,9 +1091,7 @@ function CaseDetail() {
           </div>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-3 flex items-center gap-1.5 text-sm font-semibold">
-              <UserRound className="h-4 w-4 text-muted-foreground" /> טיפול בתיק
-            </div>
+            <SectionHeading icon={UserRound} tone="success" title="טיפול בתיק" className="mb-3" />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">נציג שירות מטפל</Label>
@@ -1090,7 +1126,7 @@ function CaseDetail() {
             </div>
           </div>
 
-          <Section title="פרטי לקוח ומשלוח">
+          <Section title="פרטי לקוח ומשלוח" icon={Building2} tone="primary">
             <Field label="שם לקוח"><Input value={form.customerName} onChange={(e) => upd("customerName", e.target.value)} /></Field>
             <Field label="Ref לקוח"><Input value={form.customerRef} onChange={(e) => upd("customerRef", e.target.value)} /></Field>
             <Field label="סוג משלוח">
@@ -1105,7 +1141,7 @@ function CaseDetail() {
             )}
           </Section>
 
-          <Section title="מסלול ותאריכים">
+          <Section title="מסלול ותאריכים" icon={RouteIcon} tone="accent">
             {form.shipmentKind !== "domestic" && (
               <>
                 <Field label="נמל מוצא"><AirportCombobox value={form.originPort} onChange={(v) => upd("originPort", v)} /></Field>
@@ -1129,7 +1165,7 @@ function CaseDetail() {
           </Section>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-4 text-sm font-semibold">כתובות ואנשי קשר</div>
+            <SectionHeading icon={MapPin} tone="warning" title="כתובות ואנשי קשר" className="mb-4" />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ContactBlock
                 title="איסוף"
@@ -1152,7 +1188,7 @@ function CaseDetail() {
             </div>
           </div>
 
-          <Section title="מעקב">
+          <Section title="מעקב" icon={ClipboardList} tone="warning">
             <Field label="כיסוי">
               <div className="flex h-9 items-center gap-4 text-sm">
                 <label className="flex items-center gap-1.5">
@@ -1232,7 +1268,7 @@ function CaseDetail() {
           </Section>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-4 text-sm font-semibold">הערות ועדכונים</div>
+            <SectionHeading icon={StickyNote} tone="primary" title="הערות ועדכונים" className="mb-4" />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-1.5">
                 <Label className="text-xs text-muted-foreground">לתפעול</Label>
@@ -1249,7 +1285,7 @@ function CaseDetail() {
             </div>
           </div>
 
-          <Section title="פיננסי">
+          <Section title="פיננסי" icon={Wallet} tone="success">
             <Field label="מטבע">
               <Lookup type="currencies" matchBy="code" value={form.currency || null}
                 onChange={(item) => upd("currency", item?.code ?? "")} placeholder="בחר מטבע..." />
@@ -1259,7 +1295,7 @@ function CaseDetail() {
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm font-semibold">משלוחי דרופ (Drop Type)</div>
+              <SectionHeading icon={Waypoints} tone="warning" title="משלוחי דרופ (Drop Type)" />
               <select
                 value={form.dropType ?? ""}
                 onChange={(e) => {
@@ -1289,7 +1325,7 @@ function CaseDetail() {
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm font-semibold">מארזים ומשטחים</div>
+              <SectionHeading icon={Boxes} tone="success" title="מארזים ומשטחים" />
               <Button type="button" variant="outline" size="sm" onClick={addPackage} className="gap-2">
                 <Plus className="h-4 w-4" /> הוסף חבילה
               </Button>
@@ -1349,7 +1385,7 @@ function CaseDetail() {
             </div>
 
             <div className="mt-5 border-t pt-4">
-              <div className="mb-3 text-sm font-semibold">סדרת טמפרטורה ואריזה</div>
+              <SectionHeading icon={Thermometer} tone="primary" title="סדרת טמפרטורה ואריזה" className="mb-3" />
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -1464,7 +1500,7 @@ function CaseDetail() {
           </div>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
-            <div className="mb-4 text-sm font-semibold">לוגיסטיקה</div>
+            <SectionHeading icon={Truck} tone="accent" title="לוגיסטיקה" className="mb-4" />
             <div className="mb-4">
               <div className="mb-2 text-xs text-muted-foreground">שירותים כלולים</div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1512,7 +1548,7 @@ function CaseDetail() {
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="text-sm font-semibold">תמחור</div>
+              <SectionHeading icon={Calculator} tone="warning" title="תמחור" />
               <Button type="button" variant="outline" size="sm" onClick={addPricingItem} className="gap-2">
                 <Plus className="h-4 w-4" /> הוסף שורת תמחור
               </Button>
@@ -1594,10 +1630,58 @@ function ActionButtonGroup({ onSave, saving }: { onSave: () => void; saving: boo
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// Shared tone palette for section-header icon badges — same bg-x/10-15
+// text-x convention used across the Operations/Pickup-Distribution kind
+// cards, just cycled per section here to make this otherwise all-white
+// form page feel less monotone.
+const TONE_BADGE = {
+  primary: "bg-primary/10 text-primary",
+  accent: "bg-accent/15 text-accent",
+  success: "bg-success/15 text-success",
+  warning: "bg-warning/15 text-warning",
+  destructive: "bg-destructive/15 text-destructive",
+} as const;
+type SectionTone = keyof typeof TONE_BADGE;
+
+function SectionHeading({
+  icon: Icon,
+  tone,
+  title,
+  className,
+}: {
+  icon: typeof Info;
+  tone: SectionTone;
+  title: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center gap-2 text-sm font-semibold", className)}>
+      <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-full", TONE_BADGE[tone])}>
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      {title}
+    </div>
+  );
+}
+
+function Section({
+  title,
+  icon,
+  tone = "primary",
+  children,
+}: {
+  title: string;
+  icon?: typeof Info;
+  tone?: SectionTone;
+  children: React.ReactNode;
+}) {
   return (
     <div className="rounded-2xl border bg-card p-5 shadow-sm">
-      <div className="mb-4 text-sm font-semibold">{title}</div>
+      {icon ? (
+        <SectionHeading icon={icon} tone={tone} title={title} className="mb-4" />
+      ) : (
+        <div className="mb-4 text-sm font-semibold">{title}</div>
+      )}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">{children}</div>
     </div>
   );
