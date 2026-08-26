@@ -24,7 +24,7 @@ import {
 import { AccessDenied } from "@/components/access-denied";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
-export const Route = createFileRoute("/dashboard/roles/$id")({
+export const Route = createFileRoute("/dashboard/roles_/$id")({
   head: () => ({
     meta: [
       { title: "תפקיד — AFIK Logistics Platform" },
@@ -104,7 +104,9 @@ function RoleDetailInner({ role, meId }: { role: OrgUserRole; meId: string | nul
             </SelectTrigger>
             <SelectContent>
               {others.length === 0 ? (
-                <div className="p-2 text-sm text-muted-foreground">אין משתמשים בתפקיד "{meta.otherLabel}".</div>
+                <div className="p-2 text-sm text-muted-foreground">
+                  אין משתמשים בתפקיד "{meta.otherLabel}".
+                </div>
               ) : (
                 others.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
@@ -158,7 +160,8 @@ function RoleDetailInner({ role, meId }: { role: OrgUserRole; meId: string | nul
                     <TableRow key={u.id}>
                       <TableCell>
                         <div className="text-sm font-medium">
-                          {u.fullName || "—"} {isSelf && <span className="text-xs text-muted-foreground">(את/ה)</span>}
+                          {u.fullName || "—"}{" "}
+                          {isSelf && <span className="text-xs text-muted-foreground">(את/ה)</span>}
                         </div>
                         <div className="text-xs text-muted-foreground">{u.email}</div>
                       </TableCell>
@@ -167,7 +170,11 @@ function RoleDetailInner({ role, meId }: { role: OrgUserRole; meId: string | nul
                           size="sm"
                           variant="outline"
                           disabled={move.isPending || (isSelf && role === "admin")}
-                          title={isSelf && role === "admin" ? "לא ניתן להסיר הרשאת מנהל מעצמך כאן" : undefined}
+                          title={
+                            isSelf && role === "admin"
+                              ? "לא ניתן להסיר הרשאת מנהל מעצמך כאן"
+                              : undefined
+                          }
                           onClick={() => move.mutate({ targetUserId: u.id, toRole: meta.other })}
                         >
                           <ArrowLeftRight className="h-3.5 w-3.5" /> העבר ל{meta.otherLabel}
