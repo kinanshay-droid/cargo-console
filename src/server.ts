@@ -80,9 +80,33 @@ function bindCloudflareEnv(request: Request, env: unknown, ctx: unknown): void {
   };
 }
 
+// Temporary raw diagnostic route — reports exactly what Cloudflare passed
+// into fetch(request, env, ctx) for THIS request, before any h3/TanStack/
+// AsyncLocalStorage layer touches it. Isolates whether `env` itself is
+// empty at the Worker's true entry point, or gets lost somewhere further
+// downstream. Remove once the env-var bug is resolved.
+function debugEnvResponse(env: unknown, ctx: unknown): Response {
+  const envObj = env && typeof env === "object" ? (env as Record<string, unknown>) : null;
+  return Response.json({
+    envType: typeof env,
+    envIsNull: env === null,
+    envIsUndefined: env === undefined,
+    envKeys: envObj ? Object.keys(envObj) : null,
+    hasSupabaseUrl: envObj ? "SUPABASE_URL" in envObj : null,
+    hasSupabaseServiceRoleKey: envObj ? "SUPABASE_SERVICE_ROLE_KEY" in envObj : null,
+    ctxType: typeof ctx,
+    ctxIsNull: ctx === null,
+    ctxIsUndefined: ctx === undefined,
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname === "/__debug/env") {
+        return debugEnvResponse(env, ctx);
+      }
       bindCloudflareEnv(request, env, ctx);
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
