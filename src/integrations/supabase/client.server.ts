@@ -16,15 +16,6 @@ import type { Database } from "./types";
 // Reading `request.runtime.cloudflare.env` instead is request-scoped and
 // immune to that race. Falls back to process.env for local dev
 // (`vite dev`), where no Cloudflare request binding exists.
-// Populated by getCloudflareEnv() every call, purely for the diagnostic
-// detail appended to the "Missing Supabase environment variable(s)" error
-// below — temporary instrumentation to pin down exactly which layer
-// (getRequest, req.runtime, req.runtime.cloudflare, or .env itself) is
-// empty in production, since two theories (global-state race vs the
-// request object simply not carrying `.runtime` through this code path)
-// haven't been distinguishable from the outside. Remove once resolved.
-let lastCfEnvDiagnostic = "not yet called";
-
 function getCloudflareEnv(): Record<string, string | undefined> {
   try {
     // getRequest() throws outside a live request context (e.g. local
@@ -32,15 +23,8 @@ function getCloudflareEnv(): Record<string, string | undefined> {
     const request = getRequest() as
       | (Request & { runtime?: { cloudflare?: { env?: Record<string, string | undefined> } } })
       | undefined;
-    const hasRequest = !!request;
-    const hasRuntime = !!request?.runtime;
-    const hasCloudflare = !!request?.runtime?.cloudflare;
-    const env = request?.runtime?.cloudflare?.env;
-    const envKeyNames = env ? Object.keys(env).join(",") : "(none)";
-    lastCfEnvDiagnostic = `hasRequest=${hasRequest} hasRuntime=${hasRuntime} hasCloudflare=${hasCloudflare} envKeyNames=[${envKeyNames}]`;
-    return env ?? {};
-  } catch (err) {
-    lastCfEnvDiagnostic = `getRequest() threw: ${err instanceof Error ? err.message : String(err)}`;
+    return request?.runtime?.cloudflare?.env ?? {};
+  } catch {
     return {};
   }
 }
@@ -82,7 +66,7 @@ function createSupabaseAdminClient() {
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
       ...(!SUPABASE_SERVICE_ROLE_KEY ? ["SUPABASE_SERVICE_ROLE_KEY"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Set them in your deployment's environment/secrets configuration. [diag: ${lastCfEnvDiagnostic}; process.env.SUPABASE_URL=${process.env.SUPABASE_URL ? "set" : "unset"}]`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Set them in your deployment's environment/secrets configuration.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
