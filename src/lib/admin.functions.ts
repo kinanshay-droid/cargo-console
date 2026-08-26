@@ -50,10 +50,7 @@ async function requireOrgAdmin(
   return profile.organization_id;
 }
 
-async function requireOrgId(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-): Promise<string> {
+async function requireOrgId(supabase: SupabaseClient<Database>, userId: string): Promise<string> {
   const { data: profile, error } = await supabase
     .from("profiles")
     .select("organization_id")
@@ -77,10 +74,7 @@ export const listOrgUsers = createServerFn({ method: "GET" })
           .select("id, email, full_name, is_active, created_at")
           .eq("organization_id", organizationId)
           .order("created_at", { ascending: true }),
-        supabase
-          .from("user_roles")
-          .select("user_id, role")
-          .eq("organization_id", organizationId),
+        supabase.from("user_roles").select("user_id, role").eq("organization_id", organizationId),
       ]);
     if (profilesErr) throw new Error(profilesErr.message);
     if (rolesErr) throw new Error(rolesErr.message);
@@ -100,14 +94,19 @@ export const listOrgUsers = createServerFn({ method: "GET" })
 
 export const inviteOrgUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { fullName: string; email: string; password: string }) => {
-    if (!input?.fullName?.trim()) throw new Error("fullName is required");
-    if (!input?.email?.trim()) throw new Error("email is required");
-    if (!input?.password || input.password.length < 8) {
-      throw new Error("password must be at least 8 characters");
-    }
-    return input;
-  })
+  .inputValidator(
+    (input: { fullName: string; email: string; password: string; role?: OrgUserRole }) => {
+      if (!input?.fullName?.trim()) throw new Error("fullName is required");
+      if (!input?.email?.trim()) throw new Error("email is required");
+      if (!input?.password || input.password.length < 8) {
+        throw new Error("password must be at least 8 characters");
+      }
+      if (input.role !== undefined && input.role !== "admin" && input.role !== "member") {
+        throw new Error('role must be "admin" or "member"');
+      }
+      return input;
+    },
+  )
   .handler(async ({ data, context }) => {
     const organizationId = await requireOrgAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -137,7 +136,7 @@ export const inviteOrgUser = createServerFn({ method: "POST" })
 
     const { error: roleErr } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: newUserId, role: "member", organization_id: organizationId });
+      .insert({ user_id: newUserId, role: data.role ?? "member", organization_id: organizationId });
     if (roleErr) throw new Error(roleErr.message);
 
     return { id: newUserId };
@@ -318,7 +317,9 @@ export type AuditLogRow = {
 
 export const listAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { entityType?: string; from?: string; to?: string } | undefined) => input ?? {})
+  .inputValidator(
+    (input: { entityType?: string; from?: string; to?: string } | undefined) => input ?? {},
+  )
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const organizationId = await requireOrgAdmin(supabase, userId);
@@ -336,7 +337,9 @@ export const listAuditLog = createServerFn({ method: "GET" })
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
 
-    const userIds = Array.from(new Set((rows ?? []).map((r) => r.user_id).filter((v): v is string => !!v)));
+    const userIds = Array.from(
+      new Set((rows ?? []).map((r) => r.user_id).filter((v): v is string => !!v)),
+    );
     const namesById = new Map<string, string>();
     if (userIds.length > 0) {
       const { data: profiles } = await supabase

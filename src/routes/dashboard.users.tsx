@@ -3,7 +3,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Fragment, useState } from "react";
 import { Plus, KeyRound, Trash2 } from "lucide-react";
-import { listOrgUsers, inviteOrgUser, setUserActive, removeOrgUser, resetUserPassword, type OrgUser } from "@/lib/admin.functions";
+import {
+  listOrgUsers,
+  inviteOrgUser,
+  setUserActive,
+  removeOrgUser,
+  resetUserPassword,
+  type OrgUser,
+} from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -26,6 +33,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { OrgUserRole } from "@/lib/admin.functions";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { AccessDenied } from "@/components/access-denied";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -85,7 +100,9 @@ function UsersPageInner() {
       <PageHeader
         title="משתמשים"
         description="כל מי שיש לו גישה לארגון שלך."
-        action={<NewUserDialog onCreated={() => qc.invalidateQueries({ queryKey: ["org-users"] })} />}
+        action={
+          <NewUserDialog onCreated={() => qc.invalidateQueries({ queryKey: ["org-users"] })} />
+        }
       />
 
       <div className="overflow-hidden rounded-lg border bg-card">
@@ -120,22 +137,38 @@ function UsersPageInner() {
                     <TableRow>
                       <TableCell className="font-medium">
                         {u.fullName || "—"}
-                        {isSelf && <span className="mr-2 text-xs text-muted-foreground">(את/ה)</span>}
+                        {isSelf && (
+                          <span className="mr-2 text-xs text-muted-foreground">(את/ה)</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{u.email}</TableCell>
                       <TableCell>
-                        <Badge className={u.role === "admin" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}>
+                        <Badge
+                          className={
+                            u.role === "admin"
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted text-muted-foreground"
+                          }
+                        >
                           {u.role ? ROLE_LABEL[u.role] : "—"}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={u.isActive ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}>
+                        <Badge
+                          className={
+                            u.isActive
+                              ? "bg-success/15 text-success"
+                              : "bg-muted text-muted-foreground"
+                          }
+                        >
                           {u.isActive ? "פעיל" : "מושבת"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         {isSelf ? (
-                          <span className="text-xs text-muted-foreground">נהל את החשבון שלך בעמוד "החשבון שלי"</span>
+                          <span className="text-xs text-muted-foreground">
+                            נהל את החשבון שלך בעמוד "החשבון שלי"
+                          </span>
                         ) : (
                           <div className="flex flex-wrap justify-end gap-2">
                             <ConfirmDialog
@@ -147,14 +180,24 @@ function UsersPageInner() {
                               }
                               confirmLabel={u.isActive ? "השבת" : "הפעל מחדש"}
                               destructive={u.isActive}
-                              onConfirm={() => toggleStatus.mutate({ id: u.id, isActive: !u.isActive })}
+                              onConfirm={() =>
+                                toggleStatus.mutate({ id: u.id, isActive: !u.isActive })
+                              }
                               trigger={
-                                <Button size="sm" variant="outline" disabled={toggleStatus.isPending}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={toggleStatus.isPending}
+                                >
                                   {u.isActive ? "השבת" : "הפעל מחדש"}
                                 </Button>
                               }
                             />
-                            <Button size="sm" variant="outline" onClick={() => setResetForId(resetForId === u.id ? null : u.id)}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setResetForId(resetForId === u.id ? null : u.id)}
+                            >
                               <KeyRound className="h-3.5 w-3.5" /> איפוס סיסמה
                             </Button>
                             <ConfirmDialog
@@ -164,7 +207,12 @@ function UsersPageInner() {
                               destructive
                               onConfirm={() => remove.mutate(u.id)}
                               trigger={
-                                <Button size="sm" variant="outline" className="text-destructive hover:text-destructive" disabled={remove.isPending}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive hover:text-destructive"
+                                  disabled={remove.isPending}
+                                >
                                   <Trash2 className="h-3.5 w-3.5" /> הסר
                                 </Button>
                               }
@@ -216,11 +264,23 @@ function ResetPasswordInline({ userId, onDone }: { userId: string; onDone: () =>
     >
       <div className="space-y-1">
         <Label className="text-xs">סיסמה חדשה</Label>
-        <Input type="password" required minLength={8} value={pwd} onChange={(e) => setPwd(e.target.value)} />
+        <Input
+          type="password"
+          required
+          minLength={8}
+          value={pwd}
+          onChange={(e) => setPwd(e.target.value)}
+        />
       </div>
       <div className="space-y-1">
         <Label className="text-xs">אימות סיסמה</Label>
-        <Input type="password" required minLength={8} value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
+        <Input
+          type="password"
+          required
+          minLength={8}
+          value={confirmPwd}
+          onChange={(e) => setConfirmPwd(e.target.value)}
+        />
       </div>
       <Button size="sm" type="submit" disabled={mutation.isPending}>
         {mutation.isPending ? "שומר…" : "אפס סיסמה"}
@@ -235,14 +295,19 @@ function ResetPasswordInline({ userId, onDone }: { userId: string; onDone: () =>
 function NewUserDialog({ onCreated }: { onCreated: () => void }) {
   const inviteOrgUserFn = useServerFn(inviteOrgUser);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ fullName: "", email: "", password: "" });
+  const [form, setForm] = useState<{
+    fullName: string;
+    email: string;
+    password: string;
+    role: OrgUserRole;
+  }>({ fullName: "", email: "", password: "", role: "member" });
 
   const create = useMutation({
     mutationFn: () => inviteOrgUserFn({ data: form }),
     onSuccess: () => {
       toast.success("המשתמש נוצר");
       setOpen(false);
-      setForm({ fullName: "", email: "", password: "" });
+      setForm({ fullName: "", email: "", password: "", role: "member" });
       onCreated();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "יצירת המשתמש נכשלה"),
@@ -268,15 +333,45 @@ function NewUserDialog({ onCreated }: { onCreated: () => void }) {
         >
           <div className="space-y-1.5">
             <Label>שם מלא</Label>
-            <Input required value={form.fullName} onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))} />
+            <Input
+              required
+              value={form.fullName}
+              onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>מייל</Label>
-            <Input required type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+            <Input
+              required
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>סיסמה זמנית</Label>
-            <Input required type="password" minLength={8} value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+            <Input
+              required
+              type="password"
+              minLength={8}
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>תפקיד</Label>
+            <Select
+              value={form.role}
+              onValueChange={(v) => setForm((f) => ({ ...f, role: v as OrgUserRole }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="member">חבר צוות</SelectItem>
+                <SelectItem value="admin">מנהל</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
