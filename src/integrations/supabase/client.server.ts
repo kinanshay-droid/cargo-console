@@ -7,15 +7,15 @@ import type { Database } from "./types";
 
 // Reads the Cloudflare Worker's env bindings straight off the current
 // request instead of `process.env`/`globalThis.__env__`. Those are
-// process-wide mutable state (see bindCloudflareEnv in src/server.ts) — on
-// a reused Worker isolate handling requests concurrently, a second
-// in-flight request can overwrite `globalThis.__env__` during the `await
-// import(...)` gap between this module loading and createSupabaseAdminClient
-// actually reading it, silently handing one request another request's env
-// (or racing to undefined). Reading `request.runtime.cloudflare.env`
-// instead is request-scoped and immune to that race. Falls back to
-// process.env for local dev (`vite dev`), where no Cloudflare request
-// binding exists.
+// process-wide mutable state (set by Nitro's own generated Cloudflare entry,
+// _module-handler.mjs's augmentReq) — on a reused Worker isolate handling
+// requests concurrently, a second in-flight request can overwrite
+// `globalThis.__env__` during the `await import(...)` gap between this
+// module loading and createSupabaseAdminClient actually reading it, silently
+// handing one request another request's env (or racing to undefined).
+// Reading `request.runtime.cloudflare.env` instead is request-scoped and
+// immune to that race. Falls back to process.env for local dev
+// (`vite dev`), where no Cloudflare request binding exists.
 // Populated by getCloudflareEnv() every call, purely for the diagnostic
 // detail appended to the "Missing Supabase environment variable(s)" error
 // below — temporary instrumentation to pin down exactly which layer
