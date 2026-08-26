@@ -36,8 +36,8 @@ function getCloudflareEnv(): Record<string, string | undefined> {
     const hasRuntime = !!request?.runtime;
     const hasCloudflare = !!request?.runtime?.cloudflare;
     const env = request?.runtime?.cloudflare?.env;
-    const envKeys = env ? Object.keys(env).length : -1;
-    lastCfEnvDiagnostic = `hasRequest=${hasRequest} hasRuntime=${hasRuntime} hasCloudflare=${hasCloudflare} envKeys=${envKeys}`;
+    const envKeyNames = env ? Object.keys(env).join(",") : "(none)";
+    lastCfEnvDiagnostic = `hasRequest=${hasRequest} hasRuntime=${hasRuntime} hasCloudflare=${hasCloudflare} envKeyNames=[${envKeyNames}]`;
     return env ?? {};
   } catch (err) {
     lastCfEnvDiagnostic = `getRequest() threw: ${err instanceof Error ? err.message : String(err)}`;
