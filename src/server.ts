@@ -3,6 +3,12 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 
+// Trivial-change marker: forces a fresh `wrangler deploy` so the
+// SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY vars just added in the Cloudflare
+// dashboard's Settings -> Variables and secrets actually attach to a live
+// deployed version, in case the previously-active version was built before
+// they were saved. No functional change.
+
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
