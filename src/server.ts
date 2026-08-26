@@ -1,3 +1,8 @@
+// Redeploy marker: forces a fresh `wrangler deploy` so the Runtime
+// variables and secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) just
+// saved in the Cloudflare dashboard's Settings -> Runtime variables and
+// secrets panel actually attach to the live Worker version. No functional
+// change.
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
