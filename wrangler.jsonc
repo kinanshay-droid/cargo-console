@@ -1,0 +1,14 @@
+{
+  // Nitro's cloudflare-module preset auto-generates the deployed
+  // wrangler.json on every build (see writeWranglerConfig in
+  // node_modules/nitro/dist/_presets.mjs), merging in whatever project-root
+  // wrangler.json/.jsonc/.toml it finds. By default `wrangler deploy`
+  // overwrites/clears any environment variables configured via the
+  // Cloudflare dashboard's Settings -> Variables and secrets on every
+  // deploy — `keep_vars: true` disables that, so dashboard-managed vars
+  // (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) survive across deploys
+  // instead of being wiped back to empty each time.
+  //
+  // See: https://developers.cloudflare.com/workers/wrangler/configuration/
+  "keep_vars": true
+}
