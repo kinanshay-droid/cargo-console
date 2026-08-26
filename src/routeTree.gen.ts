@@ -42,6 +42,9 @@ import { Route as DashboardShipmentsIdRouteImport } from './routes/dashboard.shi
 import { Route as DashboardQuotesIdIndexRouteImport } from './routes/dashboard.quotes.$id.index'
 import { Route as DashboardQuotesIdCustomerViewRouteImport } from './routes/dashboard.quotes.$id.customer-view'
 import { Route as DashboardQuotesIdEditRouteImport } from './routes/dashboard.quotes.$id.edit'
+import { Route as ApiV1CasesRouteImport } from './routes/api.v1.cases'
+import { Route as ApiV1CasesIdRouteImport } from './routes/api.v1.cases.$id'
+import { Route as ApiV1CasesIdStatusRouteImport } from './routes/api.v1.cases.$id.status'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -86,6 +89,21 @@ const PortalRoute = PortalRouteImport.update({
 const PortalDashboardRoute = PortalDashboardRouteImport.update({
   id: '/portal/dashboard',
   path: '/portal/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1CasesRoute = ApiV1CasesRouteImport.update({
+  id: '/api/v1/cases',
+  path: '/api/v1/cases',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1CasesIdRoute = ApiV1CasesIdRouteImport.update({
+  id: '/api/v1/cases/$id',
+  path: '/api/v1/cases/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1CasesIdStatusRoute = ApiV1CasesIdStatusRouteImport.update({
+  id: '/api/v1/cases/$id/status',
+  path: '/api/v1/cases/$id/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardAccountRoute = DashboardAccountRouteImport.update({
@@ -222,6 +240,9 @@ export interface FileRoutesByFullPath {
   '/presentation': typeof PresentationRoute
   '/portal': typeof PortalRoute
   '/portal/dashboard': typeof PortalDashboardRoute
+  '/api/v1/cases': typeof ApiV1CasesRoute
+  '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
+  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -257,6 +278,9 @@ export interface FileRoutesByTo {
   '/presentation': typeof PresentationRoute
   '/portal': typeof PortalRoute
   '/portal/dashboard': typeof PortalDashboardRoute
+  '/api/v1/cases': typeof ApiV1CasesRoute
+  '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
+  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -292,6 +316,9 @@ export interface FileRoutesById {
   '/presentation': typeof PresentationRoute
   '/portal': typeof PortalRoute
   '/portal/dashboard': typeof PortalDashboardRoute
+  '/api/v1/cases': typeof ApiV1CasesRoute
+  '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
+  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -329,6 +356,9 @@ export interface FileRouteTypes {
     | '/presentation'
     | '/portal'
     | '/portal/dashboard'
+    | '/api/v1/cases'
+    | '/api/v1/cases/$id'
+    | '/api/v1/cases/$id/status'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -364,6 +394,9 @@ export interface FileRouteTypes {
     | '/presentation'
     | '/portal'
     | '/portal/dashboard'
+    | '/api/v1/cases'
+    | '/api/v1/cases/$id'
+    | '/api/v1/cases/$id/status'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -398,6 +431,9 @@ export interface FileRouteTypes {
     | '/presentation'
     | '/portal'
     | '/portal/dashboard'
+    | '/api/v1/cases'
+    | '/api/v1/cases/$id'
+    | '/api/v1/cases/$id/status'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -434,6 +470,9 @@ export interface RootRouteChildren {
   PresentationRoute: typeof PresentationRoute
   PortalRoute: typeof PortalRoute
   PortalDashboardRoute: typeof PortalDashboardRoute
+  ApiV1CasesRoute: typeof ApiV1CasesRoute
+  ApiV1CasesIdRoute: typeof ApiV1CasesIdRoute
+  ApiV1CasesIdStatusRoute: typeof ApiV1CasesIdStatusRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -499,6 +538,27 @@ declare module '@tanstack/react-router' {
       path: '/portal/dashboard'
       fullPath: '/portal/dashboard'
       preLoaderRoute: typeof PortalDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/cases': {
+      id: '/api/v1/cases'
+      path: '/api/v1/cases'
+      fullPath: '/api/v1/cases'
+      preLoaderRoute: typeof ApiV1CasesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/cases/$id': {
+      id: '/api/v1/cases/$id'
+      path: '/api/v1/cases/$id'
+      fullPath: '/api/v1/cases/$id'
+      preLoaderRoute: typeof ApiV1CasesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/cases/$id/status': {
+      id: '/api/v1/cases/$id/status'
+      path: '/api/v1/cases/$id/status'
+      fullPath: '/api/v1/cases/$id/status'
+      preLoaderRoute: typeof ApiV1CasesIdStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/account': {
@@ -768,6 +828,9 @@ const rootRouteChildren: RootRouteChildren = {
   PresentationRoute: PresentationRoute,
   PortalRoute: PortalRoute,
   PortalDashboardRoute: PortalDashboardRoute,
+  ApiV1CasesRoute: ApiV1CasesRoute,
+  ApiV1CasesIdRoute: ApiV1CasesIdRoute,
+  ApiV1CasesIdStatusRoute: ApiV1CasesIdStatusRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
