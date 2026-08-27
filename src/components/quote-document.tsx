@@ -99,11 +99,11 @@ export const QUOTE_STATUS_TONE: Record<string, Tone> = {
 };
 
 export const QUOTE_STATUS_BADGE_LIGHT: Record<string, string> = Object.fromEntries(
-  Object.entries(QUOTE_STATUS_TONE).map(([status, tone]) => [status, TONE_BADGE[tone]])
+  Object.entries(QUOTE_STATUS_TONE).map(([status, tone]) => [status, TONE_BADGE[tone]]),
 );
 
 const QUOTE_STATUS_BADGE_DARK: Record<string, string> = Object.fromEntries(
-  Object.entries(QUOTE_STATUS_TONE).map(([status, tone]) => [status, TONE_BADGE_ON_PRIMARY[tone]])
+  Object.entries(QUOTE_STATUS_TONE).map(([status, tone]) => [status, TONE_BADGE_ON_PRIMARY[tone]]),
 );
 
 const COUNTRY_FLAGS: [string, string][] = [
@@ -156,9 +156,10 @@ export function parsePackages(raw: unknown): PackageRow[] {
     .filter((p): p is Record<string, unknown> => p !== null)
     .map((p) => {
       const customDims = isRecord(p.customDims) ? p.customDims : null;
-      const tempSeries = typeof p.tempSeries === "string" && TEMP_SERIES.some((t) => t.key === p.tempSeries)
-        ? (p.tempSeries as TempSeriesKey)
-        : null;
+      const tempSeries =
+        typeof p.tempSeries === "string" && TEMP_SERIES.some((t) => t.key === p.tempSeries)
+          ? (p.tempSeries as TempSeriesKey)
+          : null;
       return {
         id: str(p.id) || Math.random().toString(36).slice(2, 9),
         pallet: typeof p.pallet === "string" ? p.pallet : null,
@@ -169,6 +170,7 @@ export function parsePackages(raw: unknown): PackageRow[] {
         unitQty: str(p.unitQty),
         tempSeries,
         loggerId: typeof p.loggerId === "string" ? p.loggerId : null,
+        dryIceQty: str(p.dryIceQty),
       } satisfies PackageRow;
     });
 }
@@ -206,7 +208,15 @@ function loggerLabel(loggerId: string | null | undefined, hasLogger?: boolean | 
   return "—";
 }
 
-export type PricingRow = { id: string; desc: string; qty: number; unit: string; unitPrice: number; currency: string; total: number };
+export type PricingRow = {
+  id: string;
+  desc: string;
+  qty: number;
+  unit: string;
+  unitPrice: number;
+  currency: string;
+  total: number;
+};
 
 export function parsePricingItems(raw: unknown, fallbackCurrency: string): PricingRow[] {
   if (!Array.isArray(raw)) return [];
@@ -218,7 +228,8 @@ export function parsePricingItems(raw: unknown, fallbackCurrency: string): Prici
       const currency = str(it.currency) || fallbackCurrency;
       const qty = it.qty != null ? num(it.qty) : 1;
       const unitPrice = it.unitPrice != null ? num(it.unitPrice) : num(it.price);
-      const total = it.total != null ? num(it.total) : it.price != null ? num(it.price) : qty * unitPrice;
+      const total =
+        it.total != null ? num(it.total) : it.price != null ? num(it.price) : qty * unitPrice;
       const id = str(it.id) || `price-${idx}`;
       return { id, desc, qty, unit: str(it.unit), unitPrice, currency, total };
     })
@@ -285,7 +296,11 @@ function RouteStop({
       </div>
       <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
       <div className="mt-0.5 max-w-[150px] text-sm font-semibold leading-tight">{value || "—"}</div>
-      {sub && <div className="mt-0.5 max-w-[150px] text-[11px] text-muted-foreground leading-tight">{sub}</div>}
+      {sub && (
+        <div className="mt-0.5 max-w-[150px] text-[11px] text-muted-foreground leading-tight">
+          {sub}
+        </div>
+      )}
     </div>
   );
 }
@@ -324,7 +339,13 @@ export const FULL_VISIBILITY: QuoteVisibility = {
   terms: true,
 };
 
-export function QuoteDocument({ quote, visibility }: { quote: unknown; visibility?: QuoteVisibility }) {
+export function QuoteDocument({
+  quote,
+  visibility,
+}: {
+  quote: unknown;
+  visibility?: QuoteVisibility;
+}) {
   const v = visibility ?? FULL_VISIBILITY;
   const q = isRecord(quote) ? quote : {};
   const payload = isRecord(q.payload) ? q.payload : {};
@@ -337,30 +358,46 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
 
   const packages = parsePackages(payload.packages);
   const packSelections = parsePackSelections(payload.packSelections);
-  const packageCalcsAll = packages.map((pkg) => ({ pkg, calc: getPackageCalc(pkg), cbm: packageVolumeCbm(pkg) }));
+  const packageCalcsAll = packages.map((pkg) => ({
+    pkg,
+    calc: getPackageCalc(pkg),
+    cbm: packageVolumeCbm(pkg),
+  }));
   const modelCalcsAll = packSelections.map((sel) => ({
     sel,
     calc: getPackModelCalc(sel, str(q.shipment_kind) === "import"),
     cbm: selectionVolumeCbm(sel),
   }));
 
-  const totalQty = packageCalcsAll.reduce((s, c) => s + c.calc.qty, 0) + modelCalcsAll.reduce((s, c) => s + c.sel.qty, 0);
-  const grossWeight = packageCalcsAll.reduce((s, c) => s + c.calc.grossWeight, 0) + modelCalcsAll.reduce((s, c) => s + c.calc.grossWeight, 0);
+  const totalQty =
+    packageCalcsAll.reduce((s, c) => s + c.calc.qty, 0) +
+    modelCalcsAll.reduce((s, c) => s + c.sel.qty, 0);
+  const grossWeight =
+    packageCalcsAll.reduce((s, c) => s + c.calc.grossWeight, 0) +
+    modelCalcsAll.reduce((s, c) => s + c.calc.grossWeight, 0);
   const volumetricWeight =
-    packageCalcsAll.reduce((s, c) => s + c.calc.volumetricWeight, 0) + modelCalcsAll.reduce((s, c) => s + c.calc.volumetricWeight, 0);
-  const totalCbm = packageCalcsAll.reduce((s, c) => s + c.cbm, 0) + modelCalcsAll.reduce((s, c) => s + c.cbm, 0);
+    packageCalcsAll.reduce((s, c) => s + c.calc.volumetricWeight, 0) +
+    modelCalcsAll.reduce((s, c) => s + c.calc.volumetricWeight, 0);
+  const totalCbm =
+    packageCalcsAll.reduce((s, c) => s + c.cbm, 0) + modelCalcsAll.reduce((s, c) => s + c.cbm, 0);
   const chargeableWeight = Math.max(grossWeight, volumetricWeight);
 
   // Packaging table rows respect the visibility selection; the totals
   // above stay true regardless, since they're physical facts not opt-in detail.
-  const packageCalcs = v.packageIds ? packageCalcsAll.filter((c) => v.packageIds!.includes(c.pkg.id)) : packageCalcsAll;
-  const modelCalcs = v.packageIds ? modelCalcsAll.filter((c) => v.packageIds!.includes(c.sel.key)) : modelCalcsAll;
+  const packageCalcs = v.packageIds
+    ? packageCalcsAll.filter((c) => v.packageIds!.includes(c.pkg.id))
+    : packageCalcsAll;
+  const modelCalcs = v.packageIds
+    ? modelCalcsAll.filter((c) => v.packageIds!.includes(c.sel.key))
+    : modelCalcsAll;
 
   const attrs = isRecord(payload.attrs) ? payload.attrs : {};
   const cargoType = str(payload.cargoType);
 
   const pricingItemsAll = parsePricingItems(payload.pricingItems, currency);
-  const pricingItems = v.costItemIds ? pricingItemsAll.filter((r) => v.costItemIds!.includes(r.id)) : pricingItemsAll;
+  const pricingItems = v.costItemIds
+    ? pricingItemsAll.filter((r) => v.costItemIds!.includes(r.id))
+    : pricingItemsAll;
   const pricingTotal = pricingItemsAll.reduce((s, r) => s + r.total, 0);
   const grandTotal = q.total != null ? num(q.total) : pricingTotal;
 
@@ -368,7 +405,9 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
   const destPort = str(q.dest_port);
   const pickupAddress = str(payload.pickupAddress);
   const deliveryAddress = str(payload.deliveryAddress);
-  const transitPorts = Array.isArray(q.transit_ports) ? (q.transit_ports as unknown[]).map(str).filter(Boolean) : [];
+  const transitPorts = Array.isArray(q.transit_ports)
+    ? (q.transit_ports as unknown[]).map(str).filter(Boolean)
+    : [];
 
   const departDate = str(q.depart_date);
   const arriveDate = str(q.arrive_date);
@@ -382,9 +421,16 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
     }
   }
 
-  const pickupContacts = Array.isArray(payload.pickupContacts) ? payload.pickupContacts.filter(isRecord) : [];
-  const deliveryContacts = Array.isArray(payload.deliveryContacts) ? payload.deliveryContacts.filter(isRecord) : [];
-  const moveType = pickupAddress || deliveryAddress || pickupContacts.length || deliveryContacts.length ? "דלת לדלת" : "נמל לנמל";
+  const pickupContacts = Array.isArray(payload.pickupContacts)
+    ? payload.pickupContacts.filter(isRecord)
+    : [];
+  const deliveryContacts = Array.isArray(payload.deliveryContacts)
+    ? payload.deliveryContacts.filter(isRecord)
+    : [];
+  const moveType =
+    pickupAddress || deliveryAddress || pickupContacts.length || deliveryContacts.length
+      ? "דלת לדלת"
+      : "נמל לנמל";
   const isDomestic = str(q.shipment_kind) === "domestic";
 
   const validityDays = payload.validityDays != null ? num(payload.validityDays) : 14;
@@ -404,13 +450,21 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
   const gatewayIcon = <Plane className="h-3 w-3" />;
 
   return (
-    <div dir="rtl" className="overflow-hidden rounded-2xl border bg-card shadow-sm print:border-0 print:shadow-none">
+    <div
+      dir="rtl"
+      className="overflow-hidden rounded-2xl border bg-card shadow-sm print:border-0 print:shadow-none"
+    >
       {/* Header banner */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-primary px-6 py-4 text-primary-foreground">
-        <img src="/afik-logo-white.png" alt="AFIK Logistics Platform" className="h-11 w-auto rounded-lg" />
+        <img
+          src="/afik-logo-white.png"
+          alt="AFIK Logistics Platform"
+          className="h-11 w-auto rounded-lg"
+        />
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <span className="rounded-full bg-white/15 px-3 py-1 font-mono text-xs font-semibold">
-            {str(q.quote_code) || "—"} · {SHIPMENT_KIND_LABEL[str(q.shipment_kind)] ?? (str(q.shipment_kind) || "—")}
+            {str(q.quote_code) || "—"} ·{" "}
+            {SHIPMENT_KIND_LABEL[str(q.shipment_kind)] ?? (str(q.shipment_kind) || "—")}
           </span>
           {displayStatusKey ? (
             <span
@@ -427,7 +481,10 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
       <div className="space-y-6 p-6">
         {/* Route + customer */}
         {v.route && (
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]" style={{ breakInside: "avoid" }}>
+          <div
+            className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_260px]"
+            style={{ breakInside: "avoid" }}
+          >
             <div className="rounded-xl border p-4">
               <div className="relative">
                 <div className="pointer-events-none absolute inset-x-[12%] top-[54px] h-0.5 bg-border" />
@@ -459,194 +516,287 @@ export function QuoteDocument({ quote, visibility }: { quote: unknown; visibilit
             <div className="rounded-xl border bg-muted/20 p-4">
               <div className="mb-2 text-xs font-semibold text-muted-foreground">לקוח</div>
               <div className="text-sm font-semibold">{str(q.customer_name) || "—"}</div>
-              {str(q.customer_ref) && <div className="mt-1 text-xs text-muted-foreground">Ref: {str(q.customer_ref)}</div>}
+              {str(q.customer_ref) && (
+                <div className="mt-1 text-xs text-muted-foreground">Ref: {str(q.customer_ref)}</div>
+              )}
             </div>
           </div>
         )}
 
         {/* Weight/volume summary */}
         {v.summary && (
-          <div className="grid grid-cols-2 gap-4 rounded-xl border p-4 sm:grid-cols-4" style={{ breakInside: "avoid" }}>
+          <div
+            className="grid grid-cols-2 gap-4 rounded-xl border p-4 sm:grid-cols-4"
+            style={{ breakInside: "avoid" }}
+          >
             <DocField label="כמות" value={totalQty > 0 ? totalQty : "—"} />
-            <DocField label="משקל ברוטו" value={grossWeight > 0 ? `${grossWeight.toFixed(2)} ק״ג` : "—"} />
+            <DocField
+              label="משקל ברוטו"
+              value={grossWeight > 0 ? `${grossWeight.toFixed(2)} ק״ג` : "—"}
+            />
             <DocField label="נפח" value={totalCbm > 0 ? `${totalCbm.toFixed(2)} CBM` : "—"} />
-            <DocField label="משקל לחיוב" value={chargeableWeight > 0 ? `${chargeableWeight.toFixed(2)} ק״ג` : "—"} />
+            <DocField
+              label="משקל לחיוב"
+              value={chargeableWeight > 0 ? `${chargeableWeight.toFixed(2)} ק״ג` : "—"}
+            />
           </div>
         )}
 
         {/* Info icon row */}
         {v.info && (
-          <div className={`grid grid-cols-2 gap-4 rounded-xl border p-4 ${isDomestic ? "sm:grid-cols-2" : "sm:grid-cols-3 lg:grid-cols-6"}`} style={{ breakInside: "avoid" }}>
+          <div
+            className={`grid grid-cols-2 gap-4 rounded-xl border p-4 ${isDomestic ? "sm:grid-cols-2" : "sm:grid-cols-3 lg:grid-cols-6"}`}
+            style={{ breakInside: "avoid" }}
+          >
             {!isDomestic && <DocField label="Incoterms" value={str(q.incoterm)} />}
             <DocField label="סוג העברה" value={moveType} />
-            {!isDomestic && <DocField label="שיטת שילוח" value={SHIPMENT_MODE_LABEL[str(q.shipment_mode)] ?? str(q.shipment_mode)} />}
+            {!isDomestic && (
+              <DocField
+                label="שיטת שילוח"
+                value={SHIPMENT_MODE_LABEL[str(q.shipment_mode)] ?? str(q.shipment_mode)}
+              />
+            )}
             <DocField label="זמן מעבר משוער" value={transitDaysLabel} />
             {!isDomestic && <DocField label="חברת תעופה" value={str(q.airline)} />}
-            {!isDomestic && <DocField label="דרך" value={transitPorts.length > 0 ? transitPorts.join(" · ") : "ישיר"} />}
+            {!isDomestic && (
+              <DocField
+                label="דרך"
+                value={transitPorts.length > 0 ? transitPorts.join(" · ") : "ישיר"}
+              />
+            )}
           </div>
         )}
 
         {/* Costs */}
         {v.costs && (
-        <div className="grid grid-cols-1 gap-4">
-          {v.costs && (
-          <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
-            <div className="mb-3 text-sm font-semibold">עלות שירותים</div>
-            {pricingItems.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-muted-foreground">
-                    <tr className="border-b">
-                      <th className="py-1.5 text-right font-medium">תיאור</th>
-                      <th className="py-1.5 text-right font-medium">כמות</th>
-                      <th className="py-1.5 text-right font-medium">מחיר יח&apos;</th>
-                      <th className="py-1.5 text-left font-medium">סה&quot;כ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pricingItems.map((r, i) => (
-                      <tr key={i} className="border-b last:border-0">
-                        <td className="py-1.5">{r.desc}</td>
-                        <td className="py-1.5 text-muted-foreground">{r.qty || "—"}{r.unit ? ` ${r.unit}` : ""}</td>
-                        <td className="py-1.5 text-muted-foreground">{r.unitPrice ? fmtMoney(r.unitPrice, r.currency) : "—"}</td>
-                        <td className="py-1.5 text-left font-medium">{fmtMoney(r.total, r.currency)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t-2">
-                      <td colSpan={3} className="py-2 text-sm font-semibold text-primary">סה&quot;כ</td>
-                      <td className="py-2 text-left text-sm font-bold text-primary">{fmtMoney(grandTotal, currency)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
+          <div className="grid grid-cols-1 gap-4">
+            {v.costs && (
+              <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
+                <div className="mb-3 text-sm font-semibold">עלות שירותים</div>
+                {pricingItems.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="text-xs text-muted-foreground">
+                        <tr className="border-b">
+                          <th className="py-1.5 text-right font-medium">תיאור</th>
+                          <th className="py-1.5 text-right font-medium">כמות</th>
+                          <th className="py-1.5 text-right font-medium">מחיר יח&apos;</th>
+                          <th className="py-1.5 text-left font-medium">סה&quot;כ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pricingItems.map((r, i) => (
+                          <tr key={i} className="border-b last:border-0">
+                            <td className="py-1.5">{r.desc}</td>
+                            <td className="py-1.5 text-muted-foreground">
+                              {r.qty || "—"}
+                              {r.unit ? ` ${r.unit}` : ""}
+                            </td>
+                            <td className="py-1.5 text-muted-foreground">
+                              {r.unitPrice ? fmtMoney(r.unitPrice, r.currency) : "—"}
+                            </td>
+                            <td className="py-1.5 text-left font-medium">
+                              {fmtMoney(r.total, r.currency)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2">
+                          <td colSpan={3} className="py-2 text-sm font-semibold text-primary">
+                            סה&quot;כ
+                          </td>
+                          <td className="py-2 text-left text-sm font-bold text-primary">
+                            {fmtMoney(grandTotal, currency)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">אין שורות תמחור להצעה זו.</div>
+                )}
               </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">אין שורות תמחור להצעה זו.</div>
             )}
           </div>
-          )}
-
-        </div>
         )}
 
         {/* Total price banner */}
         {v.costs && (
-        <div className="flex items-center justify-between rounded-xl bg-primary px-5 py-3 text-primary-foreground" style={{ breakInside: "avoid" }}>
-          <span className="text-sm font-medium">מחיר כולל</span>
-          <span className="text-xl font-bold">{fmtMoney(grandTotal, currency)}</span>
-        </div>
+          <div
+            className="flex items-center justify-between rounded-xl bg-primary px-5 py-3 text-primary-foreground"
+            style={{ breakInside: "avoid" }}
+          >
+            <span className="text-sm font-medium">מחיר כולל</span>
+            <span className="text-xl font-bold">{fmtMoney(grandTotal, currency)}</span>
+          </div>
         )}
 
         {/* Packaging details */}
-        {v.packaging && (packageCalcs.length > 0 || modelCalcs.length > 0) && (() => {
-          // Only add the רשם column when a logger actually applies to at
-          // least one row — most quotes don't use one, and an all-"—" column
-          // would just be noise on the customer-facing document.
-          const showLogger =
-            packageCalcs.some(({ pkg }) => !!pkg.loggerId) ||
-            modelCalcs.some(({ sel }) => !!sel.loggerId || sel.hasLogger === true);
-          return (
-          <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
-            <div className="mb-3 text-sm font-semibold">פרטי אריזה</div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr className="border-b">
-                    <th className="py-1.5 text-right font-medium">כמות</th>
-                    <th className="py-1.5 text-right font-medium">סוג אריזה</th>
-                    <th className="py-1.5 text-right font-medium">מידות (ס״מ)</th>
-                    <th className="py-1.5 text-right font-medium">משקל ברוטו</th>
-                    <th className="py-1.5 text-right font-medium">נפח (CBM)</th>
-                    {showLogger && <th className="py-1.5 text-right font-medium">רשם</th>}
-                    <th className="py-1.5 text-left font-medium">משקל לחיוב</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {packageCalcs.map(({ pkg, calc, cbm }) => (
-                    <tr key={pkg.id} className="border-b last:border-0">
-                      <td className="py-1.5">{calc.qty || "—"}</td>
-                      <td className="py-1.5">{palletLabel(pkg)}</td>
-                      <td className="py-1.5 text-muted-foreground">
-                        {calc.dims ? `${calc.dims.length}×${calc.dims.width}×${calc.dims.height}` : "—"}
-                      </td>
-                      <td className="py-1.5">{calc.grossWeight > 0 ? `${calc.grossWeight.toFixed(2)} ק״ג` : "—"}</td>
-                      <td className="py-1.5">{cbm > 0 ? cbm.toFixed(2) : "—"}</td>
-                      {showLogger && <td className="py-1.5 text-muted-foreground">{loggerLabel(pkg.loggerId)}</td>}
-                      <td className="py-1.5 text-left">{Math.max(calc.grossWeight, calc.volumetricWeight) > 0 ? `${Math.max(calc.grossWeight, calc.volumetricWeight).toFixed(2)} ק״ג` : "—"}</td>
-                    </tr>
-                  ))}
-                  {modelCalcs.map(({ sel, calc, cbm }, i) => (
-                    <tr key={`${sel.key}-${i}`} className="border-b last:border-0">
-                      <td className="py-1.5">{sel.qty}</td>
-                      <td className="py-1.5">{selectionLabel(sel)}</td>
-                      <td className="py-1.5 text-muted-foreground">
-                        {calc.dims ? `${calc.dims.length}×${calc.dims.width}×${calc.dims.height}` : "—"}
-                      </td>
-                      <td className="py-1.5">{calc.grossWeight > 0 ? `${calc.grossWeight.toFixed(2)} ק״ג` : "—"}</td>
-                      <td className="py-1.5">{cbm > 0 ? cbm.toFixed(2) : "—"}</td>
-                      {showLogger && <td className="py-1.5 text-muted-foreground">{loggerLabel(sel.loggerId, sel.hasLogger)}</td>}
-                      <td className="py-1.5 text-left">{Math.max(calc.grossWeight, calc.volumetricWeight) > 0 ? `${Math.max(calc.grossWeight, calc.volumetricWeight).toFixed(2)} ק״ג` : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2">
-                    <td className="py-2 text-sm font-semibold text-primary">{totalQty}</td>
-                    <td colSpan={showLogger ? 5 : 4} />
-                    <td className="py-2 text-left text-sm font-semibold text-primary">
-                      {chargeableWeight > 0 ? `${chargeableWeight.toFixed(2)} ק״ג` : "—"}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-          );
-        })()}
+        {v.packaging &&
+          (packageCalcs.length > 0 || modelCalcs.length > 0) &&
+          (() => {
+            // Only add the רשם column when a logger actually applies to at
+            // least one row — most quotes don't use one, and an all-"—" column
+            // would just be noise on the customer-facing document.
+            const showLogger =
+              packageCalcs.some(({ pkg }) => !!pkg.loggerId) ||
+              modelCalcs.some(({ sel }) => !!sel.loggerId || sel.hasLogger === true);
+            return (
+              <div className="rounded-xl border p-4" style={{ breakInside: "avoid" }}>
+                <div className="mb-3 text-sm font-semibold">פרטי אריזה</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-xs text-muted-foreground">
+                      <tr className="border-b">
+                        <th className="py-1.5 text-right font-medium">כמות</th>
+                        <th className="py-1.5 text-right font-medium">סוג אריזה</th>
+                        <th className="py-1.5 text-right font-medium">מידות (ס״מ)</th>
+                        <th className="py-1.5 text-right font-medium">משקל ברוטו</th>
+                        <th className="py-1.5 text-right font-medium">נפח (CBM)</th>
+                        {showLogger && <th className="py-1.5 text-right font-medium">רשם</th>}
+                        <th className="py-1.5 text-left font-medium">משקל לחיוב</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {packageCalcs.map(({ pkg, calc, cbm }) => (
+                        <tr key={pkg.id} className="border-b last:border-0">
+                          <td className="py-1.5">{calc.qty || "—"}</td>
+                          <td className="py-1.5">{palletLabel(pkg)}</td>
+                          <td className="py-1.5 text-muted-foreground">
+                            {calc.dims
+                              ? `${calc.dims.length}×${calc.dims.width}×${calc.dims.height}`
+                              : "—"}
+                          </td>
+                          <td className="py-1.5">
+                            {calc.grossWeight > 0 ? `${calc.grossWeight.toFixed(2)} ק״ג` : "—"}
+                          </td>
+                          <td className="py-1.5">{cbm > 0 ? cbm.toFixed(2) : "—"}</td>
+                          {showLogger && (
+                            <td className="py-1.5 text-muted-foreground">
+                              {loggerLabel(pkg.loggerId)}
+                            </td>
+                          )}
+                          <td className="py-1.5 text-left">
+                            {Math.max(calc.grossWeight, calc.volumetricWeight) > 0
+                              ? `${Math.max(calc.grossWeight, calc.volumetricWeight).toFixed(2)} ק״ג`
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                      {modelCalcs.map(({ sel, calc, cbm }, i) => (
+                        <tr key={`${sel.key}-${i}`} className="border-b last:border-0">
+                          <td className="py-1.5">{sel.qty}</td>
+                          <td className="py-1.5">{selectionLabel(sel)}</td>
+                          <td className="py-1.5 text-muted-foreground">
+                            {calc.dims
+                              ? `${calc.dims.length}×${calc.dims.width}×${calc.dims.height}`
+                              : "—"}
+                          </td>
+                          <td className="py-1.5">
+                            {calc.grossWeight > 0 ? `${calc.grossWeight.toFixed(2)} ק״ג` : "—"}
+                          </td>
+                          <td className="py-1.5">{cbm > 0 ? cbm.toFixed(2) : "—"}</td>
+                          {showLogger && (
+                            <td className="py-1.5 text-muted-foreground">
+                              {loggerLabel(sel.loggerId, sel.hasLogger)}
+                            </td>
+                          )}
+                          <td className="py-1.5 text-left">
+                            {Math.max(calc.grossWeight, calc.volumetricWeight) > 0
+                              ? `${Math.max(calc.grossWeight, calc.volumetricWeight).toFixed(2)} ק״ג`
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t-2">
+                        <td className="py-2 text-sm font-semibold text-primary">{totalQty}</td>
+                        <td colSpan={showLogger ? 5 : 4} />
+                        <td className="py-2 text-left text-sm font-semibold text-primary">
+                          {chargeableWeight > 0 ? `${chargeableWeight.toFixed(2)} ק״ג` : "—"}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
         {/* Shipper / consignee */}
         {v.shipperConsignee && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" style={{ breakInside: "avoid" }}>
-          <div className="rounded-xl border p-4">
-            <div className="mb-2 text-sm font-semibold">שולח (Shipper)</div>
-            <div className="space-y-1 text-xs">
-              <div><span className="text-muted-foreground">שם: </span><span className="font-medium">{str(q.customer_name) || "—"}</span></div>
-              <div><span className="text-muted-foreground">Ref: </span>{str(q.customer_ref) || "—"}</div>
-              <div><span className="text-muted-foreground">כתובת איסוף: </span>{pickupAddress || "—"}</div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" style={{ breakInside: "avoid" }}>
+            <div className="rounded-xl border p-4">
+              <div className="mb-2 text-sm font-semibold">שולח (Shipper)</div>
+              <div className="space-y-1 text-xs">
+                <div>
+                  <span className="text-muted-foreground">שם: </span>
+                  <span className="font-medium">{str(q.customer_name) || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Ref: </span>
+                  {str(q.customer_ref) || "—"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">כתובת איסוף: </span>
+                  {pickupAddress || "—"}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-xl border p-4">
+              <div className="mb-2 text-sm font-semibold">נמען (Consignee)</div>
+              <div className="space-y-1 text-xs">
+                <div>
+                  <span className="text-muted-foreground">שם: </span>
+                  <span className="font-medium">
+                    {deliveryContacts[0] ? str(deliveryContacts[0].name) : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">כתובת מסירה: </span>
+                  {deliveryAddress || "—"}
+                </div>
+              </div>
             </div>
           </div>
-          <div className="rounded-xl border p-4">
-            <div className="mb-2 text-sm font-semibold">נמען (Consignee)</div>
-            <div className="space-y-1 text-xs">
-              <div><span className="text-muted-foreground">שם: </span><span className="font-medium">{deliveryContacts[0] ? str(deliveryContacts[0].name) : "—"}</span></div>
-              <div><span className="text-muted-foreground">כתובת מסירה: </span>{deliveryAddress || "—"}</div>
-            </div>
-          </div>
-        </div>
         )}
 
         {/* Terms & conditions */}
         {v.terms && (
-        <div className="rounded-xl border p-4 text-xs leading-relaxed text-muted-foreground" style={{ breakInside: "avoid" }}>
-          <div className="mb-2 text-sm font-semibold text-foreground">הצעה זו אינה כוללת</div>
-          <ul className="mb-4 list-inside list-disc space-y-1">
-            <li>אגרות, מיסים, מע״מ, היטלים ורישיונות רגולטוריים.</li>
-            <li>ביטוח מטען, אלא אם צוין אחרת מפורשות בטבלת עלות השירותים לעיל.</li>
-            <li>אחסון בישראל וביעד, דמי המתנה (Demurrage) ודמי איחור.</li>
-            <li>בדיקות מכס פיזיות, איסוף/מסירה מיוחדים מחוץ לכתובת שצוינה.</li>
-            <li>אגרות נמל/שדה תעופה בפועל, ככל שיחולו מעבר לאמור לעיל.</li>
-          </ul>
-          <div className="mb-2 text-sm font-semibold text-foreground">תנאים כלליים</div>
-          <ul className="list-inside list-disc space-y-1">
-            <li>ההצעה כפופה לזמינות מקום וציוד אצל חברות התעופה/הספנות במועד ההזמנה.</li>
-            <li>לוחות הזמנים המוצגים הם משוערים בלבד ואינם מהווים התחייבות למועד יציאה/הגעה מדויק.</li>
-            <li>יחס נפח/משקל בהובלה אווירית מחושב לפי 1:6 (1 CBM = 167 ק״ג), אלא אם צוין אחרת.</li>
-            <li>ההצעה מתייחסת למטען כללי בלבד; מטען מסוכן, חריג או שאינו ניתן לערימה עשוי לחייב תמחור נפרד.</li>
-            <li>AFIK Logistics Platform פועלת כמתאם שירותים מול ספקים חיצוניים ואינה אחראית לעיכובים, אובדן או נזק במטען בעת החזקתו בידי צד ג׳.</li>
-            <li>אלא אם צוין אחרת, הצעה זו בתוקף למשך {validityDays} יום ממועד ההנפקה.</li>
-          </ul>
-        </div>
+          <div
+            className="rounded-xl border p-4 text-xs leading-relaxed text-muted-foreground"
+            style={{ breakInside: "avoid" }}
+          >
+            <div className="mb-2 text-sm font-semibold text-foreground">הצעה זו אינה כוללת</div>
+            <ul className="mb-4 list-inside list-disc space-y-1">
+              <li>אגרות, מיסים, מע״מ, היטלים ורישיונות רגולטוריים.</li>
+              <li>ביטוח מטען, אלא אם צוין אחרת מפורשות בטבלת עלות השירותים לעיל.</li>
+              <li>אחסון בישראל וביעד, דמי המתנה (Demurrage) ודמי איחור.</li>
+              <li>בדיקות מכס פיזיות, איסוף/מסירה מיוחדים מחוץ לכתובת שצוינה.</li>
+              <li>אגרות נמל/שדה תעופה בפועל, ככל שיחולו מעבר לאמור לעיל.</li>
+            </ul>
+            <div className="mb-2 text-sm font-semibold text-foreground">תנאים כלליים</div>
+            <ul className="list-inside list-disc space-y-1">
+              <li>ההצעה כפופה לזמינות מקום וציוד אצל חברות התעופה/הספנות במועד ההזמנה.</li>
+              <li>
+                לוחות הזמנים המוצגים הם משוערים בלבד ואינם מהווים התחייבות למועד יציאה/הגעה מדויק.
+              </li>
+              <li>
+                יחס נפח/משקל בהובלה אווירית מחושב לפי 1:6 (1 CBM = 167 ק״ג), אלא אם צוין אחרת.
+              </li>
+              <li>
+                ההצעה מתייחסת למטען כללי בלבד; מטען מסוכן, חריג או שאינו ניתן לערימה עשוי לחייב
+                תמחור נפרד.
+              </li>
+              <li>
+                AFIK Logistics Platform פועלת כמתאם שירותים מול ספקים חיצוניים ואינה אחראית
+                לעיכובים, אובדן או נזק במטען בעת החזקתו בידי צד ג׳.
+              </li>
+              <li>אלא אם צוין אחרת, הצעה זו בתוקף למשך {validityDays} יום ממועד ההנפקה.</li>
+            </ul>
+          </div>
         )}
 
         {/* Footer */}
