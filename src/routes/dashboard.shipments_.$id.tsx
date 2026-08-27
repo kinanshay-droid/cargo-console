@@ -828,9 +828,13 @@ function CaseDetail() {
           boxSize,
         };
       });
-    if (fromPackModels.length > 0) return fromPackModels;
 
-    return form.packages
+    // Manual pallets ("מארזים ומשטחים") and catalog packaging models
+    // ("סדרת טמפרטורה ואריזה") aren't mutually exclusive — a case can have
+    // both. Each real box/pallet across both sections gets its own
+    // checklist entry, instead of the catalog list silently hiding manual
+    // pallets whenever both were filled in.
+    const fromPackages = form.packages
       .filter((p) => p.pallet && Number(p.unitQty) > 0)
       .map((p): ChecklistBox => {
         const pallet = PALLETS.find((pl) => pl.id === p.pallet);
@@ -848,6 +852,8 @@ function CaseDetail() {
           boxSize,
         };
       });
+
+    return [...fromPackModels, ...fromPackages];
   }, [form]);
 
   // Everything the courier needs to physically pick up and deliver the
