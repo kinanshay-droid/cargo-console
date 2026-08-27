@@ -62,6 +62,16 @@ function isLowStock(item: WarehouseItem): boolean {
   return item.minThreshold != null && item.quantityOnHand <= item.minThreshold;
 }
 
+const EXPIRY_SOON_DAYS = 30;
+
+function expiryStatus(item: WarehouseItem): "expired" | "soon" | null {
+  if (!item.expiryDate) return null;
+  const days = (new Date(item.expiryDate).getTime() - Date.now()) / 86_400_000;
+  if (days < 0) return "expired";
+  if (days <= EXPIRY_SOON_DAYS) return "soon";
+  return null;
+}
+
 function WarehousePage() {
   const qc = useQueryClient();
   const listFn = useServerFn(listWarehouseItems);
@@ -126,6 +136,7 @@ function WarehousePage() {
               <TableHead className="text-right">קטגוריה</TableHead>
               <TableHead className="text-right">מק"ט</TableHead>
               <TableHead className="text-right">כמות במלאי</TableHead>
+              <TableHead className="text-right">תוקף</TableHead>
               <TableHead className="text-right">סטטוס</TableHead>
               <TableHead className="text-right">פעולות</TableHead>
             </TableRow>
@@ -133,13 +144,13 @@ function WarehousePage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   טוען…
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   אין עדיין פריטים במחסן.
                 </TableCell>
               </TableRow>
@@ -162,6 +173,25 @@ function WarehousePage() {
                     </span>
                     {isLowStock(item) && (
                       <Badge className="mr-2 bg-destructive/10 text-destructive">מלאי נמוך</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.expiryDate ? (
+                      <span
+                        className={
+                          expiryStatus(item) === "expired"
+                            ? "font-semibold text-destructive"
+                            : expiryStatus(item) === "soon"
+                              ? "font-semibold text-warning"
+                              : ""
+                        }
+                      >
+                        {new Date(item.expiryDate).toLocaleDateString("he-IL")}
+                        {expiryStatus(item) === "expired" && " (פג תוקף)"}
+                        {expiryStatus(item) === "soon" && " (בקרוב)"}
+                      </span>
+                    ) : (
+                      "—"
                     )}
                   </TableCell>
                   <TableCell>
@@ -212,6 +242,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
     unit: item?.unit ?? "יח׳",
     quantityOnHand: 0,
     minThreshold: item?.minThreshold != null ? String(item.minThreshold) : "",
+    expiryDate: item?.expiryDate ?? "",
     notes: item?.notes ?? "",
   });
 
@@ -226,6 +257,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
               sku: form.sku || null,
               unit: form.unit,
               minThreshold: form.minThreshold ? Number(form.minThreshold) : null,
+              expiryDate: form.expiryDate || null,
               notes: form.notes || null,
             },
           })
@@ -237,6 +269,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
               unit: form.unit,
               quantityOnHand: form.quantityOnHand,
               minThreshold: form.minThreshold ? Number(form.minThreshold) : null,
+              expiryDate: form.expiryDate || null,
               notes: form.notes || null,
             },
           }),
@@ -334,6 +367,14 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
                 onChange={(e) => setForm((f) => ({ ...f, minThreshold: e.target.value }))}
               />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>תאריך תפוגה (לא חובה)</Label>
+            <Input
+              type="date"
+              value={form.expiryDate}
+              onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>הערות</Label>

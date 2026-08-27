@@ -19,6 +19,7 @@ export type WarehouseItem = {
   unit: string;
   quantityOnHand: number;
   minThreshold: number | null;
+  expiryDate: string | null;
   notes: string | null;
   active: boolean;
   createdAt: string;
@@ -43,6 +44,7 @@ function toWarehouseItem(row: {
   unit: string;
   quantity_on_hand: number;
   min_threshold: number | null;
+  expiry_date: string | null;
   notes: string | null;
   active: boolean;
   created_at: string;
@@ -56,6 +58,7 @@ function toWarehouseItem(row: {
     unit: row.unit,
     quantityOnHand: row.quantity_on_hand,
     minThreshold: row.min_threshold,
+    expiryDate: row.expiry_date,
     notes: row.notes,
     active: row.active,
     createdAt: row.created_at,
@@ -69,7 +72,7 @@ export const listWarehouseItems = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("warehouse_items")
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, notes, active, created_at, updated_at",
       )
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
@@ -86,6 +89,7 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
       unit?: string;
       quantityOnHand?: number;
       minThreshold?: number | null;
+      expiryDate?: string | null;
       notes?: string | null;
     }) => {
       if (!input?.name?.trim()) throw new Error("name is required");
@@ -116,9 +120,10 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
         unit: data.unit?.trim() || "יח׳",
         notes: data.notes?.trim() || null,
         min_threshold: data.minThreshold ?? null,
+        expiry_date: data.expiryDate || null,
       })
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, notes, active, created_at, updated_at",
       )
       .single();
     if (error) throw new Error(error.message);
@@ -150,6 +155,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       sku?: string | null;
       unit?: string;
       minThreshold?: number | null;
+      expiryDate?: string | null;
       notes?: string | null;
     }) => {
       if (!input?.id) throw new Error("id is required");
@@ -164,6 +170,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
     if (data.sku !== undefined) patch.sku = data.sku?.trim() || null;
     if (data.unit !== undefined) patch.unit = data.unit.trim() || "יח׳";
     if (data.minThreshold !== undefined) patch.min_threshold = data.minThreshold;
+    if (data.expiryDate !== undefined) patch.expiry_date = data.expiryDate || null;
     if (data.notes !== undefined) patch.notes = data.notes?.trim() || null;
 
     const { data: row, error } = await supabase
@@ -171,7 +178,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       .update(patch as never)
       .eq("id", data.id)
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, notes, active, created_at, updated_at",
       )
       .single();
     if (error) throw new Error(error.message);
@@ -231,7 +238,7 @@ export const adjustWarehouseStock = createServerFn({ method: "POST" })
     const { data: updated, error: reloadErr } = await supabase
       .from("warehouse_items")
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, notes, active, created_at, updated_at",
       )
       .eq("id", data.itemId)
       .single();
