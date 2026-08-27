@@ -11,6 +11,7 @@ import {
   Wrench,
   Package,
   Thermometer,
+  Warehouse,
 } from "lucide-react";
 import {
   listWarehouseItems,
@@ -119,6 +120,8 @@ function WarehousePage() {
       <PageHeader
         title="מחסן"
         description="מלאי פריטי אריזה וציוד המשמשים בבניית מארזים."
+        icon={Warehouse}
+        tone="success"
         action={<ItemFormDialog onSaved={invalidate} />}
       />
 
