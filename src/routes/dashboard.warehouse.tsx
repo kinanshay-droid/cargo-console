@@ -2,7 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, PackagePlus, PackageMinus, Pencil, Boxes, Wrench } from "lucide-react";
+import {
+  Plus,
+  PackagePlus,
+  PackageMinus,
+  Pencil,
+  Boxes,
+  Wrench,
+  Package,
+  Thermometer,
+} from "lucide-react";
 import {
   listWarehouseItems,
   createWarehouseItem,
@@ -54,9 +63,18 @@ export const Route = createFileRoute("/dashboard/warehouse")({
 });
 
 const CATEGORY_LABEL: Record<WarehouseCategory, string> = {
+  boxes: "מארזים",
+  loggers: "רשמי טמפרטורה",
   packaging: "פריט אריזה",
   equipment: "ציוד",
 };
+
+const CATEGORY_FILTERS: { value: WarehouseCategory; icon: typeof Boxes }[] = [
+  { value: "boxes", icon: Package },
+  { value: "loggers", icon: Thermometer },
+  { value: "packaging", icon: Boxes },
+  { value: "equipment", icon: Wrench },
+];
 
 function isLowStock(item: WarehouseItem): boolean {
   return item.minThreshold != null && item.quantityOnHand <= item.minThreshold;
@@ -112,20 +130,16 @@ function WarehousePage() {
         >
           הכל
         </Button>
-        <Button
-          size="sm"
-          variant={categoryFilter === "packaging" ? "default" : "outline"}
-          onClick={() => setCategoryFilter("packaging")}
-        >
-          <Boxes className="h-3.5 w-3.5" /> פריטי אריזה
-        </Button>
-        <Button
-          size="sm"
-          variant={categoryFilter === "equipment" ? "default" : "outline"}
-          onClick={() => setCategoryFilter("equipment")}
-        >
-          <Wrench className="h-3.5 w-3.5" /> ציוד
-        </Button>
+        {CATEGORY_FILTERS.map(({ value, icon: Icon }) => (
+          <Button
+            key={value}
+            size="sm"
+            variant={categoryFilter === value ? "default" : "outline"}
+            onClick={() => setCategoryFilter(value)}
+          >
+            <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
+          </Button>
+        ))}
       </div>
 
       <div className="overflow-hidden rounded-lg border bg-card">
@@ -323,6 +337,8 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="boxes">מארזים</SelectItem>
+                <SelectItem value="loggers">רשמי טמפרטורה</SelectItem>
                 <SelectItem value="packaging">פריט אריזה</SelectItem>
                 <SelectItem value="equipment">ציוד</SelectItem>
               </SelectContent>

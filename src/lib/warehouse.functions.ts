@@ -9,7 +9,21 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // the running total in sync. Any org member can view/adjust stock (this is
 // day-to-day operational data, not admin-gated like admin.functions.ts).
 
-export type WarehouseCategory = "packaging" | "equipment";
+// "boxes" = the CoolGuard/BioTherm packaging models themselves (matched by
+// name to a case's box type — see packaging-checklist-dialog.tsx);
+// "loggers" = temperature recorder devices (Tive/Sensitech/ELPRO/etc., same
+// catalog as TEMP_LOGGERS in new-quote-dialog.tsx); "packaging" covers other
+// consumables (tape, absorbent, void fill...); "equipment" is anything else
+// reusable.
+export type WarehouseCategory = "packaging" | "equipment" | "boxes" | "loggers";
+
+const WAREHOUSE_CATEGORIES: WarehouseCategory[] = ["packaging", "equipment", "boxes", "loggers"];
+
+function normalizeCategory(value: string): WarehouseCategory {
+  return (WAREHOUSE_CATEGORIES as string[]).includes(value)
+    ? (value as WarehouseCategory)
+    : "packaging";
+}
 
 export type WarehouseItem = {
   id: string;
@@ -54,7 +68,7 @@ function toWarehouseItem(row: {
   return {
     id: row.id,
     name: row.name,
-    category: row.category === "equipment" ? "equipment" : "packaging",
+    category: normalizeCategory(row.category),
     sku: row.sku,
     unit: row.unit,
     quantityOnHand: row.quantity_on_hand,
@@ -94,8 +108,8 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
       notes?: string | null;
     }) => {
       if (!input?.name?.trim()) throw new Error("name is required");
-      if (input.category !== "packaging" && input.category !== "equipment") {
-        throw new Error('category must be "packaging" or "equipment"');
+      if (!WAREHOUSE_CATEGORIES.includes(input.category)) {
+        throw new Error(`category must be one of: ${WAREHOUSE_CATEGORIES.join(", ")}`);
       }
       return input;
     },
