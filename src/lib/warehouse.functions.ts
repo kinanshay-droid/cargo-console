@@ -32,6 +32,7 @@ export type WarehouseMovement = {
   delta: number;
   reason: string;
   caseId: string | null;
+  movementDate: string;
   createdBy: string;
   createdAt: string;
 };
@@ -206,7 +207,13 @@ export const setWarehouseItemActive = createServerFn({ method: "POST" })
 export const adjustWarehouseStock = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator(
-    (input: { itemId: string; delta: number; reason: string; caseId?: string | null }) => {
+    (input: {
+      itemId: string;
+      delta: number;
+      reason: string;
+      caseId?: string | null;
+      movementDate?: string;
+    }) => {
       if (!input?.itemId) throw new Error("itemId is required");
       if (typeof input.delta !== "number" || input.delta === 0) {
         throw new Error("delta must be a non-zero number");
@@ -231,6 +238,7 @@ export const adjustWarehouseStock = createServerFn({ method: "POST" })
       delta: data.delta,
       reason: data.reason.trim(),
       case_id: data.caseId ?? null,
+      movement_date: data.movementDate || new Date().toISOString().slice(0, 10),
       created_by: userId,
     });
     if (error) throw new Error(error.message);
@@ -255,7 +263,7 @@ export const listWarehouseMovements = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { data: rows, error } = await context.supabase
       .from("warehouse_movements")
-      .select("id, item_id, delta, reason, case_id, created_by, created_at")
+      .select("id, item_id, delta, reason, case_id, movement_date, created_by, created_at")
       .eq("item_id", data.itemId)
       .order("created_at", { ascending: false })
       .limit(50);
@@ -266,6 +274,7 @@ export const listWarehouseMovements = createServerFn({ method: "GET" })
       delta: r.delta,
       reason: r.reason,
       caseId: r.case_id,
+      movementDate: r.movement_date,
       createdBy: r.created_by,
       createdAt: r.created_at,
     }));

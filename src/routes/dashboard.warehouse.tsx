@@ -397,12 +397,17 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
   );
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: () => void }) {
   const adjustFn = useServerFn(adjustWarehouseStock);
   const [open, setOpen] = useState(false);
   const [direction, setDirection] = useState<"in" | "out">("out");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
+  const [movementDate, setMovementDate] = useState(todayISO);
 
   const adjust = useMutation({
     mutationFn: () =>
@@ -411,6 +416,7 @@ function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: ()
           itemId: item.id,
           delta: direction === "in" ? Number(qty) : -Number(qty),
           reason: reason.trim(),
+          movementDate,
         },
       }),
     onSuccess: () => {
@@ -418,6 +424,7 @@ function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: ()
       setOpen(false);
       setQty("");
       setReason("");
+      setMovementDate(todayISO());
       onSaved();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "העדכון נכשל"),
@@ -477,6 +484,15 @@ function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: ()
               placeholder={direction === "in" ? "לדוגמה: הזמנה מספק" : "לדוגמה: שימוש במארז"}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>{direction === "in" ? "תאריך כניסה למלאי" : "תאריך התנועה"}</Label>
+            <Input
+              type="date"
+              required
+              value={movementDate}
+              onChange={(e) => setMovementDate(e.target.value)}
             />
           </div>
           <div className="text-sm text-muted-foreground">
