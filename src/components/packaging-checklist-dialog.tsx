@@ -71,6 +71,7 @@ function PackagingChecklistFormDialog({
 }: FormDialogProps) {
   const [data, setData] = useState<ChecklistData>(emptyChecklistData);
   const [baselineConsumed, setBaselineConsumed] = useState<Record<string, number>>({});
+  const [autoSuggested, setAutoSuggested] = useState(false);
   const queryClient = useQueryClient();
   const saveChecklistFn = useServerFn(saveCaseChecklist);
   const listWarehouseItemsFn = useServerFn(listWarehouseItems);
@@ -102,8 +103,30 @@ function PackagingChecklistFormDialog({
     const baseline: Record<string, number> = {};
     for (const ci of parsed.consumedItems) baseline[ci.itemId] = ci.quantity;
     setBaselineConsumed(baseline);
+    setAutoSuggested(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, boxId]);
+
+  // Pre-fill the consumed-items list with the warehouse item matching this
+  // box's model (seeded 1:1 from the CoolGuard/BioTherm catalog — see
+  // supabase/migrations/20260827100000_seed_warehouse_packaging_catalog.sql)
+  // so the record used to build the box lines up with the one deducted from
+  // stock. Only runs once per box, and only if nothing was recorded yet.
+  useEffect(() => {
+    if (!open || autoSuggested) return;
+    const items = warehouseItemsQuery.data;
+    if (!items) return;
+    setAutoSuggested(true);
+    if (data.consumedItems.length > 0 || !caseSnapshot?.boxType) return;
+    const match = items.find((i) => i.active && i.name === caseSnapshot.boxType);
+    if (!match) return;
+    setData((d) =>
+      d.consumedItems.length > 0
+        ? d
+        : { ...d, consumedItems: [{ itemId: match.id, itemName: match.name, quantity: 1 }] },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, autoSuggested, warehouseItemsQuery.data, caseSnapshot?.boxType]);
 
   function addConsumedRow() {
     setData((d) => ({
@@ -345,6 +368,7 @@ function PackagingChecklistFormDialog({
                       {activeWarehouseItems.map((item) => (
                         <SelectItem key={item.id} value={item.id}>
                           {item.name} ({item.quantityOnHand} {item.unit} במלאי)
+                          {caseSnapshot?.boxType === item.name ? " — מארז זה" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
