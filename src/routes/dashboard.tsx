@@ -1,10 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  Outlet,
-  useNavigate,
-  useRouterState,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -19,6 +13,7 @@ import {
   Bell,
   ChevronDown,
   ArrowLeftRight,
+  Package,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -35,25 +30,80 @@ const NAV_SECTIONS = [
   {
     labelKey: null as TranslationKey | null,
     items: [
-      { to: "/dashboard/overview", labelKey: "nav.overview" as TranslationKey, icon: Building2, adminOnly: false },
-      { to: "/dashboard/commercial", labelKey: "nav.commercial" as TranslationKey, icon: TrendingUp, adminOnly: false },
-      { to: "/dashboard/operations", labelKey: "nav.operations" as TranslationKey, icon: Bell, adminOnly: false },
-      { to: "/dashboard/shipments", labelKey: "nav.shipments" as TranslationKey, icon: Truck, adminOnly: false },
-      { to: "/dashboard/pickup-distribution", labelKey: "nav.pickupDistribution" as TranslationKey, icon: ArrowLeftRight, adminOnly: false },
-      { to: "/dashboard/account", labelKey: "nav.account" as TranslationKey, icon: User, adminOnly: false },
+      {
+        to: "/dashboard/overview",
+        labelKey: "nav.overview" as TranslationKey,
+        icon: Building2,
+        adminOnly: false,
+      },
+      {
+        to: "/dashboard/commercial",
+        labelKey: "nav.commercial" as TranslationKey,
+        icon: TrendingUp,
+        adminOnly: false,
+      },
+      {
+        to: "/dashboard/operations",
+        labelKey: "nav.operations" as TranslationKey,
+        icon: Bell,
+        adminOnly: false,
+      },
+      {
+        to: "/dashboard/shipments",
+        labelKey: "nav.shipments" as TranslationKey,
+        icon: Truck,
+        adminOnly: false,
+      },
+      {
+        to: "/dashboard/pickup-distribution",
+        labelKey: "nav.pickupDistribution" as TranslationKey,
+        icon: ArrowLeftRight,
+        adminOnly: false,
+      },
+      {
+        to: "/dashboard/warehouse",
+        labelKey: "nav.warehouse" as TranslationKey,
+        icon: Package,
+        adminOnly: false,
+      },
+      {
+        to: "/dashboard/account",
+        labelKey: "nav.account" as TranslationKey,
+        icon: User,
+        adminOnly: false,
+      },
     ],
   },
   {
     labelKey: "nav.adminSection" as TranslationKey | null,
     items: [
-      { to: "/dashboard/users", labelKey: "nav.users" as TranslationKey, icon: Users, adminOnly: true },
-      { to: "/dashboard/roles", labelKey: "nav.roles" as TranslationKey, icon: ShieldCheck, adminOnly: true },
-      { to: "/dashboard/organization", labelKey: "nav.organization" as TranslationKey, icon: Building2, adminOnly: true },
-      { to: "/dashboard/audit-log", labelKey: "nav.auditLog" as TranslationKey, icon: ScrollText, adminOnly: true },
+      {
+        to: "/dashboard/users",
+        labelKey: "nav.users" as TranslationKey,
+        icon: Users,
+        adminOnly: true,
+      },
+      {
+        to: "/dashboard/roles",
+        labelKey: "nav.roles" as TranslationKey,
+        icon: ShieldCheck,
+        adminOnly: true,
+      },
+      {
+        to: "/dashboard/organization",
+        labelKey: "nav.organization" as TranslationKey,
+        icon: Building2,
+        adminOnly: true,
+      },
+      {
+        to: "/dashboard/audit-log",
+        labelKey: "nav.auditLog" as TranslationKey,
+        icon: ScrollText,
+        adminOnly: true,
+      },
     ],
   },
 ];
-
 
 function DashboardLayout() {
   const navigate = useNavigate();
@@ -106,8 +156,6 @@ function DashboardLayout() {
     );
   }
 
-
-
   const initials = (user?.fullName || email || "?")
     .split(/\s+/)
     .map((s) => s[0])
@@ -124,7 +172,11 @@ function DashboardLayout() {
         <div className="flex flex-1 flex-col rounded-2xl bg-sidebar text-sidebar-foreground shadow-xl ring-1 ring-sidebar-border/50">
           {/* Header */}
           <div className="flex items-center justify-center px-3 py-4">
-            <img src="/afik-logo-white.png" alt={t("app.name")} className="h-auto w-full rounded-xl" />
+            <img
+              src="/afik-logo-white.png"
+              alt={t("app.name")}
+              className="h-auto w-full rounded-xl"
+            />
           </div>
 
           {/* Nav */}
@@ -202,7 +254,6 @@ function DashboardLayout() {
           </div>
         </div>
       </aside>
-
 
       {/* Mobile top bar */}
       <div className="flex flex-1 flex-col">

@@ -9,7 +9,10 @@ export type Locale = "he" | "en";
 export const DICTIONARY = {
   // App-wide chrome
   "app.name": { he: "AFIK Logistics Platform", en: "AFIK Logistics Platform" },
-  "app.tagline": { he: "The Intelligence Behind Every Shipment.", en: "The Intelligence Behind Every Shipment." },
+  "app.tagline": {
+    he: "The Intelligence Behind Every Shipment.",
+    en: "The Intelligence Behind Every Shipment.",
+  },
   "common.loading": { he: "טוען...", en: "Loading…" },
   "common.member": { he: "חבר", en: "Member" },
   "common.admin": { he: "אדמין", en: "Admin" },
@@ -22,6 +25,7 @@ export const DICTIONARY = {
   "nav.shipments": { he: "משלוחים", en: "Shipments" },
   "nav.pickupDistribution": { he: "איסוף/הפצה", en: "Pickup / Distribution" },
   "nav.account": { he: "חשבון", en: "Account" },
+  "nav.warehouse": { he: "מחסן", en: "Warehouse" },
   "nav.users": { he: "משתמשים", en: "Users" },
   "nav.roles": { he: "תפקידים", en: "Roles" },
   "nav.organization": { he: "ארגון", en: "Organization" },

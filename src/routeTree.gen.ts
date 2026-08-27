@@ -24,6 +24,7 @@ import { Route as DashboardCommercialRouteImport } from './routes/dashboard.comm
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
 import { Route as DashboardOperationsRouteImport } from './routes/dashboard.operations'
 import { Route as DashboardOrganizationRouteImport } from './routes/dashboard.organization'
+import { Route as DashboardWarehouseRouteImport } from './routes/dashboard.warehouse'
 import { Route as DashboardOverviewRouteImport } from './routes/dashboard.overview'
 import { Route as DashboardPickupDistributionRouteImport } from './routes/dashboard.pickup-distribution'
 import { Route as DashboardPricelistsRouteImport } from './routes/dashboard.pricelists'
@@ -134,6 +135,11 @@ const DashboardOperationsRoute = DashboardOperationsRouteImport.update({
 const DashboardOrganizationRoute = DashboardOrganizationRouteImport.update({
   id: '/organization',
   path: '/organization',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardWarehouseRoute = DashboardWarehouseRouteImport.update({
+  id: '/warehouse',
+  path: '/warehouse',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardOverviewRoute = DashboardOverviewRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/customers': typeof DashboardCustomersRouteWithChildren
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
+  '/dashboard/warehouse': typeof DashboardWarehouseRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
@@ -286,6 +293,7 @@ export interface FileRoutesByTo {
   '/dashboard/commercial': typeof DashboardCommercialRoute
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
+  '/dashboard/warehouse': typeof DashboardWarehouseRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
@@ -325,6 +333,7 @@ export interface FileRoutesById {
   '/dashboard/customers': typeof DashboardCustomersRouteWithChildren
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
+  '/dashboard/warehouse': typeof DashboardWarehouseRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
@@ -603,6 +612,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardOrganizationRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/warehouse': {
+      id: '/dashboard/warehouse'
+      path: '/warehouse'
+      fullPath: '/dashboard/warehouse'
+      preLoaderRoute: typeof DashboardWarehouseRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/overview': {
       id: '/dashboard/overview'
       path: '/overview'
@@ -763,6 +779,7 @@ interface DashboardRouteChildren {
   DashboardCustomersRoute: typeof DashboardCustomersRouteWithChildren
   DashboardOperationsRoute: typeof DashboardOperationsRouteWithChildren
   DashboardOrganizationRoute: typeof DashboardOrganizationRoute
+  DashboardWarehouseRoute: typeof DashboardWarehouseRoute
   DashboardOverviewRoute: typeof DashboardOverviewRoute
   DashboardPickupDistributionRoute: typeof DashboardPickupDistributionRoute
   DashboardPricelistsRoute: typeof DashboardPricelistsRoute
@@ -787,6 +804,7 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardCustomersRoute: DashboardCustomersRouteWithChildren,
   DashboardOperationsRoute: DashboardOperationsRouteWithChildren,
   DashboardOrganizationRoute: DashboardOrganizationRoute,
+  DashboardWarehouseRoute: DashboardWarehouseRoute,
   DashboardOverviewRoute: DashboardOverviewRoute,
   DashboardPickupDistributionRoute: DashboardPickupDistributionRoute,
   DashboardPricelistsRoute: DashboardPricelistsRoute,

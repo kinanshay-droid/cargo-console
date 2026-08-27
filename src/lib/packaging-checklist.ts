@@ -118,6 +118,13 @@ export const CHECKLIST_SECTIONS: ChecklistSection[] = [
 
 export type ChecklistItemState = { status: ChecklistItemStatus; note: string };
 
+// A warehouse item (packaging material/equipment) consumed while building
+// this specific box, recorded on save as a warehouse_movements delta so
+// stock stays in sync — see PackagingChecklistFormDialog's saveMutation in
+// packaging-checklist-dialog.tsx for the diffing logic against the
+// previously-saved list.
+export type ConsumedItem = { itemId: string; itemName: string; quantity: number };
+
 export type ChecklistData = {
   shipmentNumber: string;
   customer: string;
@@ -128,6 +135,7 @@ export type ChecklistData = {
   qaBy: string;
   signedDate: string;
   savedAt: string | null;
+  consumedItems: ConsumedItem[];
 };
 
 export function emptyChecklistItems(): Record<string, ChecklistItemState> {
@@ -151,6 +159,7 @@ export function emptyChecklistData(): ChecklistData {
     qaBy: "",
     signedDate: "",
     savedAt: null,
+    consumedItems: [],
   };
 }
 
@@ -162,6 +171,19 @@ function toText(value: unknown): string {
 }
 function toStatus(value: unknown): ChecklistItemStatus {
   return value === "ok" || value === "not_ok" ? value : "unset";
+}
+
+function toConsumedItems(value: unknown): ConsumedItem[] {
+  if (!Array.isArray(value)) return [];
+  const out: ConsumedItem[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry)) continue;
+    const itemId = toText(entry.itemId);
+    const quantity = typeof entry.quantity === "number" ? entry.quantity : 0;
+    if (!itemId || quantity <= 0) continue;
+    out.push({ itemId, itemName: toText(entry.itemName), quantity });
+  }
+  return out;
 }
 
 export function parseChecklistData(raw: unknown): ChecklistData {
@@ -185,6 +207,7 @@ export function parseChecklistData(raw: unknown): ChecklistData {
     qaBy: toText(raw.qaBy),
     signedDate: toText(raw.signedDate),
     savedAt: typeof raw.savedAt === "string" ? raw.savedAt : null,
+    consumedItems: toConsumedItems(raw.consumedItems),
   };
 }
 
