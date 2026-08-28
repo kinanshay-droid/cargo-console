@@ -21,6 +21,7 @@ import {
   adjustWarehouseStock,
   type WarehouseItem,
   type WarehouseCategory,
+  type WarehouseCurrency,
 } from "@/lib/warehouse.functions";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -80,6 +81,12 @@ const CATEGORY_FILTERS: { value: WarehouseCategory; icon: typeof Boxes }[] = [
 function isLowStock(item: WarehouseItem): boolean {
   return item.minThreshold != null && item.quantityOnHand <= item.minThreshold;
 }
+
+const CURRENCY_SYMBOL: Record<WarehouseCurrency, string> = {
+  ILS: "₪",
+  USD: "$",
+  EUR: "€",
+};
 
 const EXPIRY_SOON_DAYS = 30;
 
@@ -196,13 +203,14 @@ function WarehousePage() {
                   <TableCell className="text-muted-foreground">
                     {item.unitCost != null ? (
                       <>
-                        {item.unitCost.toLocaleString("he-IL", { minimumFractionDigits: 2 })} ₪
+                        {item.unitCost.toLocaleString("he-IL", { minimumFractionDigits: 2 })}{" "}
+                        {CURRENCY_SYMBOL[item.unitCostCurrency]}
                         <div className="text-xs">
                           סה״כ:{" "}
                           {(item.unitCost * item.quantityOnHand).toLocaleString("he-IL", {
                             minimumFractionDigits: 2,
                           })}{" "}
-                          ₪
+                          {CURRENCY_SYMBOL[item.unitCostCurrency]}
                         </div>
                       </>
                     ) : (
@@ -278,6 +286,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
     minThreshold: item?.minThreshold != null ? String(item.minThreshold) : "",
     expiryDate: item?.expiryDate ?? "",
     unitCost: item?.unitCost != null ? String(item.unitCost) : "",
+    unitCostCurrency: item?.unitCostCurrency ?? ("ILS" as WarehouseCurrency),
     notes: item?.notes ?? "",
   });
 
@@ -294,6 +303,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
               minThreshold: form.minThreshold ? Number(form.minThreshold) : null,
               expiryDate: form.expiryDate || null,
               unitCost: form.unitCost ? Number(form.unitCost) : null,
+              unitCostCurrency: form.unitCostCurrency,
               notes: form.notes || null,
             },
           })
@@ -307,6 +317,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
               minThreshold: form.minThreshold ? Number(form.minThreshold) : null,
               expiryDate: form.expiryDate || null,
               unitCost: form.unitCost ? Number(form.unitCost) : null,
+              unitCostCurrency: form.unitCostCurrency,
               notes: form.notes || null,
             },
           }),
@@ -418,13 +429,31 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
             </div>
             <div className="space-y-1.5">
               <Label>עלות יחידה (לא חובה)</Label>
-              <Input
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.unitCost}
-                onChange={(e) => setForm((f) => ({ ...f, unitCost: e.target.value }))}
-              />
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.unitCost}
+                  onChange={(e) => setForm((f) => ({ ...f, unitCost: e.target.value }))}
+                  className="flex-1"
+                />
+                <Select
+                  value={form.unitCostCurrency}
+                  onValueChange={(v) =>
+                    setForm((f) => ({ ...f, unitCostCurrency: v as WarehouseCurrency }))
+                  }
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ILS">₪</SelectItem>
+                    <SelectItem value="USD">$</SelectItem>
+                    <SelectItem value="EUR">€</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
           <div className="space-y-1.5">

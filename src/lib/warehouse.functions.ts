@@ -25,6 +25,16 @@ function normalizeCategory(value: string): WarehouseCategory {
     : "packaging";
 }
 
+// Same 3-currency set used for quote pricing items (see ItemCurrency in
+// dashboard.quotes.$id.edit.tsx) — kept as its own small union here rather
+// than importing that route file into a server-functions module.
+export type WarehouseCurrency = "USD" | "EUR" | "ILS";
+const WAREHOUSE_CURRENCIES: WarehouseCurrency[] = ["USD", "EUR", "ILS"];
+
+function normalizeCurrency(value: string): WarehouseCurrency {
+  return (WAREHOUSE_CURRENCIES as string[]).includes(value) ? (value as WarehouseCurrency) : "ILS";
+}
+
 export type WarehouseItem = {
   id: string;
   name: string;
@@ -35,6 +45,7 @@ export type WarehouseItem = {
   minThreshold: number | null;
   expiryDate: string | null;
   unitCost: number | null;
+  unitCostCurrency: WarehouseCurrency;
   notes: string | null;
   active: boolean;
   createdAt: string;
@@ -62,6 +73,7 @@ function toWarehouseItem(row: {
   min_threshold: number | null;
   expiry_date: string | null;
   unit_cost: number | null;
+  unit_cost_currency: string;
   notes: string | null;
   active: boolean;
   created_at: string;
@@ -77,6 +89,7 @@ function toWarehouseItem(row: {
     minThreshold: row.min_threshold,
     expiryDate: row.expiry_date,
     unitCost: row.unit_cost,
+    unitCostCurrency: normalizeCurrency(row.unit_cost_currency),
     notes: row.notes,
     active: row.active,
     createdAt: row.created_at,
@@ -90,7 +103,7 @@ export const listWarehouseItems = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("warehouse_items")
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
       )
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
@@ -109,6 +122,7 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
       minThreshold?: number | null;
       expiryDate?: string | null;
       unitCost?: number | null;
+      unitCostCurrency?: WarehouseCurrency;
       notes?: string | null;
     }) => {
       if (!input?.name?.trim()) throw new Error("name is required");
@@ -141,9 +155,10 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
         min_threshold: data.minThreshold ?? null,
         expiry_date: data.expiryDate || null,
         unit_cost: data.unitCost ?? null,
+        unit_cost_currency: data.unitCostCurrency ?? "ILS",
       })
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
       )
       .single();
     if (error) throw new Error(error.message);
@@ -177,6 +192,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       minThreshold?: number | null;
       expiryDate?: string | null;
       unitCost?: number | null;
+      unitCostCurrency?: WarehouseCurrency;
       notes?: string | null;
     }) => {
       if (!input?.id) throw new Error("id is required");
@@ -193,6 +209,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
     if (data.minThreshold !== undefined) patch.min_threshold = data.minThreshold;
     if (data.expiryDate !== undefined) patch.expiry_date = data.expiryDate || null;
     if (data.unitCost !== undefined) patch.unit_cost = data.unitCost;
+    if (data.unitCostCurrency !== undefined) patch.unit_cost_currency = data.unitCostCurrency;
     if (data.notes !== undefined) patch.notes = data.notes?.trim() || null;
 
     const { data: row, error } = await supabase
@@ -200,7 +217,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       .update(patch as never)
       .eq("id", data.id)
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
       )
       .single();
     if (error) throw new Error(error.message);
@@ -267,7 +284,7 @@ export const adjustWarehouseStock = createServerFn({ method: "POST" })
     const { data: updated, error: reloadErr } = await supabase
       .from("warehouse_items")
       .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, notes, active, created_at, updated_at",
+        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
       )
       .eq("id", data.itemId)
       .single();
