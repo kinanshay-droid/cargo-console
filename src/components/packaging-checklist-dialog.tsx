@@ -374,6 +374,16 @@ function PackagingChecklistFormDialog({
               />
             </div>
           )}
+          {caseSnapshot?.loggerLabel && (
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label className="text-xs">רשם טמפרטורה משויך</Label>
+              <Input
+                value={caseSnapshot.loggerLabel}
+                disabled
+                className="bg-muted/50 font-medium text-foreground disabled:opacity-100"
+              />
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label className="text-xs">יעד</Label>
             {lockDestination ? (
@@ -606,7 +616,12 @@ export function PackagingChecklistLauncher({
 
   const activeBox = effectiveBoxes.find((b) => b.id === activeBoxId) ?? null;
   const activeSnapshot: ChecklistCaseSnapshot | undefined = activeBox
-    ? { ...baseSnapshot, boxType: activeBox.boxType || undefined, boxSize: activeBox.boxSize }
+    ? {
+        ...baseSnapshot,
+        boxType: activeBox.boxType || undefined,
+        boxSize: activeBox.boxSize,
+        loggerLabel: activeBox.loggerLabel,
+      }
     : undefined;
 
   return (

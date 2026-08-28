@@ -88,6 +88,22 @@ import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checkl
 import { CourierTaskReportLauncher } from "@/components/courier-task-report-dialog";
 import type { CourierTaskReportData, CourierTaskReportPoint } from "@/lib/courier-task-report";
 
+// Resolves a package/selection's attached recorder to a display label for
+// the packaging checklist — either a real device from the TEMP_LOGGERS
+// catalog, or (import shipments only) the simple "יש רשם" yes/no flag with
+// no specific device attached. undefined means no recorder was set at all.
+function resolveLoggerLabel(
+  loggerId: string | null | undefined,
+  hasLogger?: boolean | null,
+): string | undefined {
+  if (loggerId) {
+    const logger = TEMP_LOGGERS.find((t) => t.id === loggerId);
+    if (logger) return `${logger.company} ${logger.model}`;
+  }
+  if (hasLogger === true) return "יש רשם (ללא דגם ספציפי)";
+  return undefined;
+}
+
 export const Route = createFileRoute("/dashboard/shipments_/$id")({
   head: () => ({
     meta: [
@@ -826,6 +842,7 @@ function CaseDetail() {
           label: `${calc.label} (${sel.qty} יח')`,
           boxType: calc.label,
           boxSize,
+          loggerLabel: resolveLoggerLabel(sel.loggerId, sel.hasLogger),
         };
       });
 
@@ -850,6 +867,7 @@ function CaseDetail() {
           label: `${label} (${p.unitQty} יח')`,
           boxType: label,
           boxSize,
+          loggerLabel: resolveLoggerLabel(p.loggerId),
         };
       });
 

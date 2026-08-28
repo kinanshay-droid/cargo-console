@@ -234,6 +234,12 @@ export type ChecklistCaseSnapshot = {
   destAddress?: string;
   boxType?: string;
   boxSize?: string;
+  // Display label for the temperature recorder assigned to this specific
+  // box/pallet on the case (e.g. "Berlinger Q-tag / Fridge-tag") — not one
+  // of the CHECKLIST_SECTIONS item keys, so it isn't part of
+  // buildCaseReferenceValues below; shown as its own read-only field next
+  // to "סוג מארז" in the dialog instead.
+  loggerLabel?: string;
 };
 
 export function buildCaseReferenceValues(snap: ChecklistCaseSnapshot): Record<string, string> {
@@ -256,7 +262,13 @@ export function buildCaseReferenceValues(snap: ChecklistCaseSnapshot): Record<st
 // a pallet row). Each box gets its own independently-saved checklist, keyed
 // by this id, since a shipment can go out in more than one box and each one
 // needs to be verified on its own.
-export type ChecklistBox = { id: string; label: string; boxType: string; boxSize?: string };
+export type ChecklistBox = {
+  id: string;
+  label: string;
+  boxType: string;
+  boxSize?: string;
+  loggerLabel?: string;
+};
 
 // The id used when the case has no identifiable packaging yet — a single,
 // generic checklist with no box-type reference value.
