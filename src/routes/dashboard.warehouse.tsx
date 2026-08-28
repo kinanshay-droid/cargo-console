@@ -12,6 +12,7 @@ import {
   Package,
   Thermometer,
   Warehouse,
+  LayoutGrid,
 } from "lucide-react";
 import {
   listWarehouseItems,
@@ -25,6 +26,8 @@ import {
 } from "@/lib/warehouse.functions";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
+import { cn } from "@/lib/utils";
+import { TONE_SOLID, TONE_OUTLINE_BUTTON, type Tone } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,11 +74,11 @@ const CATEGORY_LABEL: Record<WarehouseCategory, string> = {
   equipment: "ציוד",
 };
 
-const CATEGORY_FILTERS: { value: WarehouseCategory; icon: typeof Boxes }[] = [
-  { value: "boxes", icon: Package },
-  { value: "loggers", icon: Thermometer },
-  { value: "packaging", icon: Boxes },
-  { value: "equipment", icon: Wrench },
+const CATEGORY_FILTERS: { value: WarehouseCategory; icon: typeof Boxes; tone: Tone }[] = [
+  { value: "boxes", icon: Package, tone: "accent" },
+  { value: "loggers", icon: Thermometer, tone: "warning" },
+  { value: "packaging", icon: Boxes, tone: "success" },
+  { value: "equipment", icon: Wrench, tone: "muted" },
 ];
 
 function isLowStock(item: WarehouseItem): boolean {
@@ -132,24 +135,35 @@ function WarehousePage() {
         action={<ItemFormDialog onSaved={invalidate} />}
       />
 
-      <div className="mb-4 flex gap-2">
-        <Button
-          size="sm"
-          variant={categoryFilter === "all" ? "default" : "outline"}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
           onClick={() => setCategoryFilter("all")}
+          className={cn(
+            "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+            categoryFilter === "all"
+              ? cn(TONE_SOLID.primary, "shadow-sm")
+              : TONE_OUTLINE_BUTTON.primary,
+          )}
         >
-          הכל
-        </Button>
-        {CATEGORY_FILTERS.map(({ value, icon: Icon }) => (
-          <Button
-            key={value}
-            size="sm"
-            variant={categoryFilter === value ? "default" : "outline"}
-            onClick={() => setCategoryFilter(value)}
-          >
-            <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
-          </Button>
-        ))}
+          <LayoutGrid className="h-3.5 w-3.5" /> הכל
+        </button>
+        {CATEGORY_FILTERS.map(({ value, icon: Icon, tone }) => {
+          const active = categoryFilter === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setCategoryFilter(value)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                active ? cn(TONE_SOLID[tone], "shadow-sm") : TONE_OUTLINE_BUTTON[tone],
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
+            </button>
+          );
+        })}
       </div>
 
       <div className="overflow-hidden rounded-lg border bg-card">

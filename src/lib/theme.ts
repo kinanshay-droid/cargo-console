@@ -60,3 +60,14 @@ export const TONE_OUTLINE_BUTTON: Record<Tone, string> = {
   destructive: "border-destructive/30 text-destructive hover:bg-destructive/10",
   muted: "border-border text-muted-foreground hover:bg-muted",
 };
+
+/** Solid, filled pill/chip — active filter toggles and similar controls
+ * that need a fully colored "selected" state rather than a soft badge. */
+export const TONE_SOLID: Record<Tone, string> = {
+  primary: "border-primary bg-primary text-primary-foreground",
+  accent: "border-accent bg-accent text-accent-foreground",
+  success: "border-success bg-success text-success-foreground",
+  warning: "border-warning bg-warning text-warning-foreground",
+  destructive: "border-destructive bg-destructive text-destructive-foreground",
+  muted: "border-muted-foreground bg-muted-foreground text-background",
+};
