@@ -153,6 +153,7 @@ function WarehousePage() {
               <TableHead className="text-right">קטגוריה</TableHead>
               <TableHead className="text-right">מק"ט</TableHead>
               <TableHead className="text-right">כמות במלאי</TableHead>
+              <TableHead className="text-right">עלות יחידה</TableHead>
               <TableHead className="text-right">תוקף</TableHead>
               <TableHead className="text-right">סטטוס</TableHead>
               <TableHead className="text-right">פעולות</TableHead>
@@ -161,13 +162,13 @@ function WarehousePage() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                   טוען…
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                   אין עדיין פריטים במחסן.
                 </TableCell>
               </TableRow>
@@ -190,6 +191,22 @@ function WarehousePage() {
                     </span>
                     {isLowStock(item) && (
                       <Badge className="mr-2 bg-destructive/10 text-destructive">מלאי נמוך</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {item.unitCost != null ? (
+                      <>
+                        {item.unitCost.toLocaleString("he-IL", { minimumFractionDigits: 2 })} ₪
+                        <div className="text-xs">
+                          סה״כ:{" "}
+                          {(item.unitCost * item.quantityOnHand).toLocaleString("he-IL", {
+                            minimumFractionDigits: 2,
+                          })}{" "}
+                          ₪
+                        </div>
+                      </>
+                    ) : (
+                      "—"
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -260,6 +277,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
     quantityOnHand: 0,
     minThreshold: item?.minThreshold != null ? String(item.minThreshold) : "",
     expiryDate: item?.expiryDate ?? "",
+    unitCost: item?.unitCost != null ? String(item.unitCost) : "",
     notes: item?.notes ?? "",
   });
 
@@ -275,6 +293,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
               unit: form.unit,
               minThreshold: form.minThreshold ? Number(form.minThreshold) : null,
               expiryDate: form.expiryDate || null,
+              unitCost: form.unitCost ? Number(form.unitCost) : null,
               notes: form.notes || null,
             },
           })
@@ -287,6 +306,7 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
               quantityOnHand: form.quantityOnHand,
               minThreshold: form.minThreshold ? Number(form.minThreshold) : null,
               expiryDate: form.expiryDate || null,
+              unitCost: form.unitCost ? Number(form.unitCost) : null,
               notes: form.notes || null,
             },
           }),
@@ -387,13 +407,25 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
               />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>תאריך תפוגה (לא חובה)</Label>
-            <Input
-              type="date"
-              value={form.expiryDate}
-              onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>תאריך תפוגה (לא חובה)</Label>
+              <Input
+                type="date"
+                value={form.expiryDate}
+                onChange={(e) => setForm((f) => ({ ...f, expiryDate: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>עלות יחידה (לא חובה)</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.unitCost}
+                onChange={(e) => setForm((f) => ({ ...f, unitCost: e.target.value }))}
+              />
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label>הערות</Label>
