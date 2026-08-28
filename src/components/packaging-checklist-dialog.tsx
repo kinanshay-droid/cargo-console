@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ClipboardCheck, Check, X, ChevronDown, PackageCheck, Plus, Trash2 } from "lucide-react";
+import {
+  ClipboardCheck,
+  Check,
+  X,
+  ChevronDown,
+  PackageCheck,
+  Plus,
+  Trash2,
+  FileDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -41,6 +50,105 @@ import {
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+const CHECKLIST_STATUS_ICON: Record<ChecklistItemStatus, string> = {
+  ok: "✔",
+  not_ok: "✘",
+  unset: "—",
+};
+
+// Builds a standalone printable HTML document from the checklist's current
+// in-progress state (including unsaved edits) and opens it in a new tab for
+// printing — this sidesteps trying to print the dialog itself, which sits
+// inside a fixed/transformed/scroll-clipped Radix Dialog and doesn't print
+// reliably. Mirrors the "ייצוא ל-PDF" pattern used on the quote detail page
+// (a clean page + window.print()), just generated on the fly here instead
+// of being a real route, since the data being exported may not be saved yet.
+function buildChecklistReportHtml(
+  data: ChecklistData,
+  boxLabel: string | undefined,
+  caseRef: Record<string, string>,
+): string {
+  const sectionsHtml = CHECKLIST_SECTIONS.map((section) => {
+    const rowsHtml = section.items
+      .map((item) => {
+        const state = data.items[item.key] ?? { status: "unset" as ChecklistItemStatus, note: "" };
+        const ref = caseRef[item.key];
+        return `<tr>
+          <td>${escapeHtml(item.label)}${ref ? `<div class="ref">מהתיק: ${escapeHtml(ref)}</div>` : ""}</td>
+          <td class="status status-${state.status}">${CHECKLIST_STATUS_ICON[state.status]}</td>
+          <td>${escapeHtml(state.note || "")}</td>
+        </tr>`;
+      })
+      .join("");
+    return `<h3>${escapeHtml(section.title)}</h3>
+      <table>
+        <thead><tr><th>סעיף</th><th>סטטוס</th><th>הערות</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  }).join("");
+
+  const consumedHtml = data.consumedItems.length
+    ? `<h3>פריטים שנצרכו מהמחסן</h3>
+      <table>
+        <thead><tr><th>פריט</th><th>כמות</th></tr></thead>
+        <tbody>${data.consumedItems
+          .map((ci) => `<tr><td>${escapeHtml(ci.itemName)}</td><td>${ci.quantity}</td></tr>`)
+          .join("")}</tbody>
+      </table>`
+    : "";
+
+  return `<!doctype html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8" />
+<title>צ'קליסט הכנת מארז${boxLabel ? ` — ${escapeHtml(boxLabel)}` : ""}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 13px; color: #666; margin: 0 0 16px; font-weight: normal; }
+  h3 { font-size: 14px; margin-top: 22px; margin-bottom: 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; vertical-align: top; }
+  th { background: #f3f3f3; }
+  .ref { font-size: 11px; color: #2563eb; margin-top: 2px; }
+  .status { text-align: center; font-weight: bold; width: 60px; }
+  .status-ok { color: #16a34a; }
+  .status-not_ok { color: #dc2626; }
+  .status-unset { color: #999; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin: 16px 0; font-size: 13px; }
+  .meta .label { color: #666; font-size: 11px; display: block; }
+  .sign { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 24px; font-size: 13px; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  <h1>צ'קליסט הכנת מארז מבוקר טמפרטורה${boxLabel ? ` — ${escapeHtml(boxLabel)}` : ""}</h1>
+  <h2>${data.savedAt ? `נשמר לאחרונה: ${new Date(data.savedAt).toLocaleString("he-IL")}` : "טרם נשמר"}</h2>
+  <div class="meta">
+    <div><span class="label">מספר משלוח</span>${escapeHtml(data.shipmentNumber || "—")}</div>
+    <div><span class="label">לקוח</span>${escapeHtml(data.customer || "—")}</div>
+    <div><span class="label">יעד</span>${escapeHtml(data.destination || "—")}</div>
+    <div><span class="label">תאריך</span>${escapeHtml(data.date || "—")}</div>
+  </div>
+  ${sectionsHtml}
+  ${consumedHtml}
+  <div class="sign">
+    <div><span class="label">אורז</span>${escapeHtml(data.packedBy || "—")}</div>
+    <div><span class="label">QA</span>${escapeHtml(data.qaBy || "—")}</div>
+    <div><span class="label">תאריך</span>${escapeHtml(data.signedDate || "—")}</div>
+  </div>
+</body>
+</html>`;
 }
 
 type FormDialogProps = {
@@ -200,6 +308,21 @@ function PackagingChecklistFormDialog({
   }
   function setItemNote(key: string, note: string) {
     setData((d) => ({ ...d, items: { ...d.items, [key]: { ...d.items[key], note } } }));
+  }
+
+  function exportReport() {
+    const html = buildChecklistReportHtml(data, boxLabel, caseRef);
+    const win = window.open("", "_blank");
+    if (!win) {
+      toast.error("החלון נחסם על ידי הדפדפן — יש לאפשר חלונות קופצים ולנסות שוב");
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    // Give the new tab a moment to paint before invoking print.
+    setTimeout(() => win.print(), 300);
   }
 
   const progress = checklistProgress(data);
@@ -426,6 +549,9 @@ function PackagingChecklistFormDialog({
               נשמר לאחרונה: {new Date(data.savedAt).toLocaleString("he-IL")}
             </span>
           )}
+          <Button type="button" variant="outline" onClick={exportReport} className="gap-2">
+            <FileDown className="h-4 w-4" /> ייצוא דוח
+          </Button>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             ביטול
           </Button>
