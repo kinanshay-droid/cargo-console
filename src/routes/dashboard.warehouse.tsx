@@ -16,6 +16,7 @@ import {
   Archive,
   ArchiveRestore,
   FileDown,
+  Check,
 } from "lucide-react";
 import {
   listWarehouseItems,
@@ -410,6 +411,9 @@ function WarehouseReportDialog({ items }: { items: WarehouseItem[] }) {
     CATEGORY_FILTERS.map((c) => c.value),
   );
   const [statusFilter, setStatusFilter] = useState<"active" | "archived" | "all">("active");
+  const [itemScope, setItemScope] = useState<"categories" | "specific">("categories");
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [itemSearch, setItemSearch] = useState("");
   const [scope, setScope] = useState<"snapshot" | "period">("snapshot");
   const [periodType, setPeriodType] = useState<"month" | "range">("month");
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
@@ -419,19 +423,47 @@ function WarehouseReportDialog({ items }: { items: WarehouseItem[] }) {
   const toggleCategory = (cat: WarehouseCategory) => {
     setCategories((c) => (c.includes(cat) ? c.filter((v) => v !== cat) : [...c, cat]));
   };
+  const toggleItemSelection = (id: string) => {
+    setSelectedItemIds((ids) => (ids.includes(id) ? ids.filter((v) => v !== id) : [...ids, id]));
+  };
+
+  // Item picker candidates: only the global active/archived filter applies
+  // here (not the category pills), since choosing specific items is a
+  // separate, more precise way to scope the report than by category.
+  const pickerCandidates = items.filter((i) => {
+    if (statusFilter !== "all" && i.active !== (statusFilter === "active")) return false;
+    const q = itemSearch.trim().toLowerCase();
+    if (!q) return true;
+    return i.name.toLowerCase().includes(q) || (i.sku ?? "").toLowerCase().includes(q);
+  });
 
   const generate = useMutation({
     mutationFn: async () => {
-      if (categories.length === 0) throw new Error("יש לבחור לפחות קטגוריה אחת");
+      if (itemScope === "specific") {
+        if (selectedItemIds.length === 0) throw new Error("יש לבחור לפחות פריט אחד");
+      } else if (categories.length === 0) {
+        throw new Error("יש לבחור לפחות קטגוריה אחת");
+      }
       if (scope === "snapshot") {
-        const filteredItems = items.filter(
-          (i) =>
-            categories.includes(i.category) &&
-            (statusFilter === "all" || i.active === (statusFilter === "active")),
-        );
-        const statusLabel =
-          statusFilter === "active" ? "מלאי פעיל" : statusFilter === "archived" ? "ארכיון" : "הכל";
-        return buildWarehouseReportHtml(filteredItems, statusLabel);
+        const filteredItems =
+          itemScope === "specific"
+            ? items.filter((i) => selectedItemIds.includes(i.id))
+            : items.filter(
+                (i) =>
+                  categories.includes(i.category) &&
+                  (statusFilter === "all" || i.active === (statusFilter === "active")),
+              );
+        const scopeLabel =
+          itemScope === "specific"
+            ? filteredItems.length === 1
+              ? filteredItems[0].name
+              : `${filteredItems.length} פריטים נבחרים`
+            : statusFilter === "active"
+              ? "מלאי פעיל"
+              : statusFilter === "archived"
+                ? "ארכיון"
+                : "הכל";
+        return buildWarehouseReportHtml(filteredItems, scopeLabel);
       }
       let from: string;
       let to: string;
@@ -452,7 +484,10 @@ function WarehouseReportDialog({ items }: { items: WarehouseItem[] }) {
         periodLabel = `${new Date(from).toLocaleDateString("he-IL")} — ${new Date(to).toLocaleDateString("he-IL")}`;
       }
       const movements = await listMovementsInRangeFn({ data: { from, to } });
-      const filteredMovements = movements.filter((m) => categories.includes(m.category));
+      const filteredMovements =
+        itemScope === "specific"
+          ? movements.filter((m) => selectedItemIds.includes(m.itemId))
+          : movements.filter((m) => categories.includes(m.category));
       return buildWarehouseMovementsReportHtml(filteredMovements, periodLabel);
     },
     onSuccess: (html) => {
@@ -488,28 +523,6 @@ function WarehouseReportDialog({ items }: { items: WarehouseItem[] }) {
           }}
         >
           <div className="space-y-1.5">
-            <Label>קטגוריות לכלול בדוח</Label>
-            <div className="flex flex-wrap gap-2">
-              {CATEGORY_FILTERS.map(({ value, icon: Icon }) => {
-                const checked = categories.includes(value);
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => toggleCategory(value)}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
-                      checked ? cn(TONE_SOLID.primary, "shadow-sm") : TONE_OUTLINE_BUTTON.primary,
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
             <Label>אילו פריטים לכלול</Label>
             <Select
               value={statusFilter}
@@ -525,6 +538,124 @@ function WarehouseReportDialog({ items }: { items: WarehouseItem[] }) {
               </SelectContent>
             </Select>
           </div>
+
+          <div className="space-y-1.5">
+            <Label>היקף הדוח</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                className="flex-1"
+                variant={itemScope === "categories" ? "default" : "outline"}
+                onClick={() => setItemScope("categories")}
+              >
+                לפי קטגוריות
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                variant={itemScope === "specific" ? "default" : "outline"}
+                onClick={() => setItemScope("specific")}
+              >
+                פריטים ספציפים
+              </Button>
+            </div>
+          </div>
+
+          {itemScope === "categories" ? (
+            <div className="space-y-1.5">
+              <Label>קטגוריות לכלול בדוח</Label>
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_FILTERS.map(({ value, icon: Icon }) => {
+                  const checked = categories.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => toggleCategory(value)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                        checked ? cn(TONE_SOLID.primary, "shadow-sm") : TONE_OUTLINE_BUTTON.primary,
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">בחירת פריטים ({selectedItemIds.length} נבחרו)</Label>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary hover:underline"
+                    onClick={() =>
+                      setSelectedItemIds(
+                        Array.from(
+                          new Set([...selectedItemIds, ...pickerCandidates.map((i) => i.id)]),
+                        ),
+                      )
+                    }
+                  >
+                    בחר הכל
+                  </button>
+                  <span className="text-xs text-muted-foreground">·</span>
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-muted-foreground hover:underline"
+                    onClick={() => setSelectedItemIds([])}
+                  >
+                    נקה בחירה
+                  </button>
+                </div>
+              </div>
+              <Input
+                placeholder="חיפוש פריט או מק״ט..."
+                value={itemSearch}
+                onChange={(e) => setItemSearch(e.target.value)}
+                className="bg-background"
+              />
+              <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border bg-background p-1.5">
+                {pickerCandidates.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-muted-foreground">
+                    לא נמצאו פריטים.
+                  </div>
+                ) : (
+                  pickerCandidates.map((item) => {
+                    const checked = selectedItemIds.includes(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => toggleItemSelection(item.id)}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-right text-sm transition-colors",
+                          checked ? "bg-primary/10" : "hover:bg-muted",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                            checked
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input",
+                          )}
+                        >
+                          {checked && <Check className="h-3 w-3" />}
+                        </span>
+                        <span className="flex-1 truncate font-medium">{item.name}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {CATEGORY_LABEL[item.category]}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>סוג הדוח</Label>
