@@ -215,26 +215,41 @@ function PackagingChecklistFormDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, boxId]);
 
-  // Pre-fill the consumed-items list with the warehouse item matching this
-  // box's model (seeded 1:1 from the CoolGuard/BioTherm catalog — see
+  // Pre-fill the consumed-items list with every warehouse item that matches
+  // something already recorded on the quote/case for this box — the box
+  // model itself (seeded 1:1 from the CoolGuard/BioTherm catalog — see
   // supabase/migrations/20260827100000_seed_warehouse_packaging_catalog.sql)
-  // so the record used to build the box lines up with the one deducted from
-  // stock. Only runs once per box, and only if nothing was recorded yet.
+  // and the assigned temperature logger (seeded 1:1 from TEMP_LOGGERS — see
+  // supabase/migrations/20260827130000_add_warehouse_box_logger_categories.sql),
+  // matched by exact name. So the record used to build the box lines up with
+  // what's actually deducted from stock. Only runs once per box, and only if
+  // nothing was recorded yet.
   useEffect(() => {
     if (!open || autoSuggested) return;
     const items = warehouseItemsQuery.data;
     if (!items) return;
     setAutoSuggested(true);
-    if (data.consumedItems.length > 0 || !caseSnapshot?.boxType) return;
-    const match = items.find((i) => i.active && i.name === caseSnapshot.boxType);
-    if (!match) return;
+    if (data.consumedItems.length > 0) return;
+    const matches = [caseSnapshot?.boxType, caseSnapshot?.loggerLabel]
+      .map((name) => (name ? items.find((i) => i.active && i.name === name) : undefined))
+      .filter((m): m is NonNullable<typeof m> => m != null);
+    if (matches.length === 0) return;
     setData((d) =>
       d.consumedItems.length > 0
         ? d
-        : { ...d, consumedItems: [{ itemId: match.id, itemName: match.name, quantity: 1 }] },
+        : {
+            ...d,
+            consumedItems: matches.map((m) => ({ itemId: m.id, itemName: m.name, quantity: 1 })),
+          },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, autoSuggested, warehouseItemsQuery.data, caseSnapshot?.boxType]);
+  }, [
+    open,
+    autoSuggested,
+    warehouseItemsQuery.data,
+    caseSnapshot?.boxType,
+    caseSnapshot?.loggerLabel,
+  ]);
 
   function addConsumedRow() {
     setData((d) => ({
