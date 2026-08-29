@@ -115,6 +115,32 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+// Shared CSS + toolbar markup for the two printable warehouse reports below
+// — a "no-print" toolbar with an in-page "export to PDF" (window.print, same
+// pattern used for quotes/checklists elsewhere) and "save report" (downloads
+// the rendered page as a standalone .html file via a Blob) button, so the
+// report opens for viewing instead of immediately triggering the OS print
+// dialog.
+const REPORT_TOOLBAR_STYLE = `
+  .no-print { }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 20px; }
+  .toolbar button { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 6px; cursor: pointer; border: 1px solid #1e3a5f; }
+  .toolbar button.primary { background: #1e3a5f; color: #fff; }
+  .toolbar button.secondary { background: #fff; color: #1e3a5f; }
+  @media print { .no-print { display: none !important; } }
+`;
+
+function reportToolbarHtml(): string {
+  return `<div class="no-print toolbar">
+    <button type="button" class="primary" onclick="window.print()">ייצוא ל-PDF</button>
+    <button type="button" class="secondary" onclick="saveReportHtml()">שמירת דוח</button>
+  </div>`;
+}
+
+function reportSaveScript(filename: string): string {
+  return `<script>function saveReportHtml(){var blob=new Blob(["<!doctype html>"+document.documentElement.outerHTML],{type:"text/html;charset=utf-8"});var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=${JSON.stringify(filename)};document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);}</script>`;
+}
+
 // Builds a standalone printable HTML inventory report from the warehouse
 // items currently in view (active or archive), grouped by category —
 // mirrors the "ייצוא דוח" pattern used on the packaging checklist dialog
@@ -176,9 +202,11 @@ function buildWarehouseReportHtml(items: WarehouseItem[], scopeLabel: string): s
   .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; margin: 16px 0; font-size: 13px; }
   .summary .label { color: #666; font-size: 11px; display: block; }
   @media print { body { padding: 0; } }
+  ${REPORT_TOOLBAR_STYLE}
 </style>
 </head>
 <body>
+  ${reportToolbarHtml()}
   <h1>דוח מלאי מחסן — ${escapeHtml(scopeLabel)}</h1>
   <h2>הופק: ${new Date().toLocaleString("he-IL")}</h2>
   <div class="summary">
@@ -193,6 +221,7 @@ function buildWarehouseReportHtml(items: WarehouseItem[], scopeLabel: string): s
       .join("")}
   </div>
   ${sectionsHtml || '<p style="color:#666">אין פריטים להצגה.</p>'}
+  ${reportSaveScript(`דוח-מלאי-${scopeLabel}.html`)}
 </body>
 </html>`;
 }
@@ -248,9 +277,11 @@ function buildWarehouseMovementsReportHtml(
   .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; margin: 16px 0; font-size: 13px; }
   .summary .label { color: #666; font-size: 11px; display: block; }
   @media print { body { padding: 0; } }
+  ${REPORT_TOOLBAR_STYLE}
 </style>
 </head>
 <body>
+  ${reportToolbarHtml()}
   <h1>דוח תנועות מלאי — ${escapeHtml(periodLabel)}</h1>
   <h2>הופק: ${new Date().toLocaleString("he-IL")}</h2>
   <div class="summary">
@@ -259,6 +290,7 @@ function buildWarehouseMovementsReportHtml(
     <div><span class="label">נצרך</span>${totalOut}</div>
   </div>
   ${sectionsHtml || '<p style="color:#666">אין תנועות בתקופה שנבחרה.</p>'}
+  ${reportSaveScript(`דוח-תנועות-מלאי-${periodLabel}.html`)}
 </body>
 </html>`;
 }
@@ -498,7 +530,6 @@ function WarehouseReportDialog({ items }: { items: WarehouseItem[] }) {
       }
       win.document.write(html);
       win.document.close();
-      setTimeout(() => win.print(), 300);
       setOpen(false);
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "הפקת הדוח נכשלה"),
