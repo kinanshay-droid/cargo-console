@@ -14,6 +14,7 @@ import {
   Warehouse,
   LayoutGrid,
   Archive,
+  ArchiveRestore,
   FileDown,
 } from "lucide-react";
 import {
@@ -364,21 +365,23 @@ function WarehouseItemsTable({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <AdjustStockDialog item={item} onSaved={onSaved} />
-                    <ItemFormDialog item={item} onSaved={onSaved} />
+                  <div className="flex items-center justify-end gap-1.5">
+                    <AdjustStockDialog item={item} onSaved={onSaved} compact />
+                    <ItemFormDialog item={item} onSaved={onSaved} compact />
                     <Button
-                      size="sm"
+                      size="icon"
                       variant="outline"
                       disabled={togglePending}
+                      title={item.active ? "הוסף לארכיון" : "שחזר מארכיון"}
+                      className={
+                        item.active ? TONE_OUTLINE_BUTTON.warning : TONE_OUTLINE_BUTTON.success
+                      }
                       onClick={() => onToggleActive(item.id, !item.active)}
                     >
                       {item.active ? (
-                        <>
-                          <Archive className="h-3.5 w-3.5" /> הוסף לארכיון
-                        </>
+                        <Archive className="h-4 w-4" />
                       ) : (
-                        "שחזר מארכיון"
+                        <ArchiveRestore className="h-4 w-4" />
                       )}
                     </Button>
                   </div>
@@ -751,7 +754,15 @@ function WarehousePage() {
   );
 }
 
-function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () => void }) {
+function ItemFormDialog({
+  item,
+  onSaved,
+  compact,
+}: {
+  item?: WarehouseItem;
+  onSaved: () => void;
+  compact?: boolean;
+}) {
   const createFn = useServerFn(createWarehouseItem);
   const updateFn = useServerFn(updateWarehouseItem);
   const [open, setOpen] = useState(false);
@@ -813,9 +824,20 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {isEdit ? (
-          <Button size="sm" variant="outline">
-            <Pencil className="h-3.5 w-3.5" /> עריכה
-          </Button>
+          compact ? (
+            <Button
+              size="icon"
+              variant="outline"
+              title="עריכה"
+              className={TONE_OUTLINE_BUTTON.muted}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline">
+              <Pencil className="h-3.5 w-3.5" /> עריכה
+            </Button>
+          )
         ) : (
           <Button>
             <Plus className="h-4 w-4" /> פריט חדש
@@ -957,7 +979,15 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
   );
 }
 
-function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: () => void }) {
+function AdjustStockDialog({
+  item,
+  onSaved,
+  compact,
+}: {
+  item: WarehouseItem;
+  onSaved: () => void;
+  compact?: boolean;
+}) {
   const adjustFn = useServerFn(adjustWarehouseStock);
   const [open, setOpen] = useState(false);
   const [direction, setDirection] = useState<"in" | "out">("in");
@@ -989,9 +1019,20 @@ function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: ()
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <PackagePlus className="h-3.5 w-3.5" /> עדכון מלאי
-        </Button>
+        {compact ? (
+          <Button
+            size="icon"
+            variant="outline"
+            title="עדכון מלאי"
+            className={TONE_OUTLINE_BUTTON.primary}
+          >
+            <PackagePlus className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline">
+            <PackagePlus className="h-3.5 w-3.5" /> עדכון מלאי
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent dir="rtl">
         <DialogHeader>
