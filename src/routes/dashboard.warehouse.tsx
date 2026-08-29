@@ -22,9 +22,11 @@ import {
   updateWarehouseItem,
   setWarehouseItemActive,
   adjustWarehouseStock,
+  listWarehouseMovementsInRange,
   type WarehouseItem,
   type WarehouseCategory,
   type WarehouseCurrency,
+  type WarehouseMovementWithItem,
 } from "@/lib/warehouse.functions";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -193,6 +195,72 @@ function buildWarehouseReportHtml(items: WarehouseItem[], scopeLabel: string): s
 </html>`;
 }
 
+// Same printable pattern as buildWarehouseReportHtml, but for the
+// "movements during a period" flavor of the report — a list of what moved
+// in/out of stock in a chosen month/date range, grouped by category, rather
+// than a point-in-time snapshot of current quantities.
+function buildWarehouseMovementsReportHtml(
+  movements: WarehouseMovementWithItem[],
+  periodLabel: string,
+): string {
+  const sectionsHtml = CATEGORY_FILTERS.map(({ value }) => {
+    const group = movements.filter((m) => m.category === value);
+    if (group.length === 0) return "";
+    const rowsHtml = group
+      .map(
+        (m) => `<tr>
+          <td>${new Date(m.movementDate).toLocaleDateString("he-IL")}</td>
+          <td>${escapeHtml(m.itemName)}</td>
+          <td class="${m.delta >= 0 ? "in" : "out"}">${m.delta >= 0 ? "+" : ""}${m.delta} ${escapeHtml(m.unit)}</td>
+          <td>${escapeHtml(m.reason)}</td>
+        </tr>`,
+      )
+      .join("");
+    const received = group.filter((m) => m.delta > 0).reduce((s, m) => s + m.delta, 0);
+    const consumed = group.filter((m) => m.delta < 0).reduce((s, m) => s - m.delta, 0);
+    return `<h3>${escapeHtml(CATEGORY_LABEL[value])} — ${group.length} תנועות (התקבלו ${received} · נצרכו ${consumed})</h3>
+      <table>
+        <thead><tr><th>תאריך</th><th>פריט</th><th>כמות</th><th>סיבה</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  }).join("");
+
+  const totalIn = movements.filter((m) => m.delta > 0).reduce((s, m) => s + m.delta, 0);
+  const totalOut = movements.filter((m) => m.delta < 0).reduce((s, m) => s - m.delta, 0);
+
+  return `<!doctype html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8" />
+<title>דוח תנועות מלאי — ${escapeHtml(periodLabel)}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 13px; color: #666; margin: 0 0 16px; font-weight: normal; }
+  h3 { font-size: 14px; margin-top: 22px; margin-bottom: 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; vertical-align: top; }
+  th { background: #f3f3f3; }
+  .in { color: #16a34a; font-weight: bold; }
+  .out { color: #dc2626; font-weight: bold; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; margin: 16px 0; font-size: 13px; }
+  .summary .label { color: #666; font-size: 11px; display: block; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  <h1>דוח תנועות מלאי — ${escapeHtml(periodLabel)}</h1>
+  <h2>הופק: ${new Date().toLocaleString("he-IL")}</h2>
+  <div class="summary">
+    <div><span class="label">סה״כ תנועות</span>${movements.length}</div>
+    <div><span class="label">התקבל</span>${totalIn}</div>
+    <div><span class="label">נצרך</span>${totalOut}</div>
+  </div>
+  ${sectionsHtml || '<p style="color:#666">אין תנועות בתקופה שנבחרה.</p>'}
+</body>
+</html>`;
+}
+
 // Shared row-set renderer used both for the flat "active" table and for the
 // per-category grouped sections in archive view, so the two views can't
 // drift out of sync in columns/actions.
@@ -324,6 +392,219 @@ function WarehouseItemsTable({
   );
 }
 
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Lets the user scope a report before generating it: which categories to
+// include, whether to include active/archived items, and whether it's a
+// point-in-time stock snapshot or a log of movements within a chosen month
+// or custom date range.
+function WarehouseReportDialog({ items }: { items: WarehouseItem[] }) {
+  const listMovementsInRangeFn = useServerFn(listWarehouseMovementsInRange);
+  const [open, setOpen] = useState(false);
+  const [categories, setCategories] = useState<WarehouseCategory[]>(
+    CATEGORY_FILTERS.map((c) => c.value),
+  );
+  const [statusFilter, setStatusFilter] = useState<"active" | "archived" | "all">("active");
+  const [scope, setScope] = useState<"snapshot" | "period">("snapshot");
+  const [periodType, setPeriodType] = useState<"month" | "range">("month");
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [fromDate, setFromDate] = useState(todayISO);
+  const [toDate, setToDate] = useState(todayISO);
+
+  const toggleCategory = (cat: WarehouseCategory) => {
+    setCategories((c) => (c.includes(cat) ? c.filter((v) => v !== cat) : [...c, cat]));
+  };
+
+  const generate = useMutation({
+    mutationFn: async () => {
+      if (categories.length === 0) throw new Error("יש לבחור לפחות קטגוריה אחת");
+      if (scope === "snapshot") {
+        const filteredItems = items.filter(
+          (i) =>
+            categories.includes(i.category) &&
+            (statusFilter === "all" || i.active === (statusFilter === "active")),
+        );
+        const statusLabel =
+          statusFilter === "active" ? "מלאי פעיל" : statusFilter === "archived" ? "ארכיון" : "הכל";
+        return buildWarehouseReportHtml(filteredItems, statusLabel);
+      }
+      let from: string;
+      let to: string;
+      let periodLabel: string;
+      if (periodType === "month") {
+        const [y, m] = month.split("-").map(Number);
+        if (!y || !m) throw new Error("יש לבחור חודש תקין");
+        from = `${month}-01`;
+        to = new Date(y, m, 0).toISOString().slice(0, 10);
+        periodLabel = new Date(y, m - 1, 1).toLocaleDateString("he-IL", {
+          month: "long",
+          year: "numeric",
+        });
+      } else {
+        if (!fromDate || !toDate) throw new Error("יש לבחור תאריך התחלה וסיום");
+        from = fromDate;
+        to = toDate;
+        periodLabel = `${new Date(from).toLocaleDateString("he-IL")} — ${new Date(to).toLocaleDateString("he-IL")}`;
+      }
+      const movements = await listMovementsInRangeFn({ data: { from, to } });
+      const filteredMovements = movements.filter((m) => categories.includes(m.category));
+      return buildWarehouseMovementsReportHtml(filteredMovements, periodLabel);
+    },
+    onSuccess: (html) => {
+      const win = window.open("", "_blank");
+      if (!win) {
+        toast.error("יש לאפשר חלונות קופצים כדי להפיק דוח");
+        return;
+      }
+      win.document.write(html);
+      win.document.close();
+      setTimeout(() => win.print(), 300);
+      setOpen(false);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "הפקת הדוח נכשלה"),
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <FileDown className="h-4 w-4" /> דוח מלאי
+        </Button>
+      </DialogTrigger>
+      <DialogContent dir="rtl">
+        <DialogHeader>
+          <DialogTitle>הפקת דוח מלאי</DialogTitle>
+        </DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            generate.mutate();
+          }}
+        >
+          <div className="space-y-1.5">
+            <Label>קטגוריות לכלול בדוח</Label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_FILTERS.map(({ value, icon: Icon }) => {
+                const checked = categories.includes(value);
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => toggleCategory(value)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors",
+                      checked ? cn(TONE_SOLID.primary, "shadow-sm") : TONE_OUTLINE_BUTTON.primary,
+                    )}
+                  >
+                    <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>אילו פריטים לכלול</Label>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">פעילים בלבד</SelectItem>
+                <SelectItem value="archived">ארכיון בלבד</SelectItem>
+                <SelectItem value="all">הכל</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>סוג הדוח</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                className="flex-1"
+                variant={scope === "snapshot" ? "default" : "outline"}
+                onClick={() => setScope("snapshot")}
+              >
+                מצב מלאי נוכחי
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                variant={scope === "period" ? "default" : "outline"}
+                onClick={() => setScope("period")}
+              >
+                תנועות בתקופה
+              </Button>
+            </div>
+          </div>
+
+          {scope === "period" && (
+            <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="flex-1"
+                  variant={periodType === "month" ? "default" : "outline"}
+                  onClick={() => setPeriodType("month")}
+                >
+                  לפי חודש
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="flex-1"
+                  variant={periodType === "range" ? "default" : "outline"}
+                  onClick={() => setPeriodType("range")}
+                >
+                  לפי טווח תאריכים
+                </Button>
+              </div>
+              {periodType === "month" ? (
+                <div className="space-y-1.5">
+                  <Label>חודש</Label>
+                  <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>מתאריך</Label>
+                    <Input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>עד תאריך</Label>
+                    <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              ביטול
+            </Button>
+            <Button type="submit" disabled={generate.isPending}>
+              {generate.isPending ? "מפיק…" : "הפק דוח"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function WarehousePage() {
   const qc = useQueryClient();
   const listFn = useServerFn(listWarehouseItems);
@@ -366,23 +647,7 @@ function WarehousePage() {
         tone="success"
         action={
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                const scopeLabel = view === "active" ? "מלאי פעיל" : "ארכיון";
-                const html = buildWarehouseReportHtml(viewItems, scopeLabel);
-                const win = window.open("", "_blank");
-                if (!win) {
-                  toast.error("יש לאפשר חלונות קופצים כדי להפיק דוח");
-                  return;
-                }
-                win.document.write(html);
-                win.document.close();
-                setTimeout(() => win.print(), 300);
-              }}
-            >
-              <FileDown className="h-4 w-4" /> דוח מלאי
-            </Button>
+            <WarehouseReportDialog items={items} />
             <ItemFormDialog onSaved={invalidate} />
           </div>
         }
@@ -690,10 +955,6 @@ function ItemFormDialog({ item, onSaved }: { item?: WarehouseItem; onSaved: () =
       </DialogContent>
     </Dialog>
   );
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: () => void }) {

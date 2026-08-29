@@ -317,3 +317,51 @@ export const listWarehouseMovements = createServerFn({ method: "GET" })
       createdAt: r.created_at,
     }));
   });
+
+// Cross-item movement, with the item's own name/category/unit joined in —
+// used by the "activity during period" flavor of the warehouse report (see
+// buildWarehouseMovementsReportHtml in dashboard.warehouse.tsx) where each
+// row needs to be labeled and grouped without a second round trip per item.
+export type WarehouseMovementWithItem = {
+  id: string;
+  itemId: string;
+  itemName: string;
+  category: WarehouseCategory;
+  unit: string;
+  delta: number;
+  reason: string;
+  movementDate: string;
+};
+
+// Cross-item movements within a date range (inclusive), for the "activity
+// during period" flavor of the warehouse report.
+export const listWarehouseMovementsInRange = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { from: string; to: string }) => {
+    if (!input?.from || !input?.to) throw new Error("from/to are required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await context.supabase
+      .from("warehouse_movements")
+      .select(
+        "id, item_id, delta, reason, case_id, movement_date, created_by, created_at, warehouse_items(name, category, unit)",
+      )
+      .gte("movement_date", data.from)
+      .lte("movement_date", data.to)
+      .order("movement_date", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (rows ?? []).map<WarehouseMovementWithItem>((r) => {
+      const item = Array.isArray(r.warehouse_items) ? r.warehouse_items[0] : r.warehouse_items;
+      return {
+        id: r.id as string,
+        itemId: r.item_id as string,
+        itemName: (item?.name as string | undefined) ?? "—",
+        category: normalizeCategory((item?.category as string | undefined) ?? "packaging"),
+        unit: (item?.unit as string | undefined) ?? "יח׳",
+        delta: r.delta as number,
+        reason: r.reason as string,
+        movementDate: r.movement_date as string,
+      };
+    });
+  });
