@@ -21,6 +21,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useI18n } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n-dictionary";
+import type { CustomRolePermissionKey } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardLayout,
@@ -41,30 +42,35 @@ const NAV_SECTIONS = [
         labelKey: "nav.commercial" as TranslationKey,
         icon: TrendingUp,
         adminOnly: false,
+        permissionKey: "commercial" as CustomRolePermissionKey,
       },
       {
         to: "/dashboard/operations",
         labelKey: "nav.operations" as TranslationKey,
         icon: Bell,
         adminOnly: false,
+        permissionKey: "operations" as CustomRolePermissionKey,
       },
       {
         to: "/dashboard/shipments",
         labelKey: "nav.shipments" as TranslationKey,
         icon: Truck,
         adminOnly: false,
+        permissionKey: "shipments" as CustomRolePermissionKey,
       },
       {
         to: "/dashboard/pickup-distribution",
         labelKey: "nav.pickupDistribution" as TranslationKey,
         icon: ArrowLeftRight,
         adminOnly: false,
+        permissionKey: "pickup_distribution" as CustomRolePermissionKey,
       },
       {
         to: "/dashboard/warehouse",
         labelKey: "nav.warehouse" as TranslationKey,
         icon: Package,
         adminOnly: false,
+        permissionKey: "warehouse" as CustomRolePermissionKey,
       },
       {
         to: "/dashboard/account",
@@ -109,7 +115,7 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { isAdmin, user } = useCurrentUser();
+  const { isAdmin, user, hasPermission } = useCurrentUser();
   const { t } = useI18n();
   const [sessionChecked, setSessionChecked] = useState(false);
 
@@ -137,7 +143,11 @@ function DashboardLayout() {
   const email = user?.email ?? null;
   const navSections = NAV_SECTIONS.map((s) => ({
     labelKey: s.labelKey,
-    items: s.items.filter((n) => !n.adminOnly || isAdmin),
+    items: s.items.filter(
+      (n) =>
+        (!n.adminOnly || isAdmin) &&
+        (!("permissionKey" in n) || hasPermission(n.permissionKey as CustomRolePermissionKey)),
+    ),
   })).filter((s) => s.items.length > 0);
   const flatNavItems = navSections.flatMap((s) => s.items);
 

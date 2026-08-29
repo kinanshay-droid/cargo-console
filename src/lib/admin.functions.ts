@@ -19,8 +19,78 @@ export type OrgUser = {
   fullName: string;
   isActive: boolean;
   role: OrgUserRole | null;
+  customRoleId: string | null;
+  customRoleName: string | null;
   createdAt: string;
 };
+
+// Custom roles are a second, softer permission layer — see the comment at
+// the top of the 20260830090000_add_custom_roles.sql migration. The real
+// admin/member split above still governs actual data access; these are
+// purely organizational (which sidebar modules a member sees).
+export const CUSTOM_ROLE_PERMISSION_KEYS = [
+  "commercial",
+  "operations",
+  "shipments",
+  "pickup_distribution",
+  "warehouse",
+] as const;
+export type CustomRolePermissionKey = (typeof CUSTOM_ROLE_PERMISSION_KEYS)[number];
+export type CustomRolePermissions = Partial<Record<CustomRolePermissionKey, boolean>>;
+export type CustomRoleColor =
+  "primary" | "accent" | "success" | "warning" | "destructive" | "muted";
+const CUSTOM_ROLE_COLORS: CustomRoleColor[] = [
+  "primary",
+  "accent",
+  "success",
+  "warning",
+  "destructive",
+  "muted",
+];
+
+export type CustomRole = {
+  id: string;
+  name: string;
+  description: string | null;
+  color: CustomRoleColor;
+  permissions: CustomRolePermissions;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function normalizeCustomRoleColor(value: string): CustomRoleColor {
+  return (CUSTOM_ROLE_COLORS as string[]).includes(value) ? (value as CustomRoleColor) : "primary";
+}
+
+function normalizeCustomRolePermissions(value: unknown): CustomRolePermissions {
+  if (typeof value !== "object" || value === null) return {};
+  const out: CustomRolePermissions = {};
+  for (const key of CUSTOM_ROLE_PERMISSION_KEYS) {
+    const v = (value as Record<string, unknown>)[key];
+    if (v === true) out[key] = true;
+  }
+  return out;
+}
+
+function toCustomRole(row: {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string;
+  permissions: unknown;
+  created_at: string;
+  updated_at: string;
+}): CustomRole {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    color: normalizeCustomRoleColor(row.color),
+    permissions: normalizeCustomRolePermissions(row.permissions),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 // Throws a friendly error (instead of an opaque RLS-denied Postgres error)
 // if the caller isn't an admin of their own organization. Returns the
@@ -71,13 +141,26 @@ export const listOrgUsers = createServerFn({ method: "GET" })
       await Promise.all([
         supabase
           .from("profiles")
-          .select("id, email, full_name, is_active, created_at")
+          .select("id, email, full_name, is_active, created_at, custom_role_id")
           .eq("organization_id", organizationId)
           .order("created_at", { ascending: true }),
         supabase.from("user_roles").select("user_id, role").eq("organization_id", organizationId),
       ]);
     if (profilesErr) throw new Error(profilesErr.message);
     if (rolesErr) throw new Error(rolesErr.message);
+
+    const customRoleIds = Array.from(
+      new Set((profiles ?? []).map((p) => p.custom_role_id).filter((v): v is string => !!v)),
+    );
+    const customRoleNameById = new Map<string, string>();
+    if (customRoleIds.length > 0) {
+      const { data: customRoles, error: customRolesErr } = await supabase
+        .from("custom_roles")
+        .select("id, name")
+        .in("id", customRoleIds);
+      if (customRolesErr) throw new Error(customRolesErr.message);
+      for (const r of customRoles ?? []) customRoleNameById.set(r.id, r.name);
+    }
 
     const roleByUser = new Map<string, OrgUserRole>();
     for (const r of roles ?? []) roleByUser.set(r.user_id, r.role);
@@ -88,8 +171,130 @@ export const listOrgUsers = createServerFn({ method: "GET" })
       fullName: p.full_name,
       isActive: p.is_active,
       role: roleByUser.get(p.id) ?? null,
+      customRoleId: p.custom_role_id,
+      customRoleName: p.custom_role_id ? (customRoleNameById.get(p.custom_role_id) ?? null) : null,
       createdAt: p.created_at,
     }));
+  });
+
+export const listCustomRoles = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const organizationId = await requireOrgId(supabase, userId);
+    const { data, error } = await supabase
+      .from("custom_roles")
+      .select("id, name, description, color, permissions, created_at, updated_at")
+      .eq("organization_id", organizationId)
+      .order("name", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(toCustomRole);
+  });
+
+export const createCustomRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      name: string;
+      description?: string | null;
+      color?: CustomRoleColor;
+      permissions: CustomRolePermissions;
+    }) => {
+      if (!input?.name?.trim()) throw new Error("name is required");
+      return input;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const organizationId = await requireOrgAdmin(context.supabase, context.userId);
+    const { data: row, error } = await context.supabase
+      .from("custom_roles")
+      .insert({
+        organization_id: organizationId,
+        name: data.name.trim(),
+        description: data.description?.trim() || null,
+        color: data.color ?? "primary",
+        permissions: data.permissions,
+        created_by: context.userId,
+      })
+      .select("id, name, description, color, permissions, created_at, updated_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return toCustomRole(row);
+  });
+
+export const updateCustomRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (input: {
+      id: string;
+      name: string;
+      description?: string | null;
+      color: CustomRoleColor;
+      permissions: CustomRolePermissions;
+    }) => {
+      if (!input?.id) throw new Error("id is required");
+      if (!input?.name?.trim()) throw new Error("name is required");
+      return input;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    await requireOrgAdmin(context.supabase, context.userId);
+    const { data: row, error } = await context.supabase
+      .from("custom_roles")
+      .update({
+        name: data.name.trim(),
+        description: data.description?.trim() || null,
+        color: data.color,
+        permissions: data.permissions,
+      })
+      .eq("id", data.id)
+      .select("id, name, description, color, permissions, created_at, updated_at")
+      .single();
+    if (error) throw new Error(error.message);
+    return toCustomRole(row);
+  });
+
+export const deleteCustomRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { id: string }) => {
+    if (!input?.id) throw new Error("id is required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    await requireOrgAdmin(context.supabase, context.userId);
+    // profiles.custom_role_id has ON DELETE SET NULL, so anyone holding this
+    // role is simply unassigned rather than blocking the delete.
+    const { error } = await context.supabase.from("custom_roles").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const assignCustomRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { targetUserId: string; customRoleId: string | null }) => {
+    if (!input?.targetUserId) throw new Error("targetUserId is required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const organizationId = await requireOrgAdmin(supabase, userId);
+    if (data.customRoleId) {
+      const { data: role, error: roleErr } = await supabase
+        .from("custom_roles")
+        .select("organization_id")
+        .eq("id", data.customRoleId)
+        .maybeSingle();
+      if (roleErr) throw new Error(roleErr.message);
+      if (!role || role.organization_id !== organizationId) {
+        throw new Error("Custom role not found in your organization");
+      }
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ custom_role_id: data.customRoleId })
+      .eq("id", data.targetUserId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const inviteOrgUser = createServerFn({ method: "POST" })

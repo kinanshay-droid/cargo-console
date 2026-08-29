@@ -9,7 +9,10 @@ import {
   setUserActive,
   removeOrgUser,
   resetUserPassword,
+  listCustomRoles,
+  assignCustomRole,
   type OrgUser,
+  type CustomRole,
 } from "@/lib/admin.functions";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/page-header";
@@ -69,11 +72,27 @@ function UsersPageInner() {
   const listOrgUsersFn = useServerFn(listOrgUsers);
   const setUserActiveFn = useServerFn(setUserActive);
   const removeOrgUserFn = useServerFn(removeOrgUser);
+  const listCustomRolesFn = useServerFn(listCustomRoles);
+  const assignCustomRoleFn = useServerFn(assignCustomRole);
   const [resetForId, setResetForId] = useState<string | null>(null);
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["org-users"],
     queryFn: () => listOrgUsersFn(),
+  });
+  const { data: customRoles = [] } = useQuery({
+    queryKey: ["custom-roles"],
+    queryFn: () => listCustomRolesFn(),
+  });
+
+  const assignRole = useMutation({
+    mutationFn: ({ id, customRoleId }: { id: string; customRoleId: string | null }) =>
+      assignCustomRoleFn({ data: { targetUserId: id, customRoleId } }),
+    onSuccess: () => {
+      toast.success("התפקיד המותאם עודכן");
+      qc.invalidateQueries({ queryKey: ["org-users"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "העדכון נכשל"),
   });
 
   const toggleStatus = useMutation({
@@ -112,6 +131,7 @@ function UsersPageInner() {
               <TableHead className="text-right">שם</TableHead>
               <TableHead className="text-right">מייל</TableHead>
               <TableHead className="text-right">תפקיד</TableHead>
+              <TableHead className="text-right">תפקיד מותאם</TableHead>
               <TableHead className="text-right">סטטוס</TableHead>
               <TableHead className="text-right">פעולות</TableHead>
             </TableRow>
@@ -119,13 +139,13 @@ function UsersPageInner() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   טוען…
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
                   אין עדיין משתמשים.
                 </TableCell>
               </TableRow>
@@ -152,6 +172,27 @@ function UsersPageInner() {
                         >
                           {u.role ? ROLE_LABEL[u.role] : "—"}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={u.customRoleId ?? "none"}
+                          disabled={assignRole.isPending}
+                          onValueChange={(v) =>
+                            assignRole.mutate({ id: u.id, customRoleId: v === "none" ? null : v })
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-40 text-xs">
+                            <SelectValue placeholder="ללא" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">ללא</SelectItem>
+                            {customRoles.map((cr: CustomRole) => (
+                              <SelectItem key={cr.id} value={cr.id}>
+                                {cr.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </TableCell>
                       <TableCell>
                         <Badge
