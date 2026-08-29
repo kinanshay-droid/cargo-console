@@ -14,6 +14,7 @@ import {
   Warehouse,
   LayoutGrid,
   Archive,
+  FileDown,
 } from "lucide-react";
 import {
   listWarehouseItems,
@@ -100,6 +101,96 @@ function expiryStatus(item: WarehouseItem): "expired" | "soon" | null {
   if (days < 0) return "expired";
   if (days <= EXPIRY_SOON_DAYS) return "soon";
   return null;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+// Builds a standalone printable HTML inventory report from the warehouse
+// items currently in view (active or archive), grouped by category —
+// mirrors the "ייצוא דוח" pattern used on the packaging checklist dialog
+// (window.open + document.write + print), since there's no dedicated report
+// route and the data is generated on the fly from whatever's loaded.
+function buildWarehouseReportHtml(items: WarehouseItem[], scopeLabel: string): string {
+  const sectionsHtml = CATEGORY_FILTERS.map(({ value }) => {
+    const group = items.filter((i) => i.category === value);
+    if (group.length === 0) return "";
+    const rowsHtml = group
+      .map((item) => {
+        const low = isLowStock(item);
+        const expiry = expiryStatus(item);
+        const value =
+          item.unitCost != null
+            ? `${(item.unitCost * item.quantityOnHand).toLocaleString("he-IL", { minimumFractionDigits: 2 })} ${CURRENCY_SYMBOL[item.unitCostCurrency]}`
+            : "—";
+        return `<tr>
+          <td>${escapeHtml(item.name)}</td>
+          <td>${escapeHtml(item.sku || "—")}</td>
+          <td class="${low ? "low" : ""}">${item.quantityOnHand} ${escapeHtml(item.unit)}${low ? " (מלאי נמוך)" : ""}</td>
+          <td>${value}</td>
+          <td class="${expiry ? expiry : ""}">${item.expiryDate ? new Date(item.expiryDate).toLocaleDateString("he-IL") : "—"}${expiry === "expired" ? " (פג תוקף)" : expiry === "soon" ? " (בקרוב)" : ""}</td>
+          <td>${item.active ? "פעיל" : "בארכיון"}</td>
+        </tr>`;
+      })
+      .join("");
+    return `<h3>${escapeHtml(CATEGORY_LABEL[value])} (${group.length})</h3>
+      <table>
+        <thead><tr><th>שם</th><th>מק"ט</th><th>כמות</th><th>שווי</th><th>תוקף</th><th>סטטוס</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  }).join("");
+
+  const totalsByCurrency: Record<string, number> = {};
+  for (const item of items) {
+    if (item.unitCost == null) continue;
+    totalsByCurrency[item.unitCostCurrency] =
+      (totalsByCurrency[item.unitCostCurrency] ?? 0) + item.unitCost * item.quantityOnHand;
+  }
+  const lowStockCount = items.filter(isLowStock).length;
+  const expiringCount = items.filter((i) => expiryStatus(i) != null).length;
+
+  return `<!doctype html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8" />
+<title>דוח מלאי מחסן — ${escapeHtml(scopeLabel)}</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; padding: 24px; color: #111; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 13px; color: #666; margin: 0 0 16px; font-weight: normal; }
+  h3 { font-size: 14px; margin-top: 22px; margin-bottom: 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: right; vertical-align: top; }
+  th { background: #f3f3f3; }
+  .low, .expired { color: #dc2626; font-weight: bold; }
+  .soon { color: #b45309; font-weight: bold; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 24px; margin: 16px 0; font-size: 13px; }
+  .summary .label { color: #666; font-size: 11px; display: block; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>
+  <h1>דוח מלאי מחסן — ${escapeHtml(scopeLabel)}</h1>
+  <h2>הופק: ${new Date().toLocaleString("he-IL")}</h2>
+  <div class="summary">
+    <div><span class="label">סה״כ פריטים</span>${items.length}</div>
+    <div><span class="label">מלאי נמוך</span>${lowStockCount}</div>
+    <div><span class="label">פג/קרב לפוג תוקף</span>${expiringCount}</div>
+    ${Object.entries(totalsByCurrency)
+      .map(
+        ([cur, total]) =>
+          `<div><span class="label">שווי מלאי (${cur})</span>${total.toLocaleString("he-IL", { minimumFractionDigits: 2 })} ${CURRENCY_SYMBOL[cur as WarehouseCurrency]}</div>`,
+      )
+      .join("")}
+  </div>
+  ${sectionsHtml || '<p style="color:#666">אין פריטים להצגה.</p>'}
+</body>
+</html>`;
 }
 
 // Shared row-set renderer used both for the flat "active" table and for the
@@ -273,7 +364,28 @@ function WarehousePage() {
         description="מלאי פריטי אריזה וציוד המשמשים בבניית מארזים."
         icon={Warehouse}
         tone="success"
-        action={<ItemFormDialog onSaved={invalidate} />}
+        action={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const scopeLabel = view === "active" ? "מלאי פעיל" : "ארכיון";
+                const html = buildWarehouseReportHtml(viewItems, scopeLabel);
+                const win = window.open("", "_blank");
+                if (!win) {
+                  toast.error("יש לאפשר חלונות קופצים כדי להפיק דוח");
+                  return;
+                }
+                win.document.write(html);
+                win.document.close();
+                setTimeout(() => win.print(), 300);
+              }}
+            >
+              <FileDown className="h-4 w-4" /> דוח מלאי
+            </Button>
+            <ItemFormDialog onSaved={invalidate} />
+          </div>
+        }
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
