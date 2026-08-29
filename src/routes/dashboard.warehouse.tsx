@@ -13,6 +13,7 @@ import {
   Thermometer,
   Warehouse,
   LayoutGrid,
+  Archive,
 } from "lucide-react";
 import {
   listWarehouseItems,
@@ -101,11 +102,143 @@ function expiryStatus(item: WarehouseItem): "expired" | "soon" | null {
   return null;
 }
 
+// Shared row-set renderer used both for the flat "active" table and for the
+// per-category grouped sections in archive view, so the two views can't
+// drift out of sync in columns/actions.
+function WarehouseItemsTable({
+  items,
+  emptyMessage,
+  onSaved,
+  onToggleActive,
+  togglePending,
+}: {
+  items: WarehouseItem[];
+  emptyMessage: string;
+  onSaved: () => void;
+  onToggleActive: (id: string, active: boolean) => void;
+  togglePending: boolean;
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border bg-card">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="text-right">שם</TableHead>
+            <TableHead className="text-right">קטגוריה</TableHead>
+            <TableHead className="text-right">מק"ט</TableHead>
+            <TableHead className="text-right">כמות במלאי</TableHead>
+            <TableHead className="text-right">עלות יחידה</TableHead>
+            <TableHead className="text-right">תוקף</TableHead>
+            <TableHead className="text-right">סטטוס</TableHead>
+            <TableHead className="text-right">פעולות</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {items.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                {emptyMessage}
+              </TableCell>
+            </TableRow>
+          ) : (
+            items.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium">
+                  {item.name}
+                  {item.notes && <div className="text-xs text-muted-foreground">{item.notes}</div>}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {CATEGORY_LABEL[item.category]}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{item.sku || "—"}</TableCell>
+                <TableCell>
+                  <span className={isLowStock(item) ? "font-semibold text-destructive" : ""}>
+                    {item.quantityOnHand} {item.unit}
+                  </span>
+                  {isLowStock(item) && (
+                    <Badge className="mr-2 bg-destructive/10 text-destructive">מלאי נמוך</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {item.unitCost != null ? (
+                    <>
+                      {item.unitCost.toLocaleString("he-IL", { minimumFractionDigits: 2 })}{" "}
+                      {CURRENCY_SYMBOL[item.unitCostCurrency]}
+                      <div className="text-xs">
+                        סה״כ:{" "}
+                        {(item.unitCost * item.quantityOnHand).toLocaleString("he-IL", {
+                          minimumFractionDigits: 2,
+                        })}{" "}
+                        {CURRENCY_SYMBOL[item.unitCostCurrency]}
+                      </div>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {item.expiryDate ? (
+                    <span
+                      className={
+                        expiryStatus(item) === "expired"
+                          ? "font-semibold text-destructive"
+                          : expiryStatus(item) === "soon"
+                            ? "font-semibold text-warning"
+                            : ""
+                      }
+                    >
+                      {new Date(item.expiryDate).toLocaleDateString("he-IL")}
+                      {expiryStatus(item) === "expired" && " (פג תוקף)"}
+                      {expiryStatus(item) === "soon" && " (בקרוב)"}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    className={
+                      item.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"
+                    }
+                  >
+                    {item.active ? "פעיל" : "בארכיון"}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <AdjustStockDialog item={item} onSaved={onSaved} />
+                    <ItemFormDialog item={item} onSaved={onSaved} />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={togglePending}
+                      onClick={() => onToggleActive(item.id, !item.active)}
+                    >
+                      {item.active ? (
+                        <>
+                          <Archive className="h-3.5 w-3.5" /> הוסף לארכיון
+                        </>
+                      ) : (
+                        "שחזר מארכיון"
+                      )}
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 function WarehousePage() {
   const qc = useQueryClient();
   const listFn = useServerFn(listWarehouseItems);
   const setActiveFn = useServerFn(setWarehouseItemActive);
   const [categoryFilter, setCategoryFilter] = useState<"all" | WarehouseCategory>("all");
+  const [view, setView] = useState<"active" | "archive">("active");
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["warehouse-items"],
@@ -115,15 +248,23 @@ function WarehousePage() {
   const toggleActive = useMutation({
     mutationFn: ({ id, active }: { id: string; active: boolean }) =>
       setActiveFn({ data: { id, active } }),
-    onSuccess: () => {
-      toast.success("הפריט עודכן");
+    onSuccess: (_data, vars) => {
+      toast.success(vars.active ? "הפריט שוחזר מהארכיון" : "הפריט הועבר לארכיון");
       qc.invalidateQueries({ queryKey: ["warehouse-items"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "העדכון נכשל"),
   });
 
-  const filtered = items.filter((i) => categoryFilter === "all" || i.category === categoryFilter);
   const invalidate = () => qc.invalidateQueries({ queryKey: ["warehouse-items"] });
+  const handleToggleActive = (id: string, active: boolean) => toggleActive.mutate({ id, active });
+
+  // Archive view shows everything ever deactivated, split into its own tab
+  // so it doesn't clutter the active-stock list — grouped by category per
+  // request, instead of one flat table.
+  const viewItems = items.filter((i) => i.active === (view === "active"));
+  const filtered = viewItems.filter(
+    (i) => categoryFilter === "all" || i.category === categoryFilter,
+  );
 
   return (
     <div className="mx-auto max-w-6xl" dir="rtl">
@@ -135,152 +276,100 @@ function WarehousePage() {
         action={<ItemFormDialog onSaved={invalidate} />}
       />
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setCategoryFilter("all")}
-          className={cn(
-            "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
-            categoryFilter === "all"
-              ? cn(TONE_SOLID.primary, "shadow-sm")
-              : TONE_OUTLINE_BUTTON.primary,
-          )}
-        >
-          <LayoutGrid className="h-3.5 w-3.5" /> הכל
-        </button>
-        {CATEGORY_FILTERS.map(({ value, icon: Icon, tone }) => {
-          const active = categoryFilter === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setCategoryFilter(value)}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
-                active ? cn(TONE_SOLID[tone], "shadow-sm") : TONE_OUTLINE_BUTTON[tone],
-              )}
-            >
-              <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
-            </button>
-          );
-        })}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("all")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+              categoryFilter === "all"
+                ? cn(TONE_SOLID.primary, "shadow-sm")
+                : TONE_OUTLINE_BUTTON.primary,
+            )}
+          >
+            <LayoutGrid className="h-3.5 w-3.5" /> הכל
+          </button>
+          {CATEGORY_FILTERS.map(({ value, icon: Icon, tone }) => {
+            const active = categoryFilter === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setCategoryFilter(value)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+                  active ? cn(TONE_SOLID[tone], "shadow-sm") : TONE_OUTLINE_BUTTON[tone],
+                )}
+              >
+                <Icon className="h-3.5 w-3.5" /> {CATEGORY_LABEL[value]}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setView("active")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+              view === "active" ? cn(TONE_SOLID.primary, "shadow-sm") : TONE_OUTLINE_BUTTON.primary,
+            )}
+          >
+            <Warehouse className="h-3.5 w-3.5" /> מלאי פעיל
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("archive")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors",
+              view === "archive" ? cn(TONE_SOLID.muted, "shadow-sm") : TONE_OUTLINE_BUTTON.muted,
+            )}
+          >
+            <Archive className="h-3.5 w-3.5" /> ארכיון
+          </button>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-right">שם</TableHead>
-              <TableHead className="text-right">קטגוריה</TableHead>
-              <TableHead className="text-right">מק"ט</TableHead>
-              <TableHead className="text-right">כמות במלאי</TableHead>
-              <TableHead className="text-right">עלות יחידה</TableHead>
-              <TableHead className="text-right">תוקף</TableHead>
-              <TableHead className="text-right">סטטוס</TableHead>
-              <TableHead className="text-right">פעולות</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                  טוען…
-                </TableCell>
-              </TableRow>
-            ) : filtered.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-                  אין עדיין פריטים במחסן.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    {item.name}
-                    {item.notes && (
-                      <div className="text-xs text-muted-foreground">{item.notes}</div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {CATEGORY_LABEL[item.category]}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{item.sku || "—"}</TableCell>
-                  <TableCell>
-                    <span className={isLowStock(item) ? "font-semibold text-destructive" : ""}>
-                      {item.quantityOnHand} {item.unit}
-                    </span>
-                    {isLowStock(item) && (
-                      <Badge className="mr-2 bg-destructive/10 text-destructive">מלאי נמוך</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.unitCost != null ? (
-                      <>
-                        {item.unitCost.toLocaleString("he-IL", { minimumFractionDigits: 2 })}{" "}
-                        {CURRENCY_SYMBOL[item.unitCostCurrency]}
-                        <div className="text-xs">
-                          סה״כ:{" "}
-                          {(item.unitCost * item.quantityOnHand).toLocaleString("he-IL", {
-                            minimumFractionDigits: 2,
-                          })}{" "}
-                          {CURRENCY_SYMBOL[item.unitCostCurrency]}
-                        </div>
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.expiryDate ? (
-                      <span
-                        className={
-                          expiryStatus(item) === "expired"
-                            ? "font-semibold text-destructive"
-                            : expiryStatus(item) === "soon"
-                              ? "font-semibold text-warning"
-                              : ""
-                        }
-                      >
-                        {new Date(item.expiryDate).toLocaleDateString("he-IL")}
-                        {expiryStatus(item) === "expired" && " (פג תוקף)"}
-                        {expiryStatus(item) === "soon" && " (בקרוב)"}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={
-                        item.active
-                          ? "bg-success/15 text-success"
-                          : "bg-muted text-muted-foreground"
-                      }
-                    >
-                      {item.active ? "פעיל" : "מושבת"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <AdjustStockDialog item={item} onSaved={invalidate} />
-                      <ItemFormDialog item={item} onSaved={invalidate} />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={toggleActive.isPending}
-                        onClick={() => toggleActive.mutate({ id: item.id, active: !item.active })}
-                      >
-                        {item.active ? "השבת" : "הפעל"}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {isLoading ? (
+        <div className="rounded-lg border bg-card py-10 text-center text-muted-foreground">
+          טוען…
+        </div>
+      ) : view === "active" ? (
+        <WarehouseItemsTable
+          items={filtered}
+          emptyMessage="אין עדיין פריטים במחסן."
+          onSaved={invalidate}
+          onToggleActive={handleToggleActive}
+          togglePending={toggleActive.isPending}
+        />
+      ) : filtered.length === 0 ? (
+        <div className="rounded-lg border bg-card py-10 text-center text-muted-foreground">
+          הארכיון ריק.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {CATEGORY_FILTERS.map(({ value, icon: Icon }) => {
+            const group = filtered.filter((i) => i.category === value);
+            if (group.length === 0) return null;
+            return (
+              <div key={value}>
+                <h2 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+                  <Icon className="h-4 w-4" /> {CATEGORY_LABEL[value]} ({group.length})
+                </h2>
+                <WarehouseItemsTable
+                  items={group}
+                  emptyMessage="הארכיון ריק."
+                  onSaved={invalidate}
+                  onToggleActive={handleToggleActive}
+                  togglePending={toggleActive.isPending}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
