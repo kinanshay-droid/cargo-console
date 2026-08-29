@@ -498,7 +498,7 @@ function todayISO(): string {
 function AdjustStockDialog({ item, onSaved }: { item: WarehouseItem; onSaved: () => void }) {
   const adjustFn = useServerFn(adjustWarehouseStock);
   const [open, setOpen] = useState(false);
-  const [direction, setDirection] = useState<"in" | "out">("out");
+  const [direction, setDirection] = useState<"in" | "out">("in");
   const [qty, setQty] = useState("");
   const [reason, setReason] = useState("");
   const [movementDate, setMovementDate] = useState(todayISO);
