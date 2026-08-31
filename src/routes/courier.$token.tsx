@@ -26,11 +26,13 @@ import {
   getCourierTaskDetail,
   updateCourierTaskStatus,
   uploadCourierProof,
+  uploadCourierFieldSignature,
   getCourierFileUrl,
   type CourierTaskStatus,
   type CourierTaskDetail,
   type CourierTaskPoint,
 } from "@/lib/courier-portal.functions";
+import { SignatureFieldPlacer } from "@/components/signature-field-placer";
 
 // Public, no-login mobile page for couriers — see
 // src/lib/courier-portal.functions.ts and
@@ -143,6 +145,27 @@ function CourierPortalPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "לא ניתן לפתוח את הקובץ"),
   });
 
+  const hasFields =
+    !!detailQuery.data?.hasDocument && (detailQuery.data?.signatureFields.length ?? 0) > 0;
+  const documentUrlQuery = useQuery({
+    queryKey: ["courier-document-url", token, selectedId],
+    queryFn: () =>
+      getFileUrlFn({ data: { token, caseId: selectedId as string, kind: "document" } }),
+    enabled: !!selectedId && hasFields,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const uploadFieldSignatureFn = useServerFn(uploadCourierFieldSignature);
+  const fieldSignatureMutation = useMutation({
+    mutationFn: (vars: { fieldId: string; dataUrl: string }) =>
+      uploadFieldSignatureFn({ data: { token, caseId: selectedId as string, ...vars } }),
+    onSuccess: () => {
+      toast.success("החתימה נשמרה");
+      qc.invalidateQueries({ queryKey: ["courier-task-detail", token, selectedId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "שמירת החתימה נכשלה"),
+  });
+
   if (tasksQuery.isError) {
     return (
       <ErrorScreen
@@ -187,6 +210,10 @@ function CourierPortalPage() {
             onViewDocument={() => viewFileMutation.mutate("document")}
             onViewReport={() => viewFileMutation.mutate("report")}
             viewFilePending={viewFileMutation.isPending}
+            documentUrl={documentUrlQuery.data?.url ?? null}
+            documentUrlLoading={documentUrlQuery.isLoading}
+            onSignField={(fieldId, dataUrl) => fieldSignatureMutation.mutate({ fieldId, dataUrl })}
+            fieldSignaturePending={fieldSignatureMutation.isPending}
           />
         )}
       </PageShell>
@@ -291,6 +318,10 @@ function TaskDetailCard({
   onViewDocument,
   onViewReport,
   viewFilePending,
+  documentUrl,
+  documentUrlLoading,
+  onSignField,
+  fieldSignaturePending,
 }: {
   detail: CourierTaskDetail;
   onMarkPickedUp: () => void;
@@ -302,7 +333,12 @@ function TaskDetailCard({
   onViewDocument: () => void;
   onViewReport: () => void;
   viewFilePending: boolean;
+  documentUrl: string | null;
+  documentUrlLoading: boolean;
+  onSignField: (fieldId: string, dataUrl: string) => void;
+  fieldSignaturePending: boolean;
 }) {
+  const hasFields = detail.signatureFields.length > 0;
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -321,28 +357,41 @@ function TaskDetailCard({
       </div>
 
       {(detail.hasDocument || detail.hasReport) && (
-        <div className="flex flex-wrap gap-2 rounded-2xl border bg-card p-4 shadow-sm">
-          {detail.hasReport && (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              disabled={viewFilePending}
-              onClick={onViewReport}
-            >
-              <FileText className="h-4 w-4" /> דוח משימה מלא
-            </Button>
-          )}
-          {detail.hasDocument && (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              disabled={viewFilePending}
-              onClick={onViewDocument}
-            >
-              <FileText className="h-4 w-4" /> {detail.documentName || "מסמך לחתימה"}
-            </Button>
+        <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="flex flex-wrap gap-2">
+            {detail.hasReport && (
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                disabled={viewFilePending}
+                onClick={onViewReport}
+              >
+                <FileText className="h-4 w-4" /> דוח משימה מלא
+              </Button>
+            )}
+            {detail.hasDocument && !hasFields && (
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                disabled={viewFilePending}
+                onClick={onViewDocument}
+              >
+                <FileText className="h-4 w-4" /> {detail.documentName || "מסמך לחתימה"}
+              </Button>
+            )}
+          </div>
+          {detail.hasDocument && hasFields && (
+            <SignatureFieldsPanel
+              documentUrl={documentUrl}
+              documentUrlLoading={documentUrlLoading}
+              documentIsPdf={detail.documentIsPdf}
+              fields={detail.signatureFields}
+              signedFieldIds={detail.signedFieldIds}
+              onSignField={onSignField}
+              signPending={fieldSignaturePending}
+            />
           )}
         </div>
       )}
@@ -412,6 +461,68 @@ function TaskDetailCard({
         onUploadSignature={onUploadSignature}
         uploadPending={uploadPending}
       />
+    </div>
+  );
+}
+
+function SignatureFieldsPanel({
+  documentUrl,
+  documentUrlLoading,
+  documentIsPdf,
+  fields,
+  signedFieldIds,
+  onSignField,
+  signPending,
+}: {
+  documentUrl: string | null;
+  documentUrlLoading: boolean;
+  documentIsPdf: boolean;
+  fields: CourierTaskDetail["signatureFields"];
+  signedFieldIds: string[];
+  onSignField: (fieldId: string, dataUrl: string) => void;
+  signPending: boolean;
+}) {
+  const [signingField, setSigningField] = useState<{ id: string; label: string } | null>(null);
+  const remaining = fields.filter((f) => !signedFieldIds.includes(f.id)).length;
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between text-xs">
+        <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+          מסמך לחתימה
+        </span>
+        <span className={remaining > 0 ? "text-warning" : "text-success"}>
+          {remaining > 0 ? `נותרו ${remaining} חתימות` : "כל החתימות הושלמו"}
+        </span>
+      </div>
+      {documentUrlLoading || !documentUrl ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <SignatureFieldPlacer
+          fileUrl={documentUrl}
+          isPdf={documentIsPdf}
+          fields={fields}
+          signedFieldIds={signedFieldIds}
+          onFieldTap={(f) => setSigningField({ id: f.id, label: f.label })}
+        />
+      )}
+      {signingField && (
+        <div className="mt-3">
+          <div className="mb-1.5 text-sm font-medium text-foreground">
+            חתימה: {signingField.label}
+          </div>
+          <SignaturePad
+            onCancel={() => setSigningField(null)}
+            onSave={(dataUrl) => {
+              onSignField(signingField.id, dataUrl);
+              setSigningField(null);
+            }}
+          />
+        </div>
+      )}
+      {signPending && <div className="mt-2 text-xs text-muted-foreground">שומר חתימה…</div>}
     </div>
   );
 }

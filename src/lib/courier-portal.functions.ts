@@ -56,6 +56,14 @@ async function resolveCourier(token: string | undefined | null) {
 
 export type CourierTaskStatus = "pending" | "picked_up" | "delivered";
 
+// A staff-placed marker on the signature document (see documentPath below):
+// "sign here" at a specific spot, with a short label like "איסוף" or
+// "הפצה" so a document can carry more than one required signature.
+// Percent-based (0–100) so it's independent of the document's actual pixel
+// size — the same field works whether it's rendered as a small thumbnail or
+// full-screen on a phone.
+export type SignatureField = { id: string; label: string; xPercent: number; yPercent: number };
+
 type CourierTaskState = {
   status: CourierTaskStatus;
   pickedUpAt: string | null;
@@ -64,10 +72,13 @@ type CourierTaskState = {
   proofSignaturePath: string | null;
   // "Document to sign" — a file staff attaches to this specific case (see
   // uploadCaseSignatureDocument below), fresh per case. The courier views it
-  // in the app and confirms with the existing signature pad; nothing here
-  // overlays a signature onto the document itself.
+  // in the app; if signatureFields below is non-empty, the courier signs at
+  // each marked spot (fieldSignaturePaths), otherwise they just confirm
+  // with the generic proof-of-delivery signature pad above.
   documentPath: string | null;
   documentName: string | null;
+  signatureFields: SignatureField[];
+  fieldSignaturePaths: Record<string, string>;
   // Set when staff sends the printable "דוח משימה" (task report) into the
   // courier's app (see sendCourierTaskReport below) — an HTML snapshot of
   // the same report built by src/lib/courier-task-report.ts.
@@ -75,11 +86,27 @@ type CourierTaskState = {
   reportSentAt: string | null;
 };
 
+function isSignatureField(v: unknown): v is SignatureField {
+  return (
+    isRecord(v) &&
+    typeof v.id === "string" &&
+    typeof v.label === "string" &&
+    typeof v.xPercent === "number" &&
+    typeof v.yPercent === "number"
+  );
+}
+
 function getCourierTaskState(payload: unknown): CourierTaskState {
   const p = isRecord(payload) ? payload : {};
   const raw = isRecord(p.courierTask) ? p.courierTask : {};
   const status: CourierTaskStatus =
     raw.status === "picked_up" || raw.status === "delivered" ? raw.status : "pending";
+  const fieldSignaturePaths: Record<string, string> = {};
+  if (isRecord(raw.fieldSignaturePaths)) {
+    for (const [k, v] of Object.entries(raw.fieldSignaturePaths)) {
+      if (typeof v === "string") fieldSignaturePaths[k] = v;
+    }
+  }
   return {
     status,
     pickedUpAt: typeof raw.pickedUpAt === "string" ? raw.pickedUpAt : null,
@@ -88,6 +115,10 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
     proofSignaturePath: typeof raw.proofSignaturePath === "string" ? raw.proofSignaturePath : null,
     documentPath: typeof raw.documentPath === "string" ? raw.documentPath : null,
     documentName: typeof raw.documentName === "string" ? raw.documentName : null,
+    signatureFields: Array.isArray(raw.signatureFields)
+      ? raw.signatureFields.filter(isSignatureField)
+      : [],
+    fieldSignaturePaths,
     reportPath: typeof raw.reportPath === "string" ? raw.reportPath : null,
     reportSentAt: typeof raw.reportSentAt === "string" ? raw.reportSentAt : null,
   };
@@ -188,7 +219,10 @@ export type CourierTaskDetail = {
   hasProofSignature: boolean;
   hasDocument: boolean;
   documentName: string | null;
+  documentIsPdf: boolean;
   hasReport: boolean;
+  signatureFields: SignatureField[];
+  signedFieldIds: string[];
 };
 
 export const getCourierTaskDetail = createServerFn({ method: "GET" })
@@ -284,7 +318,10 @@ export const getCourierTaskDetail = createServerFn({ method: "GET" })
       hasProofSignature: !!state.proofSignaturePath,
       hasDocument: !!state.documentPath,
       documentName: state.documentName,
+      documentIsPdf: !!state.documentPath?.toLowerCase().endsWith(".pdf"),
       hasReport: !!state.reportPath,
+      signatureFields: state.signatureFields,
+      signedFieldIds: Object.keys(state.fieldSignaturePaths),
     };
   });
 
@@ -480,7 +517,122 @@ export const uploadCaseSignatureDocument = createServerFn({ method: "POST" })
 
     const p = isRecord(payload) ? payload : {};
     const state = getCourierTaskState(payload);
-    const nextState: CourierTaskState = { ...state, documentPath: path, documentName: safeName };
+    // A fresh document invalidates any previously-placed signature markers
+    // and whatever was signed against them — they pointed at spots on the
+    // old file.
+    const nextState: CourierTaskState = {
+      ...state,
+      documentPath: path,
+      documentName: safeName,
+      signatureFields: [],
+      fieldSignaturePaths: {},
+    };
+    const { error: updErr } = await supabaseAdmin
+      .from("operations_cases")
+      .update({ payload: { ...p, courierTask: nextState } })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
+// Staff-side: overwrite the list of "sign here" markers placed on the
+// current signature document (position + label, e.g. "איסוף" / "הפצה").
+// Whole-list replace, called after every add/remove in the placement UI —
+// simpler than a diff, and the list is always small.
+export const updateCaseSignatureFields = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { caseId: string; fields: SignatureField[] }) => {
+    if (!input?.caseId) throw new Error("caseId is required");
+    if (!Array.isArray(input?.fields)) throw new Error("fields must be an array");
+    for (const f of input.fields) {
+      if (
+        !f ||
+        typeof f.id !== "string" ||
+        typeof f.label !== "string" ||
+        typeof f.xPercent !== "number" ||
+        typeof f.yPercent !== "number"
+      ) {
+        throw new Error("invalid field");
+      }
+    }
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { payload } = await requireCaseInOrg(supabase, userId, data.caseId);
+
+    const p = isRecord(payload) ? payload : {};
+    const state = getCourierTaskState(payload);
+    // Drop any signature already captured for a field that no longer
+    // exists (removed by staff).
+    const keepIds = new Set(data.fields.map((f) => f.id));
+    const fieldSignaturePaths = Object.fromEntries(
+      Object.entries(state.fieldSignaturePaths).filter(([id]) => keepIds.has(id)),
+    );
+    const nextState: CourierTaskState = {
+      ...state,
+      signatureFields: data.fields,
+      fieldSignaturePaths,
+    };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: updErr } = await supabaseAdmin
+      .from("operations_cases")
+      .update({ payload: { ...p, courierTask: nextState } })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
+// Public, token-validated: the courier signs one specific marked field on
+// the document (as opposed to uploadCourierProof's single generic
+// proof-of-delivery signature). Same base64-data-URL-in, storage-path-out
+// shape as uploadCourierProof.
+export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; caseId: string; fieldId: string; dataUrl: string }) => {
+    if (!input?.token) throw new Error("token is required");
+    if (!input?.caseId) throw new Error("caseId is required");
+    if (!input?.fieldId) throw new Error("fieldId is required");
+    if (!input?.dataUrl?.startsWith("data:image/"))
+      throw new Error("dataUrl must be an image data URL");
+    return input;
+  })
+  .handler(async ({ data }) => {
+    const courier = await resolveCourier(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("operations_cases")
+      .select("id, payload")
+      .eq("id", data.caseId)
+      .eq("organization_id", courier.organization_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("המשימה לא נמצאה");
+    const cl = getCritilog(row.payload);
+    if (cl.courierId !== courier.id) throw new Error("המשימה אינה משויכת לבלדר זה");
+
+    const state = getCourierTaskState(row.payload);
+    if (!state.signatureFields.some((f) => f.id === data.fieldId)) {
+      throw new Error("שדה החתימה לא נמצא");
+    }
+
+    const match = /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(data.dataUrl);
+    if (!match) throw new Error("פורמט תמונה לא נתמך");
+    const [, mime, base64] = match;
+    const ext = mime === "image/png" ? "png" : "jpg";
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const path = `${courier.organization_id}/${data.caseId}/field-${data.fieldId}-${Date.now()}.${ext}`;
+
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET)
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const p = isRecord(row.payload) ? row.payload : {};
+    const nextState: CourierTaskState = {
+      ...state,
+      fieldSignaturePaths: { ...state.fieldSignaturePaths, [data.fieldId]: path },
+    };
     const { error: updErr } = await supabaseAdmin
       .from("operations_cases")
       .update({ payload: { ...p, courierTask: nextState } })

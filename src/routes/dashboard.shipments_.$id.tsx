@@ -100,7 +100,18 @@ import {
   getCourierProofUrl,
   uploadCaseSignatureDocument,
   sendCourierTaskReport,
+  updateCaseSignatureFields,
+  type SignatureField,
 } from "@/lib/courier-portal.functions";
+import { SignatureFieldPlacer } from "@/components/signature-field-placer";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 // Resolves a package/selection's attached recorder to a display label for
 // the packaging checklist — either a real device from the TEMP_LOGGERS
@@ -466,6 +477,17 @@ function CaseDetail() {
     typeof courierTaskRaw.documentPath === "string" ? courierTaskRaw.documentPath : null;
   const courierDocumentName =
     typeof courierTaskRaw.documentName === "string" ? courierTaskRaw.documentName : null;
+  const courierDocumentIsPdf = !!courierDocumentPath?.toLowerCase().endsWith(".pdf");
+  const courierSignatureFields: SignatureField[] = Array.isArray(courierTaskRaw.signatureFields)
+    ? courierTaskRaw.signatureFields.filter(
+        (f): f is SignatureField =>
+          isRecord(f) &&
+          typeof f.id === "string" &&
+          typeof f.label === "string" &&
+          typeof f.xPercent === "number" &&
+          typeof f.yPercent === "number",
+      )
+    : [];
   const courierReportSentAt =
     typeof courierTaskRaw.reportSentAt === "string" ? courierTaskRaw.reportSentAt : null;
 
@@ -497,6 +519,36 @@ function CaseDetail() {
       queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "שליחת הדוח נכשלה"),
+  });
+
+  // Signature-field placement dialog: staff clicks the document to mark
+  // "sign here" spots (e.g. "איסוף" / "הפצה"), each with its own label —
+  // see src/components/signature-field-placer.tsx. Edits happen on a local
+  // draft list and are only persisted when "שמירה" is pressed.
+  const [placerOpen, setPlacerOpen] = useState(false);
+  const [draftFields, setDraftFields] = useState<SignatureField[]>([]);
+  useEffect(() => {
+    if (placerOpen) setDraftFields(courierSignatureFields);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placerOpen]);
+
+  const documentUrlQuery = useQuery({
+    queryKey: ["courier-document-url", courierDocumentPath],
+    queryFn: () => getCourierProofUrlFn({ data: { path: courierDocumentPath as string } }),
+    enabled: placerOpen && !!courierDocumentPath,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const updateCaseSignatureFieldsFn = useServerFn(updateCaseSignatureFields);
+  const saveFields = useMutation({
+    mutationFn: (fields: SignatureField[]) =>
+      updateCaseSignatureFieldsFn({ data: { caseId: id, fields } }),
+    onSuccess: () => {
+      toast.success("סימוני החתימה נשמרו");
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+      setPlacerOpen(false);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "שמירת הסימונים נכשלה"),
   });
 
   const assignedRep: CaseRep = isRecord(casePayload.assignedRep)
@@ -1763,13 +1815,79 @@ function CaseDetail() {
                       <FileText className="h-3.5 w-3.5" /> צפייה במסמך
                     </Button>
                   )}
+                  {courierDocumentPath && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => setPlacerOpen(true)}
+                    >
+                      <PenLine className="h-3.5 w-3.5" />
+                      {courierSignatureFields.length > 0
+                        ? `סימוני חתימה (${courierSignatureFields.length})`
+                        : "סימון מיקומי חתימה"}
+                    </Button>
+                  )}
                 </div>
                 {courierDocumentName && (
                   <div className="mt-1 text-xs text-muted-foreground">{courierDocumentName}</div>
                 )}
+                {courierSignatureFields.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {courierSignatureFields.map((f) => (
+                      <Badge key={f.id} variant="outline" className="text-xs">
+                        {f.label}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </Field>
             )}
           </Section>
+
+          <Dialog open={placerOpen} onOpenChange={setPlacerOpen}>
+            <DialogContent dir="rtl" className="max-w-2xl text-right sm:text-right">
+              <DialogHeader className="text-right sm:text-right">
+                <DialogTitle>סימון מיקומי חתימה על המסמך</DialogTitle>
+                <DialogDescription>
+                  לחצו על המסמך במקום שבו הבלדר צריך לחתום, תנו לו תיאור (למשל "איסוף" או "הפצה"),
+                  ואפשר להוסיף כמה סימונים שרוצים. X מסיר סימון.
+                </DialogDescription>
+              </DialogHeader>
+              {documentUrlQuery.isLoading ? (
+                <div className="flex justify-center py-10 text-muted-foreground">טוען מסמך…</div>
+              ) : documentUrlQuery.data ? (
+                <SignatureFieldPlacer
+                  fileUrl={documentUrlQuery.data.url}
+                  isPdf={courierDocumentIsPdf}
+                  fields={draftFields}
+                  onAddField={(f) =>
+                    setDraftFields((prev) => [...prev, { id: crypto.randomUUID(), ...f }])
+                  }
+                  onRemoveField={(fid) =>
+                    setDraftFields((prev) => prev.filter((f) => f.id !== fid))
+                  }
+                />
+              ) : (
+                <div className="py-10 text-center text-sm text-muted-foreground">
+                  לא ניתן לטעון את המסמך
+                </div>
+              )}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setPlacerOpen(false)}>
+                  ביטול
+                </Button>
+                <Button
+                  type="button"
+                  disabled={saveFields.isPending}
+                  onClick={() => saveFields.mutate(draftFields)}
+                >
+                  {saveFields.isPending ? "שומר…" : "שמירת סימונים"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
             <SectionHeading
