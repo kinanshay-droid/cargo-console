@@ -530,6 +530,12 @@ function TaskDetailCard({
         onUploadPhoto={onUploadPhoto}
         onUploadSignature={onUploadSignature}
         uploadPending={uploadPending}
+        // When there's a document with marked sign-here spots, that's
+        // where the courier signs (SignatureFieldsPanel above) — hiding
+        // the generic freeform signature button here avoids the mix-up
+        // where a courier signs here instead and the marked fields never
+        // get recorded as signed.
+        hideSignature={hasFields}
       />
     </div>
   );
@@ -570,6 +576,11 @@ function SignatureFieldsPanel({
           {nextField ? `הבא לחתימה: ${nextField.label}` : "כל החתימות הושלמו"}
         </span>
       </div>
+      {nextField && (
+        <div className="mb-2 text-xs text-muted-foreground">
+          יש ללחוץ על הסימון האדום על גבי המסמך למטה כדי לחתום — לא על כפתור נפרד
+        </div>
+      )}
       {documentUrlLoading || !documentUrl ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -609,12 +620,14 @@ function ProofSection({
   onUploadPhoto,
   onUploadSignature,
   uploadPending,
+  hideSignature = false,
 }: {
   hasProofPhoto: boolean;
   hasProofSignature: boolean;
   onUploadPhoto: (dataUrl: string) => void;
   onUploadSignature: (dataUrl: string) => void;
   uploadPending: boolean;
+  hideSignature?: boolean;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [signatureOpen, setSignatureOpen] = useState(false);
@@ -635,7 +648,7 @@ function ProofSection({
       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         אישור מסירה
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className={cn("grid gap-3", hideSignature ? "grid-cols-1" : "grid-cols-2")}>
         <Button
           type="button"
           variant="outline"
@@ -653,20 +666,29 @@ function ProofSection({
           className="hidden"
           onChange={handleFileChange}
         />
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2"
-          disabled={uploadPending}
-          onClick={() => setSignatureOpen(true)}
-        >
-          <PenLine className="h-4 w-4" /> {hasProofSignature ? "עדכון חתימה" : "חתימה"}
-        </Button>
+        {!hideSignature && (
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={uploadPending}
+            onClick={() => setSignatureOpen(true)}
+          >
+            <PenLine className="h-4 w-4" /> {hasProofSignature ? "עדכון חתימה" : "חתימה"}
+          </Button>
+        )}
       </div>
       {hasProofPhoto && <div className="text-xs text-success">✓ תמונה הועלתה</div>}
-      {hasProofSignature && <div className="text-xs text-success">✓ חתימה הועלתה</div>}
+      {!hideSignature && hasProofSignature && (
+        <div className="text-xs text-success">✓ חתימה הועלתה</div>
+      )}
+      {hideSignature && (
+        <div className="text-xs text-muted-foreground">
+          החתימה על המשלוח נעשית על גבי המסמך למעלה, בסימונים המסומנים
+        </div>
+      )}
 
-      {signatureOpen && (
+      {!hideSignature && signatureOpen && (
         <SignaturePad
           onCancel={() => setSignatureOpen(false)}
           onSave={(dataUrl) => {
