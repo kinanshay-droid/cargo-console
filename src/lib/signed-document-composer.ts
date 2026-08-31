@@ -12,6 +12,15 @@
 // the signature images drawn onto it.
 import { loadPdfLib, bytesToDataUrl } from "@/lib/pdf-lib-client";
 
+// A marked spot is where staff clicked on the document — typically right on
+// or just before an "X" / signature line on the source form — so the
+// signature is drawn starting AT that point and extending to the right
+// (beside it), vertically centered on it rather than stacked above it.
+// Sized as a fraction of the document width; small enough that it fits
+// next to a signature line without swallowing neighboring fields on a
+// dense form like a waybill.
+const SIGNATURE_WIDTH_RATIO = 0.14;
+
 export type ComposeField = {
   id: string;
   label: string;
@@ -42,10 +51,13 @@ async function composeImageDocument(fileUrl: string, fields: ComposeField[]): Pr
   for (const f of fields) {
     if (!f.signedUrl) continue;
     const sigImg = await loadImage(f.signedUrl);
-    const sigWidth = canvas.width * 0.22;
+    const sigWidth = canvas.width * SIGNATURE_WIDTH_RATIO;
     const sigHeight = sigWidth * (sigImg.naturalHeight / sigImg.naturalWidth);
-    const x = (f.xPercent / 100) * canvas.width - sigWidth / 2;
-    const y = (f.yPercent / 100) * canvas.height - sigHeight;
+    // Marked point = where the "X" is — draw starting there, extending
+    // right and centered vertically on it, instead of centered/stacked
+    // above it.
+    const x = (f.xPercent / 100) * canvas.width;
+    const y = (f.yPercent / 100) * canvas.height - sigHeight / 2;
     ctx.drawImage(sigImg, x, y, sigWidth, sigHeight);
   }
   return canvas.toDataURL("image/png");
@@ -64,12 +76,14 @@ async function composePdfDocument(fileUrl: string, fields: ComposeField[]): Prom
     // Field signatures always come from SignaturePad, which only ever
     // exports PNG (canvas.toDataURL("image/png")).
     const sigImage = await pdfDoc.embedPng(sigBytes);
-    const sigWidth = width * 0.22;
+    const sigWidth = width * SIGNATURE_WIDTH_RATIO;
     const sigHeight = sigWidth * (sigImage.height / sigImage.width);
-    const x = (f.xPercent / 100) * width - sigWidth / 2;
-    // PDF coordinates are bottom-up; xPercent/yPercent were captured
-    // top-down against the rendered page, so flip the y axis.
-    const y = height - (f.yPercent / 100) * height - sigHeight;
+    // Marked point = where the "X" is — draw starting there, extending
+    // right and centered vertically on it. PDF coordinates are bottom-up;
+    // xPercent/yPercent were captured top-down against the rendered page,
+    // so flip the y axis.
+    const x = (f.xPercent / 100) * width;
+    const y = height - (f.yPercent / 100) * height - sigHeight / 2;
     page.drawImage(sigImage, { x, y, width: sigWidth, height: sigHeight });
   }
   const outBytes: Uint8Array = await pdfDoc.save();
