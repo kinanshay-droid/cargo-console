@@ -65,19 +65,48 @@ export type CourierTaskStatus = "pending" | "picked_up" | "delivered";
 export type SignatureField = { id: string; label: string; xPercent: number; yPercent: number };
 
 // A field's *kind* isn't stored explicitly — it's inferred from its label,
-// so staff mark a "date" or "time" stamp spot the same way they mark a
-// signature spot (click, type a label), just naming it "תאריך" / "שעה".
-// Those spots are never tapped/signed by the courier: they're auto-filled
-// with the timestamp of the nearest earlier *signature* field (see
-// findLinkedSignatureField below) both in the courier's live view and in
-// the composited signed document.
-export type SignatureFieldKind = "signature" | "date" | "time";
+// so staff mark a "date"/"time"/"name" spot the same way they mark a
+// signature spot (click, type a label), just naming it "תאריך" / "שעה" /
+// "שם משפחה". "date"/"time" spots are never tapped by the courier: they're
+// auto-filled with the timestamp of the nearest earlier *signature* field
+// (see findLinkedSignatureField below). "name" spots ARE filled by the
+// courier, but by typing text (the signer's last name) rather than
+// drawing a signature — e.g. for a form that wants both a signature line
+// and a separate printed name at the same pickup/delivery spot.
+export type SignatureFieldKind = "signature" | "date" | "time" | "name";
 
 export function inferSignatureFieldKind(label: string): SignatureFieldKind {
   const t = label.trim();
   if (t.startsWith("תאריך")) return "date";
   if (t.startsWith("שעה") || t.startsWith("שעת")) return "time";
+  if (t.startsWith("שם")) return "name";
   return "signature";
+}
+
+// Fields the courier must actively complete, in the order they were
+// defined — as opposed to "date"/"time" fields, which are always
+// considered satisfied for ordering purposes since they fill themselves.
+export function isActionableFieldKind(kind: SignatureFieldKind): boolean {
+  return kind === "signature" || kind === "name";
+}
+
+// The next field (in array order) the courier still needs to complete —
+// shared by both the image-signature endpoint and the text-entry endpoint
+// below so "sign/fill in order" is enforced identically regardless of
+// which kind of field comes next.
+export function getNextRequiredField(
+  fields: SignatureField[],
+  fieldSignaturePaths: Record<string, string>,
+  fieldTextValues: Record<string, string>,
+): SignatureField | null {
+  for (const f of fields) {
+    const kind = inferSignatureFieldKind(f.label);
+    if (!isActionableFieldKind(kind)) continue;
+    const completed =
+      kind === "signature" ? f.id in fieldSignaturePaths : !!fieldTextValues[f.id]?.trim();
+    if (!completed) return f;
+  }
+  return null;
 }
 
 // A "תאריך"/"שעה" field is stamped from whichever real signature field
@@ -128,11 +157,16 @@ export function buildComposeFieldMeta(
   fields: SignatureField[],
   fieldSignaturePaths: Record<string, string>,
   fieldSignedAt: Record<string, string>,
+  fieldTextValues: Record<string, string>,
 ): ComposeFieldMeta[] {
   return fields.map((f, i) => {
     const kind = inferSignatureFieldKind(f.label);
     if (kind === "signature") {
       return { ...f, kind, path: fieldSignaturePaths[f.id] ?? null, displayText: null };
+    }
+    if (kind === "name") {
+      // Typed directly by the courier — no linking to another field needed.
+      return { ...f, kind, path: null, displayText: fieldTextValues[f.id]?.trim() || null };
     }
     const linked = findLinkedSignatureField(fields, i);
     const signedAt = linked ? fieldSignedAt[linked.id] : undefined;
@@ -164,6 +198,10 @@ type CourierTaskState = {
   // any linked "תאריך"/"שעה" fields (see findLinkedSignatureField above)
   // rather than requiring the courier to fill those in separately.
   fieldSignedAt: Record<string, string>;
+  // Typed values for "שם" (name)-kind fields — a manual alternative to
+  // drawing a signature, e.g. the last name of whoever signed at pickup
+  // or delivery, entered by the courier as text instead of ink.
+  fieldTextValues: Record<string, string>;
   // A flattened copy of documentPath with every captured field signature
   // composited onto it at its marked spot — built client-side (see
   // src/lib/signed-document-composer.ts) once every field is signed, then
@@ -204,6 +242,12 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
       if (typeof v === "string") fieldSignedAt[k] = v;
     }
   }
+  const fieldTextValues: Record<string, string> = {};
+  if (isRecord(raw.fieldTextValues)) {
+    for (const [k, v] of Object.entries(raw.fieldTextValues)) {
+      if (typeof v === "string") fieldTextValues[k] = v;
+    }
+  }
   return {
     status,
     pickedUpAt: typeof raw.pickedUpAt === "string" ? raw.pickedUpAt : null,
@@ -217,6 +261,7 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
       : [],
     fieldSignaturePaths,
     fieldSignedAt,
+    fieldTextValues,
     signedDocumentPath: typeof raw.signedDocumentPath === "string" ? raw.signedDocumentPath : null,
     reportPath: typeof raw.reportPath === "string" ? raw.reportPath : null,
     reportSentAt: typeof raw.reportSentAt === "string" ? raw.reportSentAt : null,
@@ -421,7 +466,16 @@ export const getCourierTaskDetail = createServerFn({ method: "GET" })
       documentIsPdf: !!state.documentPath?.toLowerCase().endsWith(".pdf"),
       hasReport: !!state.reportPath,
       signatureFields: state.signatureFields,
-      signedFieldIds: Object.keys(state.fieldSignaturePaths),
+      // Completed actionable fields — a real signature image OR (for
+      // "שם"-kind fields) a non-empty typed value. "תאריך"/"שעה" fields
+      // never appear here; they auto-fill and aren't counted as
+      // "completed by the courier".
+      signedFieldIds: [
+        ...Object.keys(state.fieldSignaturePaths),
+        ...Object.entries(state.fieldTextValues)
+          .filter(([, v]) => !!v?.trim())
+          .map(([id]) => id),
+      ],
       hasSignedDocument: !!state.signedDocumentPath,
     };
   });
@@ -628,6 +682,7 @@ export const uploadCaseSignatureDocument = createServerFn({ method: "POST" })
       signatureFields: [],
       fieldSignaturePaths: {},
       fieldSignedAt: {},
+      fieldTextValues: {},
       signedDocumentPath: null,
     };
     const { error: updErr } = await supabaseAdmin
@@ -675,11 +730,15 @@ export const updateCaseSignatureFields = createServerFn({ method: "POST" })
     const fieldSignedAt = Object.fromEntries(
       Object.entries(state.fieldSignedAt).filter(([id]) => keepIds.has(id)),
     );
+    const fieldTextValues = Object.fromEntries(
+      Object.entries(state.fieldTextValues).filter(([id]) => keepIds.has(id)),
+    );
     const nextState: CourierTaskState = {
       ...state,
       signatureFields: data.fields,
       fieldSignaturePaths,
       fieldSignedAt,
+      fieldTextValues,
       // Marker positions changed, so any previously-composited signed copy
       // no longer lines up and must be rebuilt.
       signedDocumentPath: null,
@@ -728,20 +787,22 @@ export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
     }
     // "תאריך"/"שעה" fields are never signed directly — they're auto-filled
     // from the linked signature field's timestamp (see
-    // findLinkedSignatureField). Reject an attempt to sign one directly.
+    // findLinkedSignatureField). "שם" fields are filled via
+    // uploadCourierFieldTextValue below, not here. Reject anything else.
     if (inferSignatureFieldKind(targetField.label) !== "signature") {
-      throw new Error("שדה זה מתמלא אוטומטית ואינו דורש חתימה");
+      throw new Error("שדה זה אינו דורש חתימה");
     }
-    // Signing must follow the order the (real, signable) fields were
+    // Signing must follow the order the (real, actionable) fields were
     // defined in on the document — reject any attempt to sign out of turn
     // (the client also hides/locks non-active pins, but the server is the
     // real gate).
-    const nextField = state.signatureFields.find(
-      (f) =>
-        inferSignatureFieldKind(f.label) === "signature" && !(f.id in state.fieldSignaturePaths),
+    const nextField = getNextRequiredField(
+      state.signatureFields,
+      state.fieldSignaturePaths,
+      state.fieldTextValues,
     );
     if (nextField && nextField.id !== data.fieldId) {
-      throw new Error(`יש לחתום קודם על "${nextField.label}"`);
+      throw new Error(`יש למלא קודם את "${nextField.label}"`);
     }
 
     const match = /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(data.dataUrl);
@@ -761,6 +822,64 @@ export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
       ...state,
       fieldSignaturePaths: { ...state.fieldSignaturePaths, [data.fieldId]: path },
       fieldSignedAt: { ...state.fieldSignedAt, [data.fieldId]: new Date().toISOString() },
+    };
+    const { error: updErr } = await supabaseAdmin
+      .from("operations_cases")
+      .update({ payload: { ...p, courierTask: nextState } })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
+// Public, token-validated: the manual alternative to
+// uploadCourierFieldSignature above, for "שם" (name)-kind fields — the
+// courier types text (e.g. a last name) instead of drawing a signature.
+// Same order-of-fields enforcement as signing.
+export const uploadCourierFieldTextValue = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; caseId: string; fieldId: string; value: string }) => {
+    if (!input?.token) throw new Error("token is required");
+    if (!input?.caseId) throw new Error("caseId is required");
+    if (!input?.fieldId) throw new Error("fieldId is required");
+    if (typeof input?.value !== "string" || !input.value.trim()) {
+      throw new Error("value is required");
+    }
+    return input;
+  })
+  .handler(async ({ data }) => {
+    const courier = await resolveCourier(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("operations_cases")
+      .select("id, payload")
+      .eq("id", data.caseId)
+      .eq("organization_id", courier.organization_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("המשימה לא נמצאה");
+    const cl = getCritilog(row.payload);
+    if (cl.courierId !== courier.id) throw new Error("המשימה אינה משויכת לבלדר זה");
+
+    const state = getCourierTaskState(row.payload);
+    const targetField = state.signatureFields.find((f) => f.id === data.fieldId);
+    if (!targetField) {
+      throw new Error("השדה לא נמצא");
+    }
+    if (inferSignatureFieldKind(targetField.label) !== "name") {
+      throw new Error("שדה זה דורש חתימה ולא טקסט");
+    }
+    const nextField = getNextRequiredField(
+      state.signatureFields,
+      state.fieldSignaturePaths,
+      state.fieldTextValues,
+    );
+    if (nextField && nextField.id !== data.fieldId) {
+      throw new Error(`יש למלא קודם את "${nextField.label}"`);
+    }
+
+    const p = isRecord(row.payload) ? row.payload : {};
+    const nextState: CourierTaskState = {
+      ...state,
+      fieldTextValues: { ...state.fieldTextValues, [data.fieldId]: data.value.trim() },
     };
     const { error: updErr } = await supabaseAdmin
       .from("operations_cases")
@@ -804,6 +923,7 @@ export const getCourierFieldSignatureUrls = createServerFn({ method: "GET" })
       state.signatureFields,
       state.fieldSignaturePaths,
       state.fieldSignedAt,
+      state.fieldTextValues,
     );
     const fields = await Promise.all(
       meta.map(async (m): Promise<CourierFieldSignatureUrl> => {

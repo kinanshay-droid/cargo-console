@@ -27,10 +27,12 @@ import {
   updateCourierTaskStatus,
   uploadCourierProof,
   uploadCourierFieldSignature,
+  uploadCourierFieldTextValue,
   getCourierFileUrl,
   getCourierFieldSignatureUrls,
   uploadSignedDocument,
   inferSignatureFieldKind,
+  isActionableFieldKind,
   type CourierTaskStatus,
   type CourierTaskDetail,
   type CourierTaskPoint,
@@ -170,6 +172,19 @@ function CourierPortalPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "שמירת החתימה נכשלה"),
   });
 
+  // Manual alternative to signing — for "שם" (name)-kind fields the
+  // courier types text (e.g. a last name) instead of drawing ink.
+  const uploadFieldTextValueFn = useServerFn(uploadCourierFieldTextValue);
+  const fieldTextMutation = useMutation({
+    mutationFn: (vars: { fieldId: string; value: string }) =>
+      uploadFieldTextValueFn({ data: { token, caseId: selectedId as string, ...vars } }),
+    onSuccess: () => {
+      toast.success("הפרטים נשמרו");
+      qc.invalidateQueries({ queryKey: ["courier-task-detail", token, selectedId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "השמירה נכשלה"),
+  });
+
   // Once every marked field is signed, flatten the signatures onto the
   // actual document (image via canvas, PDF via pdf-lib — see
   // src/lib/signed-document-composer.ts) and upload the result, so staff
@@ -198,13 +213,14 @@ function CourierPortalPage() {
       toast.error(e instanceof Error ? e.message : "יצירת המסמך החתום נכשלה, אפשר לנסות שוב"),
   });
 
-  // Only "signature"-kind fields need to actually be signed — "תאריך"/"שעה"
-  // fields are auto-filled from a linked signature's timestamp and never
-  // appear in signedFieldIds, so they must be excluded from this count or
-  // "all fields signed" would never become true once such fields exist.
+  // Only "signature"/"name"-kind fields need to actually be completed by
+  // the courier — "תאריך"/"שעה" fields are auto-filled from a linked
+  // signature's timestamp and never appear in signedFieldIds, so they must
+  // be excluded from this count or "all fields done" would never become
+  // true once such fields exist.
   const requiredFieldCount =
-    detailQuery.data?.signatureFields.filter(
-      (f) => inferSignatureFieldKind(f.label) === "signature",
+    detailQuery.data?.signatureFields.filter((f) =>
+      isActionableFieldKind(inferSignatureFieldKind(f.label)),
     ).length ?? 0;
   const allFieldsSignedNoDoc =
     !!detailQuery.data &&
@@ -268,6 +284,8 @@ function CourierPortalPage() {
             documentUrlLoading={documentUrlQuery.isLoading}
             onSignField={(fieldId, dataUrl) => fieldSignatureMutation.mutate({ fieldId, dataUrl })}
             fieldSignaturePending={fieldSignatureMutation.isPending}
+            onFillNameField={(fieldId, value) => fieldTextMutation.mutate({ fieldId, value })}
+            fieldTextPending={fieldTextMutation.isPending}
             generatingSignedDocument={generateSignedDocMutation.isPending}
           />
         )}
@@ -378,6 +396,8 @@ function TaskDetailCard({
   documentUrlLoading,
   onSignField,
   fieldSignaturePending,
+  onFillNameField,
+  fieldTextPending,
   generatingSignedDocument,
 }: {
   detail: CourierTaskDetail;
@@ -395,11 +415,13 @@ function TaskDetailCard({
   documentUrlLoading: boolean;
   onSignField: (fieldId: string, dataUrl: string) => void;
   fieldSignaturePending: boolean;
+  onFillNameField: (fieldId: string, value: string) => void;
+  fieldTextPending: boolean;
   generatingSignedDocument: boolean;
 }) {
   const hasFields = detail.signatureFields.length > 0;
-  const requiredFieldCount = detail.signatureFields.filter(
-    (f) => inferSignatureFieldKind(f.label) === "signature",
+  const requiredFieldCount = detail.signatureFields.filter((f) =>
+    isActionableFieldKind(inferSignatureFieldKind(f.label)),
   ).length;
   return (
     <div className="space-y-4">
@@ -453,6 +475,8 @@ function TaskDetailCard({
               signedFieldIds={detail.signedFieldIds}
               onSignField={onSignField}
               signPending={fieldSignaturePending}
+              onFillNameField={onFillNameField}
+              fieldTextPending={fieldTextPending}
             />
           )}
           {detail.hasDocument && hasFields && detail.hasSignedDocument && (
@@ -562,6 +586,8 @@ function SignatureFieldsPanel({
   signedFieldIds,
   onSignField,
   signPending,
+  onFillNameField,
+  fieldTextPending,
 }: {
   documentUrl: string | null;
   documentUrlLoading: boolean;
@@ -570,17 +596,25 @@ function SignatureFieldsPanel({
   signedFieldIds: string[];
   onSignField: (fieldId: string, dataUrl: string) => void;
   signPending: boolean;
+  onFillNameField: (fieldId: string, value: string) => void;
+  fieldTextPending: boolean;
 }) {
-  const [signingField, setSigningField] = useState<{ id: string; label: string } | null>(null);
-  // Signing must follow the order the (real, signable) fields were defined
-  // in on the document — only the next unsigned signature-kind field (in
-  // array order) is tappable; every other unsigned pin shows locked.
-  // "תאריך"/"שעה" fields are never signed — they auto-fill — so they're
-  // excluded from this count entirely. The server enforces the same rule
-  // independently.
-  const signableFields = fields.filter((f) => inferSignatureFieldKind(f.label) === "signature");
-  const nextField = signableFields.find((f) => !signedFieldIds.includes(f.id)) ?? null;
-  const remaining = signableFields.filter((f) => !signedFieldIds.includes(f.id)).length;
+  const [signingField, setSigningField] = useState<{
+    id: string;
+    label: string;
+    kind: ReturnType<typeof inferSignatureFieldKind>;
+  } | null>(null);
+  // Completing a field must follow the order the (real, actionable) fields
+  // were defined in on the document — only the next uncompleted
+  // signature/name-kind field (in array order) is tappable; every other
+  // unsigned pin shows locked. "תאריך"/"שעה" fields are never tapped —
+  // they auto-fill — so they're excluded from this count entirely. The
+  // server enforces the same rule independently.
+  const requiredFields = fields.filter((f) =>
+    isActionableFieldKind(inferSignatureFieldKind(f.label)),
+  );
+  const nextField = requiredFields.find((f) => !signedFieldIds.includes(f.id)) ?? null;
+  const remaining = requiredFields.filter((f) => !signedFieldIds.includes(f.id)).length;
 
   return (
     <div>
@@ -589,12 +623,14 @@ function SignatureFieldsPanel({
           מסמך לחתימה
         </span>
         <span className={remaining > 0 ? "text-warning" : "text-success"}>
-          {nextField ? `הבא לחתימה: ${nextField.label}` : "כל החתימות הושלמו"}
+          {nextField ? `הבא למילוי: ${nextField.label}` : "כל הסימונים הושלמו"}
         </span>
       </div>
       {nextField && (
         <div className="mb-2 text-xs text-muted-foreground">
-          יש ללחוץ על הסימון האדום על גבי המסמך למטה כדי לחתום — לא על כפתור נפרד
+          יש ללחוץ על הסימון האדום על גבי המסמך למטה כדי{" "}
+          {inferSignatureFieldKind(nextField.label) === "name" ? "למלא את השם" : "לחתום"} — לא על
+          כפתור נפרד
         </div>
       )}
       {documentUrlLoading || !documentUrl ? (
@@ -608,10 +644,24 @@ function SignatureFieldsPanel({
           fields={fields}
           signedFieldIds={signedFieldIds}
           activeFieldId={nextField?.id ?? null}
-          onFieldTap={(f) => setSigningField({ id: f.id, label: f.label })}
+          onFieldTap={(f) =>
+            setSigningField({ id: f.id, label: f.label, kind: inferSignatureFieldKind(f.label) })
+          }
         />
       )}
-      {signingField && (
+      {signingField && signingField.kind === "name" ? (
+        <div className="mt-3">
+          <div className="mb-1.5 text-sm font-medium text-foreground">{signingField.label}</div>
+          <NameFieldPad
+            key={signingField.id}
+            onCancel={() => setSigningField(null)}
+            onSave={(value) => {
+              onFillNameField(signingField.id, value);
+              setSigningField(null);
+            }}
+          />
+        </div>
+      ) : signingField ? (
         <div className="mt-3">
           <div className="mb-1.5 text-sm font-medium text-foreground">
             חתימה: {signingField.label}
@@ -631,8 +681,51 @@ function SignatureFieldsPanel({
             }}
           />
         </div>
+      ) : null}
+      {(signPending || fieldTextPending) && (
+        <div className="mt-2 text-xs text-muted-foreground">שומר…</div>
       )}
-      {signPending && <div className="mt-2 text-xs text-muted-foreground">שומר חתימה…</div>}
+    </div>
+  );
+}
+
+function NameFieldPad({
+  onSave,
+  onCancel,
+}: {
+  onSave: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState("");
+
+  function save() {
+    if (!value.trim()) {
+      toast.error("יש להזין שם משפחה");
+      return;
+    }
+    onSave(value.trim());
+  }
+
+  return (
+    <div className="rounded-lg border bg-white p-2">
+      <input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="שם משפחה"
+        className="w-full rounded border px-3 py-2 text-sm"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+        }}
+      />
+      <div className="mt-2 flex items-center justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          ביטול
+        </Button>
+        <Button type="button" size="sm" onClick={save}>
+          שמירה
+        </Button>
+      </div>
     </div>
   );
 }

@@ -104,6 +104,7 @@ import {
   updateCaseSignatureFields,
   regenerateSignedDocument,
   inferSignatureFieldKind,
+  isActionableFieldKind,
   buildComposeFieldMeta,
   type SignatureField,
 } from "@/lib/courier-portal.functions";
@@ -533,16 +534,33 @@ function CaseDetail() {
         ),
       )
     : {};
-  // Only "signature"-kind fields actually need a captured signature —
-  // "תאריך"/"שעה" fields auto-fill and never appear in
-  // fieldSignaturePaths, so they must be excluded here or this would never
-  // be true once such fields exist on a document.
-  const courierRequiredFields = courierSignatureFields.filter(
-    (f) => inferSignatureFieldKind(f.label) === "signature",
+  // Typed values for "שם" (name)-kind fields — the manual alternative to
+  // drawing a signature (e.g. the last name of whoever signed at pickup or
+  // delivery).
+  const courierFieldTextValues: Record<string, string> = isRecord(courierTaskRaw.fieldTextValues)
+    ? Object.fromEntries(
+        Object.entries(courierTaskRaw.fieldTextValues).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      )
+    : {};
+  // Only "signature"/"name"-kind fields actually need to be completed by
+  // the courier — "תאריך"/"שעה" fields auto-fill and never appear in
+  // fieldSignaturePaths/fieldTextValues, so they must be excluded here or
+  // this would never be true once such fields exist on a document.
+  const courierRequiredFields = courierSignatureFields.filter((f) =>
+    isActionableFieldKind(inferSignatureFieldKind(f.label)),
   );
+  function isCourierFieldComplete(f: SignatureField): boolean {
+    const kind = inferSignatureFieldKind(f.label);
+    return kind === "signature"
+      ? !!courierFieldSignaturePaths[f.id]
+      : kind === "name"
+        ? !!courierFieldTextValues[f.id]?.trim()
+        : false;
+  }
   const courierAllFieldsSigned =
-    courierRequiredFields.length > 0 &&
-    courierRequiredFields.every((f) => !!courierFieldSignaturePaths[f.id]);
+    courierRequiredFields.length > 0 && courierRequiredFields.every(isCourierFieldComplete);
   const courierReportSentAt =
     typeof courierTaskRaw.reportSentAt === "string" ? courierTaskRaw.reportSentAt : null;
 
@@ -576,6 +594,7 @@ function CaseDetail() {
         courierSignatureFields,
         courierFieldSignaturePaths,
         courierFieldSignedAt,
+        courierFieldTextValues,
       );
       const fields = await Promise.all(
         meta.map(async (m) => {
@@ -1975,7 +1994,7 @@ function CaseDetail() {
                       title={
                         courierAllFieldsSigned
                           ? undefined
-                          : "אפשר ליצור את המסמך החתום רק אחרי שכל הסימונים נחתמו"
+                          : "אפשר ליצור את המסמך החתום רק אחרי שכל הסימונים הושלמו"
                       }
                       onClick={() => regenerateSignedDoc.mutate()}
                     >
@@ -1994,11 +2013,19 @@ function CaseDetail() {
                 {courierSignatureFields.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {courierSignatureFields.map((f) => {
+                      const kind = inferSignatureFieldKind(f.label);
                       // "תאריך"/"שעה" fields auto-fill from a linked
-                      // signature and are never signed directly — badge
-                      // them as informational rather than pending.
-                      const isAutoFill = inferSignatureFieldKind(f.label) !== "signature";
-                      const signed = !!courierFieldSignaturePaths[f.id];
+                      // signature and are never completed by the courier
+                      // directly — badge them as informational rather than
+                      // pending. "שם" fields are a manual, typed
+                      // alternative to signing, so they're badged the same
+                      // way a signature field is (pending/done), just
+                      // showing the typed value once filled in.
+                      const isAutoFill = kind === "date" || kind === "time";
+                      const isNameField = kind === "name";
+                      const signed = isNameField
+                        ? !!courierFieldTextValues[f.id]?.trim()
+                        : !!courierFieldSignaturePaths[f.id];
                       return (
                         <Badge
                           key={f.id}
@@ -2015,6 +2042,7 @@ function CaseDetail() {
                           {isAutoFill ? null : signed ? <Check className="h-3 w-3" /> : null}
                           {f.label}
                           {isAutoFill ? " (אוטומטי)" : ""}
+                          {isNameField && signed ? `: ${courierFieldTextValues[f.id]}` : ""}
                         </Badge>
                       );
                     })}
@@ -2023,8 +2051,8 @@ function CaseDetail() {
                 {courierRequiredFields.length > 0 && !courierSignedDocumentPath && (
                   <div className="mt-1 text-xs text-muted-foreground">
                     {courierAllFieldsSigned
-                      ? "כל הסימונים נחתמו — המסמך החתום נוצר אוטומטית, ואם לא הופיע אפשר ליצור אותו כאן ידנית"
-                      : `נחתמו ${courierRequiredFields.filter((f) => !!courierFieldSignaturePaths[f.id]).length} מתוך ${courierRequiredFields.length} סימונים`}
+                      ? "כל הסימונים הושלמו — המסמך החתום נוצר אוטומטית, ואם לא הופיע אפשר ליצור אותו כאן ידנית"
+                      : `הושלמו ${courierRequiredFields.filter(isCourierFieldComplete).length} מתוך ${courierRequiredFields.length} סימונים`}
                   </div>
                 )}
               </Field>
@@ -2042,6 +2070,11 @@ function CaseDetail() {
                   לחצו על המסמך במקום שבו הבלדר צריך לחתום, תנו לו תיאור (למשל "איסוף" או "הפצה"),
                   ואפשר להוסיף כמה סימונים שרוצים. X מסיר סימון.
                 </DialogDescription>
+                <div className="text-xs text-muted-foreground">
+                  טיפ: תיאור שמתחיל ב"תאריך" או "שעה" יתמלא אוטומטית לפי זמן החתימה הסמוכה שלפניו,
+                  בלי שהבלדר יצטרך למלא אותו. תיאור שמתחיל ב"שם" (למשל "שם משפחה") יאפשר לבלדר
+                  להקליד שם במקום לחתום — שימושי לאיסוף ולמסירה כאחד.
+                </div>
               </DialogHeader>
               {documentUrlQuery.isLoading ? (
                 <div className="flex justify-center py-10 text-muted-foreground">טוען מסמך…</div>

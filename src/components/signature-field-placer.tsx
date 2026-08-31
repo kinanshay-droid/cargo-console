@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Lock, Loader2, X, CalendarClock } from "lucide-react";
+import { Check, Lock, Loader2, X, CalendarClock, Type } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { inferSignatureFieldKind } from "@/lib/courier-portal.functions";
 
@@ -136,10 +136,14 @@ export function SignatureFieldPlacer({
 
       {fields.map((f) => {
         // "תאריך"/"שעה" pins are informational only — they auto-fill from a
-        // linked signature field's timestamp and are never tapped/signed,
-        // so they always render as a neutral badge regardless of sign-mode
-        // locking, and (in sign mode) never respond to a tap.
-        const isAutoFill = inferSignatureFieldKind(f.label) !== "signature";
+        // linked signature field's timestamp and are never tapped, so they
+        // always render as a neutral badge regardless of sign-mode locking,
+        // and (in sign mode) never respond to a tap. "שם" pins ARE filled
+        // by the courier (typed text instead of ink), so they behave like
+        // signature pins for locking/tapping — just with a different icon.
+        const kind = inferSignatureFieldKind(f.label);
+        const isAutoFill = kind === "date" || kind === "time";
+        const isNameField = kind === "name";
         const signed = signedFieldIds.includes(f.id);
         const locked =
           !isAutoFill && !signed && activeFieldId !== undefined && f.id !== activeFieldId;
@@ -178,6 +182,8 @@ export function SignatureFieldPlacer({
                 <Check className="h-3 w-3" />
               ) : locked ? (
                 <Lock className="h-3 w-3" />
+              ) : isNameField ? (
+                <Type className="h-3 w-3" />
               ) : null}
               {f.label || "חתימה"}
             </span>
