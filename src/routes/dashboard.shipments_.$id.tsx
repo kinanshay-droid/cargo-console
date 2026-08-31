@@ -28,6 +28,7 @@ import {
   PenLine,
   Send,
   Upload,
+  FileCheck2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -488,6 +489,10 @@ function CaseDetail() {
           typeof f.yPercent === "number",
       )
     : [];
+  const courierSignedDocumentPath =
+    typeof courierTaskRaw.signedDocumentPath === "string"
+      ? courierTaskRaw.signedDocumentPath
+      : null;
   const courierReportSentAt =
     typeof courierTaskRaw.reportSentAt === "string" ? courierTaskRaw.reportSentAt : null;
 
@@ -1829,6 +1834,18 @@ function CaseDetail() {
                         : "סימון מיקומי חתימה"}
                     </Button>
                   )}
+                  {courierSignedDocumentPath && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 border-success/40 text-success hover:text-success"
+                      disabled={viewCourierProof.isPending}
+                      onClick={() => viewCourierProof.mutate(courierSignedDocumentPath)}
+                    >
+                      <FileCheck2 className="h-3.5 w-3.5" /> צפייה במסמך חתום
+                    </Button>
+                  )}
                 </div>
                 {courierDocumentName && (
                   <div className="mt-1 text-xs text-muted-foreground">{courierDocumentName}</div>
@@ -1836,10 +1853,22 @@ function CaseDetail() {
                 {courierSignatureFields.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {courierSignatureFields.map((f) => (
-                      <Badge key={f.id} variant="outline" className="text-xs">
+                      <Badge
+                        key={f.id}
+                        variant="outline"
+                        className={cn(
+                          "text-xs",
+                          courierSignedDocumentPath && "border-success/40 text-success",
+                        )}
+                      >
                         {f.label}
                       </Badge>
                     ))}
+                  </div>
+                )}
+                {courierSignatureFields.length > 0 && !courierSignedDocumentPath && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    המסמך החתום יופיע כאן אוטומטית לאחר שהבלדר יחתום על כל הסימונים
                   </div>
                 )}
               </Field>

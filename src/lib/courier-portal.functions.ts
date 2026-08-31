@@ -79,6 +79,12 @@ type CourierTaskState = {
   documentName: string | null;
   signatureFields: SignatureField[];
   fieldSignaturePaths: Record<string, string>;
+  // A flattened copy of documentPath with every captured field signature
+  // composited onto it at its marked spot — built client-side (see
+  // src/lib/signed-document-composer.ts) once every field is signed, then
+  // uploaded via uploadSignedDocument below. Cleared whenever the document
+  // or the marker positions change, since it would no longer be accurate.
+  signedDocumentPath: string | null;
   // Set when staff sends the printable "דוח משימה" (task report) into the
   // courier's app (see sendCourierTaskReport below) — an HTML snapshot of
   // the same report built by src/lib/courier-task-report.ts.
@@ -119,6 +125,7 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
       ? raw.signatureFields.filter(isSignatureField)
       : [],
     fieldSignaturePaths,
+    signedDocumentPath: typeof raw.signedDocumentPath === "string" ? raw.signedDocumentPath : null,
     reportPath: typeof raw.reportPath === "string" ? raw.reportPath : null,
     reportSentAt: typeof raw.reportSentAt === "string" ? raw.reportSentAt : null,
   };
@@ -223,6 +230,7 @@ export type CourierTaskDetail = {
   hasReport: boolean;
   signatureFields: SignatureField[];
   signedFieldIds: string[];
+  hasSignedDocument: boolean;
 };
 
 export const getCourierTaskDetail = createServerFn({ method: "GET" })
@@ -322,6 +330,7 @@ export const getCourierTaskDetail = createServerFn({ method: "GET" })
       hasReport: !!state.reportPath,
       signatureFields: state.signatureFields,
       signedFieldIds: Object.keys(state.fieldSignaturePaths),
+      hasSignedDocument: !!state.signedDocumentPath,
     };
   });
 
@@ -526,6 +535,7 @@ export const uploadCaseSignatureDocument = createServerFn({ method: "POST" })
       documentName: safeName,
       signatureFields: [],
       fieldSignaturePaths: {},
+      signedDocumentPath: null,
     };
     const { error: updErr } = await supabaseAdmin
       .from("operations_cases")
@@ -573,6 +583,9 @@ export const updateCaseSignatureFields = createServerFn({ method: "POST" })
       ...state,
       signatureFields: data.fields,
       fieldSignaturePaths,
+      // Marker positions changed, so any previously-composited signed copy
+      // no longer lines up and must be rebuilt.
+      signedDocumentPath: null,
     };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -648,6 +661,97 @@ export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Public, token-validated: for the courier's own client-side compositing
+// step (see src/lib/signed-document-composer.ts) — returns every marked
+// field together with a short-lived signed URL to its captured signature
+// image (null if not yet signed), so the browser can fetch each signature
+// and draw it onto the document without ever seeing a raw storage path.
+export type CourierFieldSignatureUrl = SignatureField & { signedUrl: string | null };
+
+export const getCourierFieldSignatureUrls = createServerFn({ method: "GET" })
+  .inputValidator((input: { token: string; caseId: string }) => {
+    if (!input?.token) throw new Error("token is required");
+    if (!input?.caseId) throw new Error("caseId is required");
+    return input;
+  })
+  .handler(async ({ data }): Promise<{ fields: CourierFieldSignatureUrl[] }> => {
+    const courier = await resolveCourier(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("operations_cases")
+      .select("id, payload")
+      .eq("id", data.caseId)
+      .eq("organization_id", courier.organization_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("המשימה לא נמצאה");
+    const cl = getCritilog(row.payload);
+    if (cl.courierId !== courier.id) throw new Error("המשימה אינה משויכת לבלדר זה");
+
+    const state = getCourierTaskState(row.payload);
+    const fields = await Promise.all(
+      state.signatureFields.map(async (f): Promise<CourierFieldSignatureUrl> => {
+        const path = state.fieldSignaturePaths[f.id];
+        if (!path) return { ...f, signedUrl: null };
+        const { data: signed, error: signErr } = await supabaseAdmin.storage
+          .from(PROOF_BUCKET)
+          .createSignedUrl(path, 60 * 10);
+        return { ...f, signedUrl: signErr ? null : signed.signedUrl };
+      }),
+    );
+    return { fields };
+  });
+
+// Public, token-validated: stores the flattened "signed document" the
+// courier's browser composites once every marked field has been signed —
+// the original document with each captured signature drawn onto it at its
+// marked spot (see src/lib/signed-document-composer.ts). Same
+// data-URL-in/storage-path-out shape as the other courier uploads, except
+// the mime type isn't constrained to images since a signed PDF stays a PDF.
+export const uploadSignedDocument = createServerFn({ method: "POST" })
+  .inputValidator((input: { token: string; caseId: string; dataUrl: string }) => {
+    if (!input?.token) throw new Error("token is required");
+    if (!input?.caseId) throw new Error("caseId is required");
+    if (!input?.dataUrl?.startsWith("data:")) throw new Error("dataUrl must be a data URL");
+    return input;
+  })
+  .handler(async ({ data }) => {
+    const courier = await resolveCourier(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("operations_cases")
+      .select("id, payload")
+      .eq("id", data.caseId)
+      .eq("organization_id", courier.organization_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("המשימה לא נמצאה");
+    const cl = getCritilog(row.payload);
+    if (cl.courierId !== courier.id) throw new Error("המשימה אינה משויכת לבלדר זה");
+
+    const match = /^data:([^;]+);base64,(.+)$/.exec(data.dataUrl);
+    if (!match) throw new Error("פורמט קובץ לא נתמך");
+    const [, mime, base64] = match;
+    const ext = mime === "application/pdf" ? "pdf" : mime === "image/jpeg" ? "jpg" : "png";
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const path = `${courier.organization_id}/${data.caseId}/signed-document-${Date.now()}.${ext}`;
+
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET)
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const p = isRecord(row.payload) ? row.payload : {};
+    const state = getCourierTaskState(row.payload);
+    const nextState: CourierTaskState = { ...state, signedDocumentPath: path };
+    const { error: updErr } = await supabaseAdmin
+      .from("operations_cases")
+      .update({ payload: { ...p, courierTask: nextState } })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
 // Staff-side: push the same "דוח משימה" HTML the case page already builds
 // (src/lib/courier-task-report.ts) into the courier's app for this specific
 // case, so the courier can open the full task report on their phone instead
@@ -698,11 +802,11 @@ export const getCourierFileUrl = createServerFn({ method: "GET" })
     (input: {
       token: string;
       caseId: string;
-      kind: "photo" | "signature" | "document" | "report";
+      kind: "photo" | "signature" | "document" | "report" | "signed-document";
     }) => {
       if (!input?.token) throw new Error("token is required");
       if (!input?.caseId) throw new Error("caseId is required");
-      if (!["photo", "signature", "document", "report"].includes(input.kind)) {
+      if (!["photo", "signature", "document", "report", "signed-document"].includes(input.kind)) {
         throw new Error("invalid kind");
       }
       return input;
@@ -730,7 +834,9 @@ export const getCourierFileUrl = createServerFn({ method: "GET" })
           ? state.proofSignaturePath
           : data.kind === "document"
             ? state.documentPath
-            : state.reportPath;
+            : data.kind === "signed-document"
+              ? state.signedDocumentPath
+              : state.reportPath;
     if (!path) throw new Error("הקובץ אינו זמין");
 
     const { data: signed, error: signErr } = await supabaseAdmin.storage

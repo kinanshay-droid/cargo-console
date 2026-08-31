@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Camera,
@@ -28,11 +28,14 @@ import {
   uploadCourierProof,
   uploadCourierFieldSignature,
   getCourierFileUrl,
+  getCourierFieldSignatureUrls,
+  uploadSignedDocument,
   type CourierTaskStatus,
   type CourierTaskDetail,
   type CourierTaskPoint,
 } from "@/lib/courier-portal.functions";
 import { SignatureFieldPlacer } from "@/components/signature-field-placer";
+import { composeSignedDocument } from "@/lib/signed-document-composer";
 
 // Public, no-login mobile page for couriers — see
 // src/lib/courier-portal.functions.ts and
@@ -137,7 +140,7 @@ function CourierPortalPage() {
   });
 
   const viewFileMutation = useMutation({
-    mutationFn: (kind: "document" | "report") =>
+    mutationFn: (kind: "document" | "report" | "signed-document") =>
       getFileUrlFn({ data: { token, caseId: selectedId as string, kind } }),
     onSuccess: (res) => {
       window.open(res.url, "_blank", "noopener,noreferrer");
@@ -165,6 +168,47 @@ function CourierPortalPage() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "שמירת החתימה נכשלה"),
   });
+
+  // Once every marked field is signed, flatten the signatures onto the
+  // actual document (image via canvas, PDF via pdf-lib — see
+  // src/lib/signed-document-composer.ts) and upload the result, so staff
+  // and the courier both get one finished, signed file instead of a blank
+  // document plus separate signature snapshots.
+  const getFieldSignatureUrlsFn = useServerFn(getCourierFieldSignatureUrls);
+  const uploadSignedDocumentFn = useServerFn(uploadSignedDocument);
+  const generateSignedDocMutation = useMutation({
+    mutationFn: async () => {
+      const doc = documentUrlQuery.data;
+      if (!doc) throw new Error("המסמך לא נטען");
+      const { fields } = await getFieldSignatureUrlsFn({
+        data: { token, caseId: selectedId as string },
+      });
+      const dataUrl = await composeSignedDocument(
+        doc.url,
+        detailQuery.data?.documentIsPdf ?? false,
+        fields,
+      );
+      await uploadSignedDocumentFn({ data: { token, caseId: selectedId as string, dataUrl } });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["courier-task-detail", token, selectedId] });
+    },
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : "יצירת המסמך החתום נכשלה, אפשר לנסות שוב"),
+  });
+
+  const allFieldsSignedNoDoc =
+    !!detailQuery.data &&
+    detailQuery.data.signatureFields.length > 0 &&
+    detailQuery.data.signedFieldIds.length === detailQuery.data.signatureFields.length &&
+    !detailQuery.data.hasSignedDocument;
+
+  useEffect(() => {
+    if (allFieldsSignedNoDoc && !generateSignedDocMutation.isPending) {
+      generateSignedDocMutation.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allFieldsSignedNoDoc]);
 
   if (tasksQuery.isError) {
     return (
@@ -209,11 +253,13 @@ function CourierPortalPage() {
             uploadPending={uploadMutation.isPending}
             onViewDocument={() => viewFileMutation.mutate("document")}
             onViewReport={() => viewFileMutation.mutate("report")}
+            onViewSignedDocument={() => viewFileMutation.mutate("signed-document")}
             viewFilePending={viewFileMutation.isPending}
             documentUrl={documentUrlQuery.data?.url ?? null}
             documentUrlLoading={documentUrlQuery.isLoading}
             onSignField={(fieldId, dataUrl) => fieldSignatureMutation.mutate({ fieldId, dataUrl })}
             fieldSignaturePending={fieldSignatureMutation.isPending}
+            generatingSignedDocument={generateSignedDocMutation.isPending}
           />
         )}
       </PageShell>
@@ -317,11 +363,13 @@ function TaskDetailCard({
   uploadPending,
   onViewDocument,
   onViewReport,
+  onViewSignedDocument,
   viewFilePending,
   documentUrl,
   documentUrlLoading,
   onSignField,
   fieldSignaturePending,
+  generatingSignedDocument,
 }: {
   detail: CourierTaskDetail;
   onMarkPickedUp: () => void;
@@ -332,11 +380,13 @@ function TaskDetailCard({
   uploadPending: boolean;
   onViewDocument: () => void;
   onViewReport: () => void;
+  onViewSignedDocument: () => void;
   viewFilePending: boolean;
   documentUrl: string | null;
   documentUrlLoading: boolean;
   onSignField: (fieldId: string, dataUrl: string) => void;
   fieldSignaturePending: boolean;
+  generatingSignedDocument: boolean;
 }) {
   const hasFields = detail.signatureFields.length > 0;
   return (
@@ -393,6 +443,26 @@ function TaskDetailCard({
               signPending={fieldSignaturePending}
             />
           )}
+          {detail.hasDocument && hasFields && detail.hasSignedDocument && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              disabled={viewFilePending}
+              onClick={onViewSignedDocument}
+            >
+              <FileText className="h-4 w-4" /> צפייה במסמך החתום
+            </Button>
+          )}
+          {detail.hasDocument &&
+            hasFields &&
+            !detail.hasSignedDocument &&
+            detail.signedFieldIds.length === detail.signatureFields.length &&
+            generatingSignedDocument && (
+              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" /> מרכיב מסמך חתום…
+              </div>
+            )}
         </div>
       )}
 
