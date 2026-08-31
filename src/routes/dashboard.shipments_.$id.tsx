@@ -87,6 +87,7 @@ import { PackagingChecklistLauncher } from "@/components/packaging-checklist-dia
 import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checklist";
 import { CourierTaskReportLauncher } from "@/components/courier-task-report-dialog";
 import type { CourierTaskReportData, CourierTaskReportPoint } from "@/lib/courier-task-report";
+import { listCouriers } from "@/lib/couriers.functions";
 
 // Resolves a package/selection's attached recorder to a display label for
 // the packaging checklist — either a real device from the TEMP_LOGGERS
@@ -174,6 +175,7 @@ type CritiLogForm = {
   evening: boolean;
   weekend: boolean;
   courier: string;
+  courierId: string;
   notes: string;
   pickupAbroad: string;
 };
@@ -202,6 +204,7 @@ const EMPTY_CRITILOG: CritiLogForm = {
   evening: false,
   weekend: false,
   courier: "",
+  courierId: "",
   notes: "",
   pickupAbroad: "",
 };
@@ -346,6 +349,7 @@ function parseCritiLog(raw: unknown): CritiLogForm {
     evening: raw.evening === true,
     weekend: raw.weekend === true,
     courier: toText(raw.courier),
+    courierId: toText(raw.courierId),
     notes: toText(raw.notes),
     pickupAbroad: toText(raw.pickupAbroad),
   };
@@ -387,6 +391,7 @@ function CaseDetail() {
   const updateCasePipelineStatusFn = useServerFn(updateCasePipelineStatus);
   const listServiceRepsFn = useServerFn(listServiceReps);
   const assignCaseRepFn = useServerFn(assignCaseRep);
+  const listCouriersFn = useServerFn(listCouriers);
 
   const { data: caseRow, isLoading } = useQuery({
     queryKey: ["operations-case", id],
@@ -396,6 +401,11 @@ function CaseDetail() {
   const { data: serviceReps = [] } = useQuery({
     queryKey: ["service-reps"],
     queryFn: () => listServiceRepsFn(),
+  });
+
+  const { data: couriers = [] } = useQuery({
+    queryKey: ["couriers"],
+    queryFn: () => listCouriersFn(),
   });
 
   const statusMutation = useMutation({
@@ -1039,6 +1049,7 @@ function CaseDetail() {
                 evening: form.critilog.evening,
                 weekend: form.critilog.weekend,
                 courier: form.critilog.courier.trim() || null,
+                courierId: form.critilog.courierId || null,
                 notes: form.critilog.notes.trim() || null,
                 pickupAbroad: form.critilog.pickupAbroad || null,
               },
@@ -1511,11 +1522,44 @@ function CaseDetail() {
                 />
               </Field>
             )}
-            <Field label="בלדר">
-              <Input
-                value={form.critilog.courier}
-                onChange={(e) => updCl("courier", e.target.value)}
-              />
+            <Field
+              label="בלדר"
+              hint="בחירת בלדר משויכת מקשרת את התיק לאפליקציית הבלדר שלו — ניהול בלדרים וקישורים בעמוד הארגון"
+            >
+              <div className="space-y-2">
+                <Select
+                  value={form.critilog.courierId || "none"}
+                  onValueChange={(v) => {
+                    if (v === "none") {
+                      updCl("courierId", "");
+                      return;
+                    }
+                    const c = couriers.find((c) => c.id === v);
+                    updCl("courierId", v);
+                    if (c) updCl("courier", c.name);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="שיוך לבלדר באפליקציה (לא חובה)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">ללא שיוך</SelectItem>
+                    {couriers
+                      .filter((c) => c.isActive || c.id === form.critilog.courierId)
+                      .map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                          {!c.isActive ? " (מושבת)" : ""}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  value={form.critilog.courier}
+                  onChange={(e) => updCl("courier", e.target.value)}
+                  placeholder="שם הבלדר (חופשי)"
+                />
+              </div>
             </Field>
           </Section>
 

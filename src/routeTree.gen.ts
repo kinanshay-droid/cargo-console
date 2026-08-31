@@ -46,6 +46,7 @@ import { Route as DashboardQuotesIdEditRouteImport } from './routes/dashboard.qu
 import { Route as ApiV1CasesRouteImport } from './routes/api.v1.cases'
 import { Route as ApiV1CasesIdRouteImport } from './routes/api.v1.cases.$id'
 import { Route as ApiV1CasesIdStatusRouteImport } from './routes/api.v1.cases.$id.status'
+import { Route as CourierTokenRouteImport } from './routes/courier.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -105,6 +106,11 @@ const ApiV1CasesIdRoute = ApiV1CasesIdRouteImport.update({
 const ApiV1CasesIdStatusRoute = ApiV1CasesIdStatusRouteImport.update({
   id: '/api/v1/cases/$id/status',
   path: '/api/v1/cases/$id/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CourierTokenRoute = CourierTokenRouteImport.update({
+  id: '/courier/$token',
+  path: '/courier/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardAccountRoute = DashboardAccountRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/api/v1/cases': typeof ApiV1CasesRoute
   '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
   '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
+  '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/api/v1/cases': typeof ApiV1CasesRoute
   '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
   '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
+  '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -327,6 +335,7 @@ export interface FileRoutesById {
   '/api/v1/cases': typeof ApiV1CasesRoute
   '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
   '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
+  '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
@@ -368,6 +377,7 @@ export interface FileRouteTypes {
     | '/api/v1/cases'
     | '/api/v1/cases/$id'
     | '/api/v1/cases/$id/status'
+    | '/courier/$token'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -406,6 +416,7 @@ export interface FileRouteTypes {
     | '/api/v1/cases'
     | '/api/v1/cases/$id'
     | '/api/v1/cases/$id/status'
+    | '/courier/$token'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -443,6 +454,7 @@ export interface FileRouteTypes {
     | '/api/v1/cases'
     | '/api/v1/cases/$id'
     | '/api/v1/cases/$id/status'
+    | '/courier/$token'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
@@ -482,6 +494,7 @@ export interface RootRouteChildren {
   ApiV1CasesRoute: typeof ApiV1CasesRoute
   ApiV1CasesIdRoute: typeof ApiV1CasesIdRoute
   ApiV1CasesIdStatusRoute: typeof ApiV1CasesIdStatusRoute
+  CourierTokenRoute: typeof CourierTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -568,6 +581,13 @@ declare module '@tanstack/react-router' {
       path: '/api/v1/cases/$id/status'
       fullPath: '/api/v1/cases/$id/status'
       preLoaderRoute: typeof ApiV1CasesIdStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/courier/$token': {
+      id: '/courier/$token'
+      path: '/courier/$token'
+      fullPath: '/courier/$token'
+      preLoaderRoute: typeof CourierTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/account': {
@@ -839,6 +859,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiV1CasesRoute: ApiV1CasesRoute,
   ApiV1CasesIdRoute: ApiV1CasesIdRoute,
   ApiV1CasesIdStatusRoute: ApiV1CasesIdStatusRoute,
+  CourierTokenRoute: CourierTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
