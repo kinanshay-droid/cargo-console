@@ -601,6 +601,13 @@ function SignatureFieldsPanel({
             חתימה: {signingField.label}
           </div>
           <SignaturePad
+            // Keyed on the field id so switching from signing one field to
+            // another remounts the canvas instead of reusing the DOM
+            // element — otherwise the previous field's strokes stay drawn
+            // on screen and a courier who taps "שמירת חתימה" without first
+            // clearing it ends up saving the SAME signature image for both
+            // fields.
+            key={signingField.id}
             onCancel={() => setSigningField(null)}
             onSave={(dataUrl) => {
               onSignField(signingField.id, dataUrl);
