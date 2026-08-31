@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Loader2, X } from "lucide-react";
+import { Check, Lock, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Renders a "document to sign" (image or PDF) with clickable pin markers
@@ -34,6 +34,13 @@ type Props = {
   // Sign mode (courier): tapping an existing pin signs it.
   onFieldTap?: (field: SignatureFieldPin) => void;
   signedFieldIds?: string[];
+  // Sign mode only: the one field the courier is currently allowed to sign
+  // (the next unsigned field in the order they were defined). When set,
+  // every other unsigned pin is shown locked and can't be tapped, so
+  // signing follows the same order the fields were placed in on the
+  // document. Leave undefined in edit mode (staff placement), where every
+  // pin should stay tappable/removable regardless of order.
+  activeFieldId?: string | null;
 };
 
 export function SignatureFieldPlacer({
@@ -44,6 +51,7 @@ export function SignatureFieldPlacer({
   onRemoveField,
   onFieldTap,
   signedFieldIds = [],
+  activeFieldId,
 }: Props) {
   const [pdfImageUrl, setPdfImageUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
@@ -127,6 +135,8 @@ export function SignatureFieldPlacer({
 
       {fields.map((f) => {
         const signed = signedFieldIds.includes(f.id);
+        const locked = !signed && activeFieldId !== undefined && f.id !== activeFieldId;
+        const tappable = !!onFieldTap && !signed && !locked;
         return (
           <button
             key={f.id}
@@ -134,28 +144,32 @@ export function SignatureFieldPlacer({
             data-pin
             onClick={(e) => {
               e.stopPropagation();
-              onFieldTap?.(f);
+              if (tappable) onFieldTap?.(f);
             }}
-            disabled={!onFieldTap || signed}
+            disabled={!tappable}
             className={cn(
               "absolute flex -translate-x-1/2 -translate-y-full flex-col items-center",
-              onFieldTap && !signed ? "cursor-pointer" : "cursor-default",
+              tappable ? "cursor-pointer" : "cursor-default",
             )}
             style={{ left: `${f.xPercent}%`, top: `${f.yPercent}%` }}
           >
             <span
               className={cn(
                 "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-white shadow",
-                signed ? "bg-success" : "bg-destructive",
+                signed ? "bg-success" : locked ? "bg-muted-foreground/60" : "bg-destructive",
               )}
             >
-              {signed ? <Check className="h-3 w-3" /> : null}
+              {signed ? (
+                <Check className="h-3 w-3" />
+              ) : locked ? (
+                <Lock className="h-3 w-3" />
+              ) : null}
               {f.label || "חתימה"}
             </span>
             <span
               className={cn(
                 "h-2.5 w-2.5 rounded-full border-2 border-white shadow",
-                signed ? "bg-success" : "bg-destructive",
+                signed ? "bg-success" : locked ? "bg-muted-foreground/60" : "bg-destructive",
               )}
             />
             {onRemoveField && (

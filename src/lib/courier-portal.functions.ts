@@ -615,6 +615,13 @@ export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
     if (!state.signatureFields.some((f) => f.id === data.fieldId)) {
       throw new Error("שדה החתימה לא נמצא");
     }
+    // Signing must follow the order the fields were defined in on the
+    // document — reject any attempt to sign out of turn (the client also
+    // hides/locks non-active pins, but the server is the real gate).
+    const nextField = state.signatureFields.find((f) => !(f.id in state.fieldSignaturePaths));
+    if (nextField && nextField.id !== data.fieldId) {
+      throw new Error(`יש לחתום קודם על "${nextField.label}"`);
+    }
 
     const match = /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(data.dataUrl);
     if (!match) throw new Error("פורמט תמונה לא נתמך");

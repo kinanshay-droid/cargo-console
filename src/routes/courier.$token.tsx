@@ -483,6 +483,11 @@ function SignatureFieldsPanel({
   signPending: boolean;
 }) {
   const [signingField, setSigningField] = useState<{ id: string; label: string } | null>(null);
+  // Signing must follow the order the fields were defined in on the
+  // document — only the next unsigned field (in array order) is tappable;
+  // every other unsigned pin shows locked. The server enforces the same
+  // rule independently.
+  const nextField = fields.find((f) => !signedFieldIds.includes(f.id)) ?? null;
   const remaining = fields.filter((f) => !signedFieldIds.includes(f.id)).length;
 
   return (
@@ -492,7 +497,7 @@ function SignatureFieldsPanel({
           מסמך לחתימה
         </span>
         <span className={remaining > 0 ? "text-warning" : "text-success"}>
-          {remaining > 0 ? `נותרו ${remaining} חתימות` : "כל החתימות הושלמו"}
+          {nextField ? `הבא לחתימה: ${nextField.label}` : "כל החתימות הושלמו"}
         </span>
       </div>
       {documentUrlLoading || !documentUrl ? (
@@ -505,6 +510,7 @@ function SignatureFieldsPanel({
           isPdf={documentIsPdf}
           fields={fields}
           signedFieldIds={signedFieldIds}
+          activeFieldId={nextField?.id ?? null}
           onFieldTap={(f) => setSigningField({ id: f.id, label: f.label })}
         />
       )}
