@@ -103,6 +103,8 @@ import {
   sendCourierTaskReport,
   updateCaseSignatureFields,
   regenerateSignedDocument,
+  inferSignatureFieldKind,
+  buildComposeFieldMeta,
   type SignatureField,
 } from "@/lib/courier-portal.functions";
 import { SignatureFieldPlacer } from "@/components/signature-field-placer";
@@ -521,9 +523,26 @@ function CaseDetail() {
         ),
       )
     : {};
+  // When each field was actually signed — needed to resolve the auto-fill
+  // text for any "תאריך"/"שעה" fields when (re)composing the signed
+  // document (see buildComposeFieldMeta).
+  const courierFieldSignedAt: Record<string, string> = isRecord(courierTaskRaw.fieldSignedAt)
+    ? Object.fromEntries(
+        Object.entries(courierTaskRaw.fieldSignedAt).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      )
+    : {};
+  // Only "signature"-kind fields actually need a captured signature —
+  // "תאריך"/"שעה" fields auto-fill and never appear in
+  // fieldSignaturePaths, so they must be excluded here or this would never
+  // be true once such fields exist on a document.
+  const courierRequiredFields = courierSignatureFields.filter(
+    (f) => inferSignatureFieldKind(f.label) === "signature",
+  );
   const courierAllFieldsSigned =
-    courierSignatureFields.length > 0 &&
-    courierSignatureFields.every((f) => !!courierFieldSignaturePaths[f.id]);
+    courierRequiredFields.length > 0 &&
+    courierRequiredFields.every((f) => !!courierFieldSignaturePaths[f.id]);
   const courierReportSentAt =
     typeof courierTaskRaw.reportSentAt === "string" ? courierTaskRaw.reportSentAt : null;
 
@@ -548,12 +567,21 @@ function CaseDetail() {
     mutationFn: async () => {
       if (!courierDocumentPath) throw new Error("אין מסמך לחתימה");
       const docRes = await getCourierProofUrlFn({ data: { path: courierDocumentPath } });
+      // Shared with the courier's own auto-compose flow (see
+      // buildComposeFieldMeta in courier-portal.functions.ts) so
+      // "תאריך"/"שעה" fields get the same auto-filled stamp text here as
+      // they would automatically — only signature-kind fields need a
+      // signed URL resolved.
+      const meta = buildComposeFieldMeta(
+        courierSignatureFields,
+        courierFieldSignaturePaths,
+        courierFieldSignedAt,
+      );
       const fields = await Promise.all(
-        courierSignatureFields.map(async (f) => {
-          const path = courierFieldSignaturePaths[f.id];
-          if (!path) return { ...f, signedUrl: null };
-          const res = await getCourierProofUrlFn({ data: { path } });
-          return { ...f, signedUrl: res.url };
+        meta.map(async (m) => {
+          if (!m.path) return { ...m, signedUrl: null };
+          const res = await getCourierProofUrlFn({ data: { path: m.path } });
+          return { ...m, signedUrl: res.url };
         }),
       );
       const dataUrl = await composeSignedDocument(docRes.url, courierDocumentIsPdf, fields);
@@ -1966,6 +1994,10 @@ function CaseDetail() {
                 {courierSignatureFields.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {courierSignatureFields.map((f) => {
+                      // "תאריך"/"שעה" fields auto-fill from a linked
+                      // signature and are never signed directly — badge
+                      // them as informational rather than pending.
+                      const isAutoFill = inferSignatureFieldKind(f.label) !== "signature";
                       const signed = !!courierFieldSignaturePaths[f.id];
                       return (
                         <Badge
@@ -1973,21 +2005,26 @@ function CaseDetail() {
                           variant="outline"
                           className={cn(
                             "gap-1 text-xs",
-                            signed ? "border-success/40 text-success" : "text-muted-foreground",
+                            isAutoFill
+                              ? "border-sky-400/40 text-sky-600"
+                              : signed
+                                ? "border-success/40 text-success"
+                                : "text-muted-foreground",
                           )}
                         >
-                          {signed ? <Check className="h-3 w-3" /> : null}
+                          {isAutoFill ? null : signed ? <Check className="h-3 w-3" /> : null}
                           {f.label}
+                          {isAutoFill ? " (אוטומטי)" : ""}
                         </Badge>
                       );
                     })}
                   </div>
                 )}
-                {courierSignatureFields.length > 0 && !courierSignedDocumentPath && (
+                {courierRequiredFields.length > 0 && !courierSignedDocumentPath && (
                   <div className="mt-1 text-xs text-muted-foreground">
                     {courierAllFieldsSigned
                       ? "כל הסימונים נחתמו — המסמך החתום נוצר אוטומטית, ואם לא הופיע אפשר ליצור אותו כאן ידנית"
-                      : `נחתמו ${courierSignatureFields.filter((f) => !!courierFieldSignaturePaths[f.id]).length} מתוך ${courierSignatureFields.length} סימונים`}
+                      : `נחתמו ${courierRequiredFields.filter((f) => !!courierFieldSignaturePaths[f.id]).length} מתוך ${courierRequiredFields.length} סימונים`}
                   </div>
                 )}
               </Field>

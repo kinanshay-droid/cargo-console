@@ -30,6 +30,7 @@ import {
   getCourierFileUrl,
   getCourierFieldSignatureUrls,
   uploadSignedDocument,
+  inferSignatureFieldKind,
   type CourierTaskStatus,
   type CourierTaskDetail,
   type CourierTaskPoint,
@@ -197,10 +198,18 @@ function CourierPortalPage() {
       toast.error(e instanceof Error ? e.message : "יצירת המסמך החתום נכשלה, אפשר לנסות שוב"),
   });
 
+  // Only "signature"-kind fields need to actually be signed — "תאריך"/"שעה"
+  // fields are auto-filled from a linked signature's timestamp and never
+  // appear in signedFieldIds, so they must be excluded from this count or
+  // "all fields signed" would never become true once such fields exist.
+  const requiredFieldCount =
+    detailQuery.data?.signatureFields.filter(
+      (f) => inferSignatureFieldKind(f.label) === "signature",
+    ).length ?? 0;
   const allFieldsSignedNoDoc =
     !!detailQuery.data &&
-    detailQuery.data.signatureFields.length > 0 &&
-    detailQuery.data.signedFieldIds.length === detailQuery.data.signatureFields.length &&
+    requiredFieldCount > 0 &&
+    detailQuery.data.signedFieldIds.length === requiredFieldCount &&
     !detailQuery.data.hasSignedDocument;
 
   useEffect(() => {
@@ -389,6 +398,9 @@ function TaskDetailCard({
   generatingSignedDocument: boolean;
 }) {
   const hasFields = detail.signatureFields.length > 0;
+  const requiredFieldCount = detail.signatureFields.filter(
+    (f) => inferSignatureFieldKind(f.label) === "signature",
+  ).length;
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border bg-card p-4 shadow-sm">
@@ -457,7 +469,8 @@ function TaskDetailCard({
           {detail.hasDocument &&
             hasFields &&
             !detail.hasSignedDocument &&
-            detail.signedFieldIds.length === detail.signatureFields.length &&
+            requiredFieldCount > 0 &&
+            detail.signedFieldIds.length === requiredFieldCount &&
             generatingSignedDocument && (
               <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> מרכיב מסמך חתום…
@@ -559,12 +572,15 @@ function SignatureFieldsPanel({
   signPending: boolean;
 }) {
   const [signingField, setSigningField] = useState<{ id: string; label: string } | null>(null);
-  // Signing must follow the order the fields were defined in on the
-  // document — only the next unsigned field (in array order) is tappable;
-  // every other unsigned pin shows locked. The server enforces the same
-  // rule independently.
-  const nextField = fields.find((f) => !signedFieldIds.includes(f.id)) ?? null;
-  const remaining = fields.filter((f) => !signedFieldIds.includes(f.id)).length;
+  // Signing must follow the order the (real, signable) fields were defined
+  // in on the document — only the next unsigned signature-kind field (in
+  // array order) is tappable; every other unsigned pin shows locked.
+  // "תאריך"/"שעה" fields are never signed — they auto-fill — so they're
+  // excluded from this count entirely. The server enforces the same rule
+  // independently.
+  const signableFields = fields.filter((f) => inferSignatureFieldKind(f.label) === "signature");
+  const nextField = signableFields.find((f) => !signedFieldIds.includes(f.id)) ?? null;
+  const remaining = signableFields.filter((f) => !signedFieldIds.includes(f.id)).length;
 
   return (
     <div>

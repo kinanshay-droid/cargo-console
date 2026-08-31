@@ -64,6 +64,87 @@ export type CourierTaskStatus = "pending" | "picked_up" | "delivered";
 // full-screen on a phone.
 export type SignatureField = { id: string; label: string; xPercent: number; yPercent: number };
 
+// A field's *kind* isn't stored explicitly — it's inferred from its label,
+// so staff mark a "date" or "time" stamp spot the same way they mark a
+// signature spot (click, type a label), just naming it "תאריך" / "שעה".
+// Those spots are never tapped/signed by the courier: they're auto-filled
+// with the timestamp of the nearest earlier *signature* field (see
+// findLinkedSignatureField below) both in the courier's live view and in
+// the composited signed document.
+export type SignatureFieldKind = "signature" | "date" | "time";
+
+export function inferSignatureFieldKind(label: string): SignatureFieldKind {
+  const t = label.trim();
+  if (t.startsWith("תאריך")) return "date";
+  if (t.startsWith("שעה") || t.startsWith("שעת")) return "time";
+  return "signature";
+}
+
+// A "תאריך"/"שעה" field is stamped from whichever real signature field
+// comes right before it in placement order — matching the natural pattern
+// staff use (e.g. איסוף, תאריך, שעה, מסירה, תאריך, שעה).
+export function findLinkedSignatureField(
+  fields: SignatureField[],
+  index: number,
+): SignatureField | null {
+  for (let i = index - 1; i >= 0; i--) {
+    if (inferSignatureFieldKind(fields[i].label) === "signature") return fields[i];
+  }
+  return null;
+}
+
+function formatDateHe(iso: string): string {
+  return new Intl.DateTimeFormat("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(iso));
+}
+
+function formatTimeHe(iso: string): string {
+  return new Intl.DateTimeFormat("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+// Pure — safe to call from both the server (Cloudflare Workers) and the
+// browser (this is a .functions.ts file, which ships to the client bundle
+// too), so the linking/formatting logic lives in exactly one place instead
+// of being duplicated between the courier's auto-compose flow and staff's
+// manual regenerate flow. Callers each resolve `path` (a signature field's
+// raw storage path) to a real signed URL themselves, since that requires
+// different auth depending on who's asking.
+export type ComposeFieldMeta = SignatureField & {
+  kind: SignatureFieldKind;
+  path: string | null;
+  displayText: string | null;
+};
+
+export function buildComposeFieldMeta(
+  fields: SignatureField[],
+  fieldSignaturePaths: Record<string, string>,
+  fieldSignedAt: Record<string, string>,
+): ComposeFieldMeta[] {
+  return fields.map((f, i) => {
+    const kind = inferSignatureFieldKind(f.label);
+    if (kind === "signature") {
+      return { ...f, kind, path: fieldSignaturePaths[f.id] ?? null, displayText: null };
+    }
+    const linked = findLinkedSignatureField(fields, i);
+    const signedAt = linked ? fieldSignedAt[linked.id] : undefined;
+    const displayText = signedAt
+      ? kind === "date"
+        ? formatDateHe(signedAt)
+        : formatTimeHe(signedAt)
+      : null;
+    return { ...f, kind, path: null, displayText };
+  });
+}
+
 type CourierTaskState = {
   status: CourierTaskStatus;
   pickedUpAt: string | null;
@@ -79,6 +160,10 @@ type CourierTaskState = {
   documentName: string | null;
   signatureFields: SignatureField[];
   fieldSignaturePaths: Record<string, string>;
+  // When each signature field was actually captured — used to auto-fill
+  // any linked "תאריך"/"שעה" fields (see findLinkedSignatureField above)
+  // rather than requiring the courier to fill those in separately.
+  fieldSignedAt: Record<string, string>;
   // A flattened copy of documentPath with every captured field signature
   // composited onto it at its marked spot — built client-side (see
   // src/lib/signed-document-composer.ts) once every field is signed, then
@@ -113,6 +198,12 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
       if (typeof v === "string") fieldSignaturePaths[k] = v;
     }
   }
+  const fieldSignedAt: Record<string, string> = {};
+  if (isRecord(raw.fieldSignedAt)) {
+    for (const [k, v] of Object.entries(raw.fieldSignedAt)) {
+      if (typeof v === "string") fieldSignedAt[k] = v;
+    }
+  }
   return {
     status,
     pickedUpAt: typeof raw.pickedUpAt === "string" ? raw.pickedUpAt : null,
@@ -125,6 +216,7 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
       ? raw.signatureFields.filter(isSignatureField)
       : [],
     fieldSignaturePaths,
+    fieldSignedAt,
     signedDocumentPath: typeof raw.signedDocumentPath === "string" ? raw.signedDocumentPath : null,
     reportPath: typeof raw.reportPath === "string" ? raw.reportPath : null,
     reportSentAt: typeof raw.reportSentAt === "string" ? raw.reportSentAt : null,
@@ -535,6 +627,7 @@ export const uploadCaseSignatureDocument = createServerFn({ method: "POST" })
       documentName: safeName,
       signatureFields: [],
       fieldSignaturePaths: {},
+      fieldSignedAt: {},
       signedDocumentPath: null,
     };
     const { error: updErr } = await supabaseAdmin
@@ -579,10 +672,14 @@ export const updateCaseSignatureFields = createServerFn({ method: "POST" })
     const fieldSignaturePaths = Object.fromEntries(
       Object.entries(state.fieldSignaturePaths).filter(([id]) => keepIds.has(id)),
     );
+    const fieldSignedAt = Object.fromEntries(
+      Object.entries(state.fieldSignedAt).filter(([id]) => keepIds.has(id)),
+    );
     const nextState: CourierTaskState = {
       ...state,
       signatureFields: data.fields,
       fieldSignaturePaths,
+      fieldSignedAt,
       // Marker positions changed, so any previously-composited signed copy
       // no longer lines up and must be rebuilt.
       signedDocumentPath: null,
@@ -625,13 +722,24 @@ export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
     if (cl.courierId !== courier.id) throw new Error("המשימה אינה משויכת לבלדר זה");
 
     const state = getCourierTaskState(row.payload);
-    if (!state.signatureFields.some((f) => f.id === data.fieldId)) {
+    const targetField = state.signatureFields.find((f) => f.id === data.fieldId);
+    if (!targetField) {
       throw new Error("שדה החתימה לא נמצא");
     }
-    // Signing must follow the order the fields were defined in on the
-    // document — reject any attempt to sign out of turn (the client also
-    // hides/locks non-active pins, but the server is the real gate).
-    const nextField = state.signatureFields.find((f) => !(f.id in state.fieldSignaturePaths));
+    // "תאריך"/"שעה" fields are never signed directly — they're auto-filled
+    // from the linked signature field's timestamp (see
+    // findLinkedSignatureField). Reject an attempt to sign one directly.
+    if (inferSignatureFieldKind(targetField.label) !== "signature") {
+      throw new Error("שדה זה מתמלא אוטומטית ואינו דורש חתימה");
+    }
+    // Signing must follow the order the (real, signable) fields were
+    // defined in on the document — reject any attempt to sign out of turn
+    // (the client also hides/locks non-active pins, but the server is the
+    // real gate).
+    const nextField = state.signatureFields.find(
+      (f) =>
+        inferSignatureFieldKind(f.label) === "signature" && !(f.id in state.fieldSignaturePaths),
+    );
     if (nextField && nextField.id !== data.fieldId) {
       throw new Error(`יש לחתום קודם על "${nextField.label}"`);
     }
@@ -652,6 +760,7 @@ export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
     const nextState: CourierTaskState = {
       ...state,
       fieldSignaturePaths: { ...state.fieldSignaturePaths, [data.fieldId]: path },
+      fieldSignedAt: { ...state.fieldSignedAt, [data.fieldId]: new Date().toISOString() },
     };
     const { error: updErr } = await supabaseAdmin
       .from("operations_cases")
@@ -663,10 +772,12 @@ export const uploadCourierFieldSignature = createServerFn({ method: "POST" })
 
 // Public, token-validated: for the courier's own client-side compositing
 // step (see src/lib/signed-document-composer.ts) — returns every marked
-// field together with a short-lived signed URL to its captured signature
-// image (null if not yet signed), so the browser can fetch each signature
-// and draw it onto the document without ever seeing a raw storage path.
-export type CourierFieldSignatureUrl = SignatureField & { signedUrl: string | null };
+// field with everything needed to draw it: for a signature field, a
+// short-lived signed URL to its captured image (null if not yet signed);
+// for a "תאריך"/"שעה" field, the formatted stamp text taken from its
+// linked signature field's own signing time (see buildComposeFieldMeta).
+// The browser never sees a raw storage path.
+export type CourierFieldSignatureUrl = ComposeFieldMeta & { signedUrl: string | null };
 
 export const getCourierFieldSignatureUrls = createServerFn({ method: "GET" })
   .inputValidator((input: { token: string; caseId: string }) => {
@@ -689,14 +800,18 @@ export const getCourierFieldSignatureUrls = createServerFn({ method: "GET" })
     if (cl.courierId !== courier.id) throw new Error("המשימה אינה משויכת לבלדר זה");
 
     const state = getCourierTaskState(row.payload);
+    const meta = buildComposeFieldMeta(
+      state.signatureFields,
+      state.fieldSignaturePaths,
+      state.fieldSignedAt,
+    );
     const fields = await Promise.all(
-      state.signatureFields.map(async (f): Promise<CourierFieldSignatureUrl> => {
-        const path = state.fieldSignaturePaths[f.id];
-        if (!path) return { ...f, signedUrl: null };
+      meta.map(async (m): Promise<CourierFieldSignatureUrl> => {
+        if (!m.path) return { ...m, signedUrl: null };
         const { data: signed, error: signErr } = await supabaseAdmin.storage
           .from(PROOF_BUCKET)
-          .createSignedUrl(path, 60 * 10);
-        return { ...f, signedUrl: signErr ? null : signed.signedUrl };
+          .createSignedUrl(m.path, 60 * 10);
+        return { ...m, signedUrl: signErr ? null : signed.signedUrl };
       }),
     );
     return { fields };

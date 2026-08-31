@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Lock, Loader2, X } from "lucide-react";
+import { Check, Lock, Loader2, X, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { inferSignatureFieldKind } from "@/lib/courier-portal.functions";
 
 // Renders a "document to sign" (image or PDF) with clickable pin markers
 // for signature placement, shared between:
@@ -134,9 +135,15 @@ export function SignatureFieldPlacer({
       )}
 
       {fields.map((f) => {
+        // "תאריך"/"שעה" pins are informational only — they auto-fill from a
+        // linked signature field's timestamp and are never tapped/signed,
+        // so they always render as a neutral badge regardless of sign-mode
+        // locking, and (in sign mode) never respond to a tap.
+        const isAutoFill = inferSignatureFieldKind(f.label) !== "signature";
         const signed = signedFieldIds.includes(f.id);
-        const locked = !signed && activeFieldId !== undefined && f.id !== activeFieldId;
-        const tappable = !!onFieldTap && !signed && !locked;
+        const locked =
+          !isAutoFill && !signed && activeFieldId !== undefined && f.id !== activeFieldId;
+        const tappable = !isAutoFill && !!onFieldTap && !signed && !locked;
         return (
           <button
             key={f.id}
@@ -156,10 +163,18 @@ export function SignatureFieldPlacer({
             <span
               className={cn(
                 "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold text-white shadow",
-                signed ? "bg-success" : locked ? "bg-muted-foreground/60" : "bg-destructive",
+                isAutoFill
+                  ? "bg-sky-500"
+                  : signed
+                    ? "bg-success"
+                    : locked
+                      ? "bg-muted-foreground/60"
+                      : "bg-destructive",
               )}
             >
-              {signed ? (
+              {isAutoFill ? (
+                <CalendarClock className="h-3 w-3" />
+              ) : signed ? (
                 <Check className="h-3 w-3" />
               ) : locked ? (
                 <Lock className="h-3 w-3" />
@@ -169,7 +184,13 @@ export function SignatureFieldPlacer({
             <span
               className={cn(
                 "h-2.5 w-2.5 rounded-full border-2 border-white shadow",
-                signed ? "bg-success" : locked ? "bg-muted-foreground/60" : "bg-destructive",
+                isAutoFill
+                  ? "bg-sky-500"
+                  : signed
+                    ? "bg-success"
+                    : locked
+                      ? "bg-muted-foreground/60"
+                      : "bg-destructive",
               )}
             />
             {onRemoveField && (
