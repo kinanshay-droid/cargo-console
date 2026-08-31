@@ -1937,13 +1937,18 @@ function CaseDetail() {
                       <FileCheck2 className="h-3.5 w-3.5" /> צפייה במסמך חתום
                     </Button>
                   )}
-                  {courierAllFieldsSigned && (
+                  {courierSignatureFields.length > 0 && (
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
                       className="gap-1.5"
-                      disabled={regenerateSignedDoc.isPending}
+                      disabled={regenerateSignedDoc.isPending || !courierAllFieldsSigned}
+                      title={
+                        courierAllFieldsSigned
+                          ? undefined
+                          : "אפשר ליצור את המסמך החתום רק אחרי שכל הסימונים נחתמו"
+                      }
                       onClick={() => regenerateSignedDoc.mutate()}
                     >
                       <FileCheck2 className="h-3.5 w-3.5" />
@@ -1960,23 +1965,29 @@ function CaseDetail() {
                 )}
                 {courierSignatureFields.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {courierSignatureFields.map((f) => (
-                      <Badge
-                        key={f.id}
-                        variant="outline"
-                        className={cn(
-                          "text-xs",
-                          courierSignedDocumentPath && "border-success/40 text-success",
-                        )}
-                      >
-                        {f.label}
-                      </Badge>
-                    ))}
+                    {courierSignatureFields.map((f) => {
+                      const signed = !!courierFieldSignaturePaths[f.id];
+                      return (
+                        <Badge
+                          key={f.id}
+                          variant="outline"
+                          className={cn(
+                            "gap-1 text-xs",
+                            signed ? "border-success/40 text-success" : "text-muted-foreground",
+                          )}
+                        >
+                          {signed ? <Check className="h-3 w-3" /> : null}
+                          {f.label}
+                        </Badge>
+                      );
+                    })}
                   </div>
                 )}
                 {courierSignatureFields.length > 0 && !courierSignedDocumentPath && (
                   <div className="mt-1 text-xs text-muted-foreground">
-                    המסמך החתום יופיע כאן אוטומטית לאחר שהבלדר יחתום על כל הסימונים
+                    {courierAllFieldsSigned
+                      ? "כל הסימונים נחתמו — המסמך החתום נוצר אוטומטית, ואם לא הופיע אפשר ליצור אותו כאן ידנית"
+                      : `נחתמו ${courierSignatureFields.filter((f) => !!courierFieldSignaturePaths[f.id]).length} מתוך ${courierSignatureFields.length} סימונים`}
                   </div>
                 )}
               </Field>
