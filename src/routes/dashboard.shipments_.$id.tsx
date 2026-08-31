@@ -102,9 +102,11 @@ import {
   uploadCaseSignatureDocument,
   sendCourierTaskReport,
   updateCaseSignatureFields,
+  regenerateSignedDocument,
   type SignatureField,
 } from "@/lib/courier-portal.functions";
 import { SignatureFieldPlacer } from "@/components/signature-field-placer";
+import { composeSignedDocument } from "@/lib/signed-document-composer";
 import {
   Dialog,
   DialogContent,
@@ -493,6 +495,18 @@ function CaseDetail() {
     typeof courierTaskRaw.signedDocumentPath === "string"
       ? courierTaskRaw.signedDocumentPath
       : null;
+  const courierFieldSignaturePaths: Record<string, string> = isRecord(
+    courierTaskRaw.fieldSignaturePaths,
+  )
+    ? Object.fromEntries(
+        Object.entries(courierTaskRaw.fieldSignaturePaths).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      )
+    : {};
+  const courierAllFieldsSigned =
+    courierSignatureFields.length > 0 &&
+    courierSignatureFields.every((f) => !!courierFieldSignaturePaths[f.id]);
   const courierReportSentAt =
     typeof courierTaskRaw.reportSentAt === "string" ? courierTaskRaw.reportSentAt : null;
 
@@ -505,10 +519,73 @@ function CaseDetail() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "לא ניתן לפתוח את הקובץ"),
   });
 
+  // Manual (re)compose of the signed document — normally this happens
+  // automatically in the courier's browser the moment every field is
+  // signed, but a courier closing the tab right after finishing (common on
+  // mobile) can interrupt that before it completes. Staff can trigger the
+  // same composition here as a fallback, since everything it needs
+  // (document + each field's signature) is reachable via staff-side signed
+  // URLs.
+  const regenerateSignedDocumentFn = useServerFn(regenerateSignedDocument);
+  const regenerateSignedDoc = useMutation({
+    mutationFn: async () => {
+      if (!courierDocumentPath) throw new Error("אין מסמך לחתימה");
+      const docRes = await getCourierProofUrlFn({ data: { path: courierDocumentPath } });
+      const fields = await Promise.all(
+        courierSignatureFields.map(async (f) => {
+          const path = courierFieldSignaturePaths[f.id];
+          if (!path) return { ...f, signedUrl: null };
+          const res = await getCourierProofUrlFn({ data: { path } });
+          return { ...f, signedUrl: res.url };
+        }),
+      );
+      const dataUrl = await composeSignedDocument(docRes.url, courierDocumentIsPdf, fields);
+      return regenerateSignedDocumentFn({ data: { caseId: id, dataUrl } });
+    },
+    onSuccess: () => {
+      toast.success("המסמך החתום נוצר");
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "יצירת המסמך החתום נכשלה"),
+  });
+
   const uploadCaseSignatureDocumentFn = useServerFn(uploadCaseSignatureDocument);
   const uploadDocument = useMutation({
-    mutationFn: (vars: { fileName: string; dataUrl: string }) =>
-      uploadCaseSignatureDocumentFn({ data: { caseId: id, ...vars } }),
+    // Accepts one or more files. A single file (image or PDF) uploads as
+    //-is, same as before. Selecting several files at once is treated as a
+    // multi-page scan taken as separate photos — they're combined
+    // client-side into one multi-page PDF (via pdf-lib) before uploading,
+    // since the rest of the signature-field system only ever works with a
+    // single document file.
+    mutationFn: async (files: File[]) => {
+      if (files.length === 0) throw new Error("לא נבחר קובץ");
+      let fileName: string;
+      let dataUrl: string;
+      if (files.length > 1) {
+        if (!files.every((f) => f.type.startsWith("image/"))) {
+          throw new Error(
+            "אפשר לבחור כמה קבצים רק אם כולם תמונות — יש להעלות קובץ PDF בודד או כמה תמונות יחד",
+          );
+        }
+        const { combineImagesIntoPdf } = await import("@/lib/pdf-lib-client");
+        dataUrl = await combineImagesIntoPdf(files);
+        const base = files[0].name.replace(/\.[^.]+$/, "");
+        fileName = `${base}-${files.length}-עמודים.pdf`;
+      } else {
+        const file = files[0];
+        fileName = file.name;
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === "string") resolve(reader.result);
+            else reject(new Error("קריאת הקובץ נכשלה"));
+          };
+          reader.onerror = () => reject(new Error("קריאת הקובץ נכשלה"));
+          reader.readAsDataURL(file);
+        });
+      }
+      return uploadCaseSignatureDocumentFn({ data: { caseId: id, fileName, dataUrl } });
+    },
     onSuccess: () => {
       toast.success("המסמך הועלה — יופיע באפליקציית הבלדר");
       queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
@@ -1772,24 +1849,19 @@ function CaseDetail() {
             {form.critilog.courierId && (
               <Field
                 label="מסמך לחתימה"
-                hint="מסמך שתעלו כאן (למשל שטר מטען) יופיע באפליקציית הבלדר לצפייה — הבלדר מאשר בחתימה שכבר קיימת באפליקציה"
+                hint="מסמך שתעלו כאן (למשל שטר מטען) יופיע באפליקציית הבלדר לצפייה — הבלדר מאשר בחתימה שכבר קיימת באפליקציה. אפשר לבחור כמה תמונות יחד (למשל צילום של כל עמוד) והן ישולבו אוטומטית למסמך PDF אחד רב-עמודים"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     id="courier-document-upload"
                     type="file"
                     accept="application/pdf,image/*"
+                    multiple
                     className="hidden"
                     onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        if (typeof reader.result === "string") {
-                          uploadDocument.mutate({ fileName: file.name, dataUrl: reader.result });
-                        }
-                      };
-                      reader.readAsDataURL(file);
+                      const files = Array.from(e.target.files ?? []);
+                      if (files.length === 0) return;
+                      uploadDocument.mutate(files);
                       e.target.value = "";
                     }}
                   />
@@ -1844,6 +1916,23 @@ function CaseDetail() {
                       onClick={() => viewCourierProof.mutate(courierSignedDocumentPath)}
                     >
                       <FileCheck2 className="h-3.5 w-3.5" /> צפייה במסמך חתום
+                    </Button>
+                  )}
+                  {courierAllFieldsSigned && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={regenerateSignedDoc.isPending}
+                      onClick={() => regenerateSignedDoc.mutate()}
+                    >
+                      <FileCheck2 className="h-3.5 w-3.5" />
+                      {regenerateSignedDoc.isPending
+                        ? "יוצר…"
+                        : courierSignedDocumentPath
+                          ? "יצירה מחדש של מסמך חתום"
+                          : "יצירת מסמך חתום"}
                     </Button>
                   )}
                 </div>

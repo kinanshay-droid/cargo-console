@@ -2,17 +2,15 @@
 // the original "document to sign" so both the courier and staff can view
 // one finished, signed file instead of a blank document plus separate
 // signature snapshots. Runs entirely in the browser — image documents use
-// the canvas API; PDFs use pdf-lib loaded from cdnjs at runtime (same
-// pattern as pdf.js in signature-field-placer.tsx: a dynamic
-// `import(/* @vite-ignore */ url)`, never a static/top-level import, so
-// this heavy library never ships in the app bundle and never runs during
-// SSR — this module must only ever be called from client event handlers).
+// the canvas API; PDFs use pdf-lib (see src/lib/pdf-lib-client.ts) loaded
+// from cdnjs at runtime — this module must only ever be called from client
+// event handlers.
 //
 // Unlike the page-1-only preview in signature-field-placer.tsx, the PDF
 // path here loads and re-saves the *real* PDF bytes via pdf-lib, so every
 // original page survives — only page 1 (where fields can be placed) gets
 // the signature images drawn onto it.
-const PDF_LIB_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js";
+import { loadPdfLib, bytesToDataUrl } from "@/lib/pdf-lib-client";
 
 export type ComposeField = {
   id: string;
@@ -30,15 +28,6 @@ function loadImage(url: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error("לא ניתן לטעון תמונה לצורך הרכבת המסמך"));
     img.src = url;
   });
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunkSize = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
-  }
-  return btoa(binary);
 }
 
 async function composeImageDocument(fileUrl: string, fields: ComposeField[]): Promise<string> {
@@ -63,9 +52,7 @@ async function composeImageDocument(fileUrl: string, fields: ComposeField[]): Pr
 }
 
 async function composePdfDocument(fileUrl: string, fields: ComposeField[]): Promise<string> {
-  // @vite-ignore — deliberately loaded from a CDN at runtime, not bundled.
-  const PDFLib = await import(/* @vite-ignore */ PDF_LIB_URL);
-  const { PDFDocument } = PDFLib;
+  const { PDFDocument } = await loadPdfLib();
   const pdfBytes = await fetch(fileUrl).then((r) => r.arrayBuffer());
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const page = pdfDoc.getPage(0);
@@ -86,7 +73,7 @@ async function composePdfDocument(fileUrl: string, fields: ComposeField[]): Prom
     page.drawImage(sigImage, { x, y, width: sigWidth, height: sigHeight });
   }
   const outBytes: Uint8Array = await pdfDoc.save();
-  return `data:application/pdf;base64,${bytesToBase64(outBytes)}`;
+  return bytesToDataUrl(outBytes, "application/pdf");
 }
 
 export async function composeSignedDocument(

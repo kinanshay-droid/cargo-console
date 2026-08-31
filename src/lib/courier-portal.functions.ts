@@ -702,6 +702,47 @@ export const getCourierFieldSignatureUrls = createServerFn({ method: "GET" })
     return { fields };
   });
 
+// Staff-side equivalent of uploadSignedDocument below — lets staff manually
+// (re)compose the signed document from the case detail page (see
+// src/lib/signed-document-composer.ts), for cases where the courier's
+// browser closed before the automatic compositing step finished (a real
+// risk on mobile — couriers tend to background/close the tab the instant
+// they're done).
+export const regenerateSignedDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { caseId: string; dataUrl: string }) => {
+    if (!input?.caseId) throw new Error("caseId is required");
+    if (!input?.dataUrl?.startsWith("data:")) throw new Error("dataUrl must be a data URL");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { organizationId, payload } = await requireCaseInOrg(supabase, userId, data.caseId);
+
+    const match = /^data:([^;]+);base64,(.+)$/.exec(data.dataUrl);
+    if (!match) throw new Error("פורמט קובץ לא נתמך");
+    const [, mime, base64] = match;
+    const ext = mime === "application/pdf" ? "pdf" : mime === "image/jpeg" ? "jpg" : "png";
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const path = `${organizationId}/${data.caseId}/signed-document-${Date.now()}.${ext}`;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET)
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const p = isRecord(payload) ? payload : {};
+    const state = getCourierTaskState(payload);
+    const nextState: CourierTaskState = { ...state, signedDocumentPath: path };
+    const { error: updErr } = await supabaseAdmin
+      .from("operations_cases")
+      .update({ payload: { ...p, courierTask: nextState } })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
 // Public, token-validated: stores the flattened "signed document" the
 // courier's browser composites once every marked field has been signed —
 // the original document with each captured signature drawn onto it at its
