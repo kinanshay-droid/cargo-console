@@ -24,6 +24,8 @@ import {
   Thermometer,
   Truck,
   Calculator,
+  Camera,
+  PenLine,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,6 +90,7 @@ import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checkl
 import { CourierTaskReportLauncher } from "@/components/courier-task-report-dialog";
 import type { CourierTaskReportData, CourierTaskReportPoint } from "@/lib/courier-task-report";
 import { listCouriers } from "@/lib/couriers.functions";
+import { getCourierProofUrl } from "@/lib/courier-portal.functions";
 
 // Resolves a package/selection's attached recorder to a display label for
 // the packaging checklist — either a real device from the TEMP_LOGGERS
@@ -429,6 +432,36 @@ function CaseDetail() {
   });
 
   const casePayload = caseRow && isRecord(caseRow.payload) ? caseRow.payload : {};
+
+  // Set only by the courier's own no-login portal (src/routes/courier.$token.tsx
+  // via src/lib/courier-portal.functions.ts) — never edited from this page,
+  // just displayed here so staff can see pickup/delivery status and open the
+  // proof photo/signature the courier uploaded.
+  const courierTaskRaw = isRecord(casePayload.courierTask) ? casePayload.courierTask : {};
+  const courierTaskStatus: "pending" | "picked_up" | "delivered" =
+    courierTaskRaw.status === "picked_up" || courierTaskRaw.status === "delivered"
+      ? courierTaskRaw.status
+      : "pending";
+  const courierPickedUpAt =
+    typeof courierTaskRaw.pickedUpAt === "string" ? courierTaskRaw.pickedUpAt : null;
+  const courierDeliveredAt =
+    typeof courierTaskRaw.deliveredAt === "string" ? courierTaskRaw.deliveredAt : null;
+  const courierProofPhotoPath =
+    typeof courierTaskRaw.proofPhotoPath === "string" ? courierTaskRaw.proofPhotoPath : null;
+  const courierProofSignaturePath =
+    typeof courierTaskRaw.proofSignaturePath === "string"
+      ? courierTaskRaw.proofSignaturePath
+      : null;
+
+  const getCourierProofUrlFn = useServerFn(getCourierProofUrl);
+  const viewCourierProof = useMutation({
+    mutationFn: (path: string) => getCourierProofUrlFn({ data: { path } }),
+    onSuccess: (res) => {
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "לא ניתן לפתוח את הקובץ"),
+  });
+
   const assignedRep: CaseRep = isRecord(casePayload.assignedRep)
     ? {
         id: toText(casePayload.assignedRep.id),
@@ -1561,6 +1594,65 @@ function CaseDetail() {
                 />
               </div>
             </Field>
+            {form.critilog.courierId && (
+              <Field label="סטטוס באפליקציית הבלדר">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    className={
+                      courierTaskStatus === "delivered"
+                        ? "bg-success/15 text-success"
+                        : courierTaskStatus === "picked_up"
+                          ? "bg-warning/15 text-warning"
+                          : "bg-muted text-muted-foreground"
+                    }
+                  >
+                    {courierTaskStatus === "delivered"
+                      ? "נמסר ללקוח"
+                      : courierTaskStatus === "picked_up"
+                        ? "נאסף"
+                        : "ממתין לאיסוף"}
+                  </Badge>
+                  {courierPickedUpAt && (
+                    <span className="text-xs text-muted-foreground">
+                      נאסף: {new Date(courierPickedUpAt).toLocaleString("he-IL")}
+                    </span>
+                  )}
+                  {courierDeliveredAt && (
+                    <span className="text-xs text-muted-foreground">
+                      נמסר: {new Date(courierDeliveredAt).toLocaleString("he-IL")}
+                    </span>
+                  )}
+                </div>
+                {(courierProofPhotoPath || courierProofSignaturePath) && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {courierProofPhotoPath && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={viewCourierProof.isPending}
+                        onClick={() => viewCourierProof.mutate(courierProofPhotoPath)}
+                      >
+                        <Camera className="h-3.5 w-3.5" /> צפייה בתמונה
+                      </Button>
+                    )}
+                    {courierProofSignaturePath && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5"
+                        disabled={viewCourierProof.isPending}
+                        onClick={() => viewCourierProof.mutate(courierProofSignaturePath)}
+                      >
+                        <PenLine className="h-3.5 w-3.5" /> צפייה בחתימה
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </Field>
+            )}
           </Section>
 
           <div className="rounded-2xl border bg-card p-5 shadow-sm">
