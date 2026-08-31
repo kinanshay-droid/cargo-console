@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 
 // Public, no-login courier mobile portal (see
 // supabase/migrations/20260831090000_add_couriers.sql and
@@ -60,6 +62,17 @@ type CourierTaskState = {
   deliveredAt: string | null;
   proofPhotoPath: string | null;
   proofSignaturePath: string | null;
+  // "Document to sign" — a file staff attaches to this specific case (see
+  // uploadCaseSignatureDocument below), fresh per case. The courier views it
+  // in the app and confirms with the existing signature pad; nothing here
+  // overlays a signature onto the document itself.
+  documentPath: string | null;
+  documentName: string | null;
+  // Set when staff sends the printable "דוח משימה" (task report) into the
+  // courier's app (see sendCourierTaskReport below) — an HTML snapshot of
+  // the same report built by src/lib/courier-task-report.ts.
+  reportPath: string | null;
+  reportSentAt: string | null;
 };
 
 function getCourierTaskState(payload: unknown): CourierTaskState {
@@ -73,6 +86,10 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
     deliveredAt: typeof raw.deliveredAt === "string" ? raw.deliveredAt : null,
     proofPhotoPath: typeof raw.proofPhotoPath === "string" ? raw.proofPhotoPath : null,
     proofSignaturePath: typeof raw.proofSignaturePath === "string" ? raw.proofSignaturePath : null,
+    documentPath: typeof raw.documentPath === "string" ? raw.documentPath : null,
+    documentName: typeof raw.documentName === "string" ? raw.documentName : null,
+    reportPath: typeof raw.reportPath === "string" ? raw.reportPath : null,
+    reportSentAt: typeof raw.reportSentAt === "string" ? raw.reportSentAt : null,
   };
 }
 
@@ -169,6 +186,9 @@ export type CourierTaskDetail = {
   deliveredAt: string | null;
   hasProofPhoto: boolean;
   hasProofSignature: boolean;
+  hasDocument: boolean;
+  documentName: string | null;
+  hasReport: boolean;
 };
 
 export const getCourierTaskDetail = createServerFn({ method: "GET" })
@@ -262,6 +282,9 @@ export const getCourierTaskDetail = createServerFn({ method: "GET" })
       deliveredAt: state.deliveredAt,
       hasProofPhoto: !!state.proofPhotoPath,
       hasProofSignature: !!state.proofSignaturePath,
+      hasDocument: !!state.documentPath,
+      documentName: state.documentName,
+      hasReport: !!state.reportPath,
     };
   });
 
@@ -397,5 +420,163 @@ export const getCourierProofUrl = createServerFn({ method: "GET" })
       .from(PROOF_BUCKET)
       .createSignedUrl(data.path, 60 * 10);
     if (error) throw new Error(error.message);
+    return { url: signed.signedUrl };
+  });
+
+async function requireCaseInOrg(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  caseId: string,
+): Promise<{ organizationId: string; payload: unknown }> {
+  const { data: profile, error: profileErr } = await supabase
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profileErr) throw new Error(profileErr.message);
+  if (!profile?.organization_id) throw new Error("User has no organization");
+
+  const { data: row, error } = await supabase
+    .from("operations_cases")
+    .select("id, payload, organization_id")
+    .eq("id", caseId)
+    .eq("organization_id", profile.organization_id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!row) throw new Error("התיק לא נמצא");
+  return { organizationId: row.organization_id, payload: row.payload };
+}
+
+// Staff-side: attach a fresh document to this case that the courier will see
+// in their app (e.g. a waybill that needs to be signed on delivery). Each
+// upload replaces the previous one — "בכל תיק מחדש" — the old file is left
+// orphaned in storage rather than deleted, which is fine for a private
+// bucket nobody browses directly.
+export const uploadCaseSignatureDocument = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { caseId: string; fileName: string; dataUrl: string }) => {
+    if (!input?.caseId) throw new Error("caseId is required");
+    if (!input?.fileName?.trim()) throw new Error("fileName is required");
+    if (!input?.dataUrl?.startsWith("data:")) throw new Error("dataUrl must be a data URL");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { organizationId, payload } = await requireCaseInOrg(supabase, userId, data.caseId);
+
+    const match = /^data:([^;]+);base64,(.+)$/.exec(data.dataUrl);
+    if (!match) throw new Error("פורמט קובץ לא נתמך");
+    const [, mime, base64] = match;
+    const safeName = data.fileName.trim().replace(/[^\w.\-֐-׿ ]+/g, "_");
+    const ext = safeName.includes(".") ? safeName.split(".").pop() : "bin";
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const path = `${organizationId}/${data.caseId}/document-${Date.now()}.${ext}`;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET)
+      .upload(path, bytes, { contentType: mime, upsert: false });
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const p = isRecord(payload) ? payload : {};
+    const state = getCourierTaskState(payload);
+    const nextState: CourierTaskState = { ...state, documentPath: path, documentName: safeName };
+    const { error: updErr } = await supabaseAdmin
+      .from("operations_cases")
+      .update({ payload: { ...p, courierTask: nextState } })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
+// Staff-side: push the same "דוח משימה" HTML the case page already builds
+// (src/lib/courier-task-report.ts) into the courier's app for this specific
+// case, so the courier can open the full task report on their phone instead
+// of it only being printable from the office.
+export const sendCourierTaskReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { caseId: string; html: string }) => {
+    if (!input?.caseId) throw new Error("caseId is required");
+    if (!input?.html?.trim()) throw new Error("html is required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { organizationId, payload } = await requireCaseInOrg(supabase, userId, data.caseId);
+
+    const path = `${organizationId}/${data.caseId}/report-${Date.now()}.html`;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: uploadErr } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET)
+      .upload(path, new TextEncoder().encode(data.html), {
+        contentType: "text/html; charset=utf-8",
+        upsert: false,
+      });
+    if (uploadErr) throw new Error(uploadErr.message);
+
+    const p = isRecord(payload) ? payload : {};
+    const state = getCourierTaskState(payload);
+    const nextState: CourierTaskState = {
+      ...state,
+      reportPath: path,
+      reportSentAt: new Date().toISOString(),
+    };
+    const { error: updErr } = await supabaseAdmin
+      .from("operations_cases")
+      .update({ payload: { ...p, courierTask: nextState } })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
+// Public, token-validated equivalent of getCourierProofUrl for the courier's
+// own app — takes a "kind" instead of a raw storage path so the courier
+// client never needs to see (or be able to guess) real storage paths; the
+// path is resolved server-side from that case's own courierTask state after
+// confirming the case really is assigned to this courier.
+export const getCourierFileUrl = createServerFn({ method: "GET" })
+  .inputValidator(
+    (input: {
+      token: string;
+      caseId: string;
+      kind: "photo" | "signature" | "document" | "report";
+    }) => {
+      if (!input?.token) throw new Error("token is required");
+      if (!input?.caseId) throw new Error("caseId is required");
+      if (!["photo", "signature", "document", "report"].includes(input.kind)) {
+        throw new Error("invalid kind");
+      }
+      return input;
+    },
+  )
+  .handler(async ({ data }) => {
+    const courier = await resolveCourier(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row, error } = await supabaseAdmin
+      .from("operations_cases")
+      .select("id, payload")
+      .eq("id", data.caseId)
+      .eq("organization_id", courier.organization_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("המשימה לא נמצאה");
+    const cl = getCritilog(row.payload);
+    if (cl.courierId !== courier.id) throw new Error("המשימה אינה משויכת לבלדר זה");
+
+    const state = getCourierTaskState(row.payload);
+    const path =
+      data.kind === "photo"
+        ? state.proofPhotoPath
+        : data.kind === "signature"
+          ? state.proofSignaturePath
+          : data.kind === "document"
+            ? state.documentPath
+            : state.reportPath;
+    if (!path) throw new Error("הקובץ אינו זמין");
+
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET)
+      .createSignedUrl(path, 60 * 10);
+    if (signErr) throw new Error(signErr.message);
     return { url: signed.signedUrl };
   });

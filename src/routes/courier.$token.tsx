@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Camera,
   CheckCircle2,
+  FileText,
   Loader2,
   MapPin,
   PackageCheck,
@@ -25,6 +26,7 @@ import {
   getCourierTaskDetail,
   updateCourierTaskStatus,
   uploadCourierProof,
+  getCourierFileUrl,
   type CourierTaskStatus,
   type CourierTaskDetail,
   type CourierTaskPoint,
@@ -94,6 +96,7 @@ function CourierPortalPage() {
   const getDetailFn = useServerFn(getCourierTaskDetail);
   const updateStatusFn = useServerFn(updateCourierTaskStatus);
   const uploadProofFn = useServerFn(uploadCourierProof);
+  const getFileUrlFn = useServerFn(getCourierFileUrl);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -129,6 +132,15 @@ function CourierPortalPage() {
       qc.invalidateQueries({ queryKey: ["courier-task-detail", token, selectedId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "ההעלאה נכשלה"),
+  });
+
+  const viewFileMutation = useMutation({
+    mutationFn: (kind: "document" | "report") =>
+      getFileUrlFn({ data: { token, caseId: selectedId as string, kind } }),
+    onSuccess: (res) => {
+      window.open(res.url, "_blank", "noopener,noreferrer");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "לא ניתן לפתוח את הקובץ"),
   });
 
   if (tasksQuery.isError) {
@@ -172,6 +184,9 @@ function CourierPortalPage() {
             onUploadPhoto={(dataUrl) => uploadMutation.mutate({ kind: "photo", dataUrl })}
             onUploadSignature={(dataUrl) => uploadMutation.mutate({ kind: "signature", dataUrl })}
             uploadPending={uploadMutation.isPending}
+            onViewDocument={() => viewFileMutation.mutate("document")}
+            onViewReport={() => viewFileMutation.mutate("report")}
+            viewFilePending={viewFileMutation.isPending}
           />
         )}
       </PageShell>
@@ -273,6 +288,9 @@ function TaskDetailCard({
   onUploadPhoto,
   onUploadSignature,
   uploadPending,
+  onViewDocument,
+  onViewReport,
+  viewFilePending,
 }: {
   detail: CourierTaskDetail;
   onMarkPickedUp: () => void;
@@ -281,6 +299,9 @@ function TaskDetailCard({
   onUploadPhoto: (dataUrl: string) => void;
   onUploadSignature: (dataUrl: string) => void;
   uploadPending: boolean;
+  onViewDocument: () => void;
+  onViewReport: () => void;
+  viewFilePending: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -298,6 +319,33 @@ function TaskDetailCard({
           </div>
         )}
       </div>
+
+      {(detail.hasDocument || detail.hasReport) && (
+        <div className="flex flex-wrap gap-2 rounded-2xl border bg-card p-4 shadow-sm">
+          {detail.hasReport && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              disabled={viewFilePending}
+              onClick={onViewReport}
+            >
+              <FileText className="h-4 w-4" /> דוח משימה מלא
+            </Button>
+          )}
+          {detail.hasDocument && (
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              disabled={viewFilePending}
+              onClick={onViewDocument}
+            >
+              <FileText className="h-4 w-4" /> {detail.documentName || "מסמך לחתימה"}
+            </Button>
+          )}
+        </div>
+      )}
 
       <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
         <PointsBlock title="איסוף" points={detail.pickupPoints} />

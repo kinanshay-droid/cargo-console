@@ -26,6 +26,8 @@ import {
   Calculator,
   Camera,
   PenLine,
+  Send,
+  Upload,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -88,9 +90,17 @@ import { REVIEW_STATUS_OPTIONS, getReviewStatusStyle } from "@/lib/review-status
 import { PackagingChecklistLauncher } from "@/components/packaging-checklist-dialog";
 import type { ChecklistCaseSnapshot, ChecklistBox } from "@/lib/packaging-checklist";
 import { CourierTaskReportLauncher } from "@/components/courier-task-report-dialog";
-import type { CourierTaskReportData, CourierTaskReportPoint } from "@/lib/courier-task-report";
+import {
+  buildCourierTaskReportHtml,
+  type CourierTaskReportData,
+  type CourierTaskReportPoint,
+} from "@/lib/courier-task-report";
 import { listCouriers } from "@/lib/couriers.functions";
-import { getCourierProofUrl } from "@/lib/courier-portal.functions";
+import {
+  getCourierProofUrl,
+  uploadCaseSignatureDocument,
+  sendCourierTaskReport,
+} from "@/lib/courier-portal.functions";
 
 // Resolves a package/selection's attached recorder to a display label for
 // the packaging checklist — either a real device from the TEMP_LOGGERS
@@ -452,6 +462,12 @@ function CaseDetail() {
     typeof courierTaskRaw.proofSignaturePath === "string"
       ? courierTaskRaw.proofSignaturePath
       : null;
+  const courierDocumentPath =
+    typeof courierTaskRaw.documentPath === "string" ? courierTaskRaw.documentPath : null;
+  const courierDocumentName =
+    typeof courierTaskRaw.documentName === "string" ? courierTaskRaw.documentName : null;
+  const courierReportSentAt =
+    typeof courierTaskRaw.reportSentAt === "string" ? courierTaskRaw.reportSentAt : null;
 
   const getCourierProofUrlFn = useServerFn(getCourierProofUrl);
   const viewCourierProof = useMutation({
@@ -460,6 +476,27 @@ function CaseDetail() {
       window.open(res.url, "_blank", "noopener,noreferrer");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "לא ניתן לפתוח את הקובץ"),
+  });
+
+  const uploadCaseSignatureDocumentFn = useServerFn(uploadCaseSignatureDocument);
+  const uploadDocument = useMutation({
+    mutationFn: (vars: { fileName: string; dataUrl: string }) =>
+      uploadCaseSignatureDocumentFn({ data: { caseId: id, ...vars } }),
+    onSuccess: () => {
+      toast.success("המסמך הועלה — יופיע באפליקציית הבלדר");
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "העלאת המסמך נכשלה"),
+  });
+
+  const sendCourierTaskReportFn = useServerFn(sendCourierTaskReport);
+  const sendReport = useMutation({
+    mutationFn: (html: string) => sendCourierTaskReportFn({ data: { caseId: id, html } }),
+    onSuccess: () => {
+      toast.success("דוח המשימה נשלח לאפליקציית הבלדר");
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "שליחת הדוח נכשלה"),
   });
 
   const assignedRep: CaseRep = isRecord(casePayload.assignedRep)
@@ -1189,6 +1226,23 @@ function CaseDetail() {
           <div className="flex flex-wrap items-center gap-2">
             <ActionButtonGroup onSave={handleSave} saving={saving} />
             {courierReportData && <CourierTaskReportLauncher data={courierReportData} />}
+            {courierReportData && form.critilog.courierId && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                disabled={sendReport.isPending}
+                onClick={() => sendReport.mutate(buildCourierTaskReportHtml(courierReportData))}
+              >
+                <Send className="h-3.5 w-3.5" />
+                {sendReport.isPending
+                  ? "שולח…"
+                  : courierReportSentAt
+                    ? "שליחת דוח מעודכן לבלדר"
+                    : "שליחת דוח לבלדר"}
+              </Button>
+            )}
             {form.critilog.pickupIsrael && (
               <PackagingChecklistLauncher
                 caseId={id}
@@ -1650,6 +1704,68 @@ function CaseDetail() {
                       </Button>
                     )}
                   </div>
+                )}
+                {courierReportSentAt && (
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    דוח משימה נשלח לבלדר: {new Date(courierReportSentAt).toLocaleString("he-IL")}
+                  </div>
+                )}
+              </Field>
+            )}
+            {form.critilog.courierId && (
+              <Field
+                label="מסמך לחתימה"
+                hint="מסמך שתעלו כאן (למשל שטר מטען) יופיע באפליקציית הבלדר לצפייה — הבלדר מאשר בחתימה שכבר קיימת באפליקציה"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    id="courier-document-upload"
+                    type="file"
+                    accept="application/pdf,image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        if (typeof reader.result === "string") {
+                          uploadDocument.mutate({ fileName: file.name, dataUrl: reader.result });
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5"
+                    disabled={uploadDocument.isPending}
+                    onClick={() => document.getElementById("courier-document-upload")?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {uploadDocument.isPending
+                      ? "מעלה…"
+                      : courierDocumentPath
+                        ? "החלפת מסמך"
+                        : "העלאת מסמך"}
+                  </Button>
+                  {courierDocumentPath && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={viewCourierProof.isPending}
+                      onClick={() => viewCourierProof.mutate(courierDocumentPath)}
+                    >
+                      <FileText className="h-3.5 w-3.5" /> צפייה במסמך
+                    </Button>
+                  )}
+                </div>
+                {courierDocumentName && (
+                  <div className="mt-1 text-xs text-muted-foreground">{courierDocumentName}</div>
                 )}
               </Field>
             )}
