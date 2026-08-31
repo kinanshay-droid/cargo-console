@@ -1847,7 +1847,10 @@ function CaseDetail() {
           </Section>
 
           <Dialog open={placerOpen} onOpenChange={setPlacerOpen}>
-            <DialogContent dir="rtl" className="max-w-2xl text-right sm:text-right">
+            <DialogContent
+              dir="rtl"
+              className="max-h-[92vh] max-w-5xl overflow-y-auto text-right sm:text-right"
+            >
               <DialogHeader className="text-right sm:text-right">
                 <DialogTitle>סימון מיקומי חתימה על המסמך</DialogTitle>
                 <DialogDescription>
@@ -1858,17 +1861,19 @@ function CaseDetail() {
               {documentUrlQuery.isLoading ? (
                 <div className="flex justify-center py-10 text-muted-foreground">טוען מסמך…</div>
               ) : documentUrlQuery.data ? (
-                <SignatureFieldPlacer
-                  fileUrl={documentUrlQuery.data.url}
-                  isPdf={courierDocumentIsPdf}
-                  fields={draftFields}
-                  onAddField={(f) =>
-                    setDraftFields((prev) => [...prev, { id: crypto.randomUUID(), ...f }])
-                  }
-                  onRemoveField={(fid) =>
-                    setDraftFields((prev) => prev.filter((f) => f.id !== fid))
-                  }
-                />
+                <div className="mx-auto w-full max-w-3xl">
+                  <SignatureFieldPlacer
+                    fileUrl={documentUrlQuery.data.url}
+                    isPdf={courierDocumentIsPdf}
+                    fields={draftFields}
+                    onAddField={(f) =>
+                      setDraftFields((prev) => [...prev, { id: crypto.randomUUID(), ...f }])
+                    }
+                    onRemoveField={(fid) =>
+                      setDraftFields((prev) => prev.filter((f) => f.id !== fid))
+                    }
+                  />
+                </div>
               ) : (
                 <div className="py-10 text-center text-sm text-muted-foreground">
                   לא ניתן לטעון את המסמך
