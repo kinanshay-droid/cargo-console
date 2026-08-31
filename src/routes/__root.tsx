@@ -1,8 +1,4 @@
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -13,7 +9,6 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
-
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
@@ -101,7 +96,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -188,17 +186,18 @@ function SupabaseAuthListener() {
     let unsub: (() => void) | undefined;
     import("@/integrations/supabase/client").then(({ supabase }) => {
       const { data } = supabase.auth.onAuthStateChange((event) => {
-        if (
-          event !== "SIGNED_IN" &&
-          event !== "SIGNED_OUT" &&
-          event !== "USER_UPDATED"
-        )
-          return;
+        if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
         router.invalidate();
         if (event === "SIGNED_OUT") {
           qc.clear();
           const publicPaths = ["/login", "/signup", "/forgot-password", "/reset-password"];
-          if (!publicPaths.includes(pathname)) {
+          // /courier/<token> is the courier's own no-login personal link (see
+          // src/routes/courier.$token.tsx) — it never has a Supabase Auth
+          // session at all, so the initial SIGNED_OUT event this listener
+          // gets on page load must not bounce it to /login like every other
+          // staff-only page does.
+          const isPublicPath = publicPaths.includes(pathname) || pathname.startsWith("/courier/");
+          if (!isPublicPath) {
             router.navigate({ to: "/login", replace: true });
           }
         } else {
@@ -213,5 +212,3 @@ function SupabaseAuthListener() {
   }, [qc, router, pathname]);
   return null;
 }
-
-
