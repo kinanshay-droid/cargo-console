@@ -153,6 +153,72 @@ export const setCourierActive = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Persists the case↔courier assignment immediately, separately from the
+// case detail page's big "save" button. The courier Select used to only
+// update local form state, so an assignment made right before some other
+// action refetched the case (uploading a document, sending the report,
+// placing signature fields — anything that invalidates the case query)
+// got silently wiped: the page re-derives its whole form from the
+// freshly-fetched payload, which still had the old, unsaved courierId.
+// Also updates the free-text courier name to match, but only when
+// assigning (courierId set) — clearing the assignment leaves any manually
+// typed name alone rather than blanking it.
+export const assignCaseCourier = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { caseId: string; courierId: string | null }) => {
+    if (!input?.caseId) throw new Error("caseId is required");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const organizationId = await requireOrgId(supabase, userId);
+
+    const { data: existing, error: getErr } = await supabase
+      .from("operations_cases")
+      .select("payload")
+      .eq("id", data.caseId)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (getErr) throw new Error(getErr.message);
+    if (!existing) throw new Error("התיק לא נמצא");
+
+    const payload =
+      existing.payload && typeof existing.payload === "object" && !Array.isArray(existing.payload)
+        ? (existing.payload as Record<string, unknown>)
+        : {};
+    const critilog =
+      payload.critilog && typeof payload.critilog === "object" && !Array.isArray(payload.critilog)
+        ? (payload.critilog as Record<string, unknown>)
+        : {};
+
+    let courierName: string | null = null;
+    if (data.courierId) {
+      const { data: courier, error: courierErr } = await supabase
+        .from("couriers")
+        .select("name")
+        .eq("id", data.courierId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (courierErr) throw new Error(courierErr.message);
+      if (!courier) throw new Error("בלדר לא נמצא");
+      courierName = courier.name;
+    }
+
+    const nextCritilog = {
+      ...critilog,
+      courierId: data.courierId ?? "",
+      ...(courierName !== null ? { courier: courierName } : {}),
+    };
+    const nextPayload = { ...payload, critilog: nextCritilog };
+
+    const { error: updErr } = await supabase
+      .from("operations_cases")
+      .update({ payload: nextPayload as never })
+      .eq("id", data.caseId);
+    if (updErr) throw new Error(updErr.message);
+    return { ok: true };
+  });
+
 // Invalidates the courier's existing personal link and issues a new one —
 // for when a link leaks or a phone is lost. Returns the new plaintext token
 // exactly once, same as createCourier.

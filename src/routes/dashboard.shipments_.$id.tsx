@@ -96,7 +96,7 @@ import {
   type CourierTaskReportData,
   type CourierTaskReportPoint,
 } from "@/lib/courier-task-report";
-import { listCouriers } from "@/lib/couriers.functions";
+import { listCouriers, assignCaseCourier } from "@/lib/couriers.functions";
 import {
   getCourierProofUrl,
   uploadCaseSignatureDocument,
@@ -453,6 +453,23 @@ function CaseDetail() {
       queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
     },
     onError: () => toast.error("שיוך הנציג נכשל"),
+  });
+
+  // Persists the courier assignment the moment it's changed, same reason
+  // as assignRepMutation above — the Select used to only update local
+  // form state, so it got silently lost if the user then triggered any
+  // action that refetches the case (uploading a document, sending the
+  // report, placing signature fields) before clicking the page's own
+  // "save" button.
+  const assignCaseCourierFn = useServerFn(assignCaseCourier);
+  const assignCourierMutation = useMutation({
+    mutationFn: (courierId: string | null) =>
+      assignCaseCourierFn({ data: { caseId: id, courierId } }),
+    onSuccess: () => {
+      toast.success("שיוך הבלדר עודכן");
+      queryClient.invalidateQueries({ queryKey: ["operations-case", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "שיוך הבלדר נכשל"),
   });
 
   const casePayload = caseRow && isRecord(caseRow.payload) ? caseRow.payload : {};
@@ -1753,11 +1770,13 @@ function CaseDetail() {
                   onValueChange={(v) => {
                     if (v === "none") {
                       updCl("courierId", "");
+                      assignCourierMutation.mutate(null);
                       return;
                     }
                     const c = couriers.find((c) => c.id === v);
                     updCl("courierId", v);
                     if (c) updCl("courier", c.name);
+                    assignCourierMutation.mutate(v);
                   }}
                 >
                   <SelectTrigger>
