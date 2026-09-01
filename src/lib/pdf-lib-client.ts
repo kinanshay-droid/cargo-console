@@ -17,6 +17,48 @@ export async function loadPdfLib(): Promise<any> {
   return import(/* @vite-ignore */ PDF_LIB_ESM_URL);
 }
 
+// pdf-lib's built-in StandardFonts (Helvetica etc.) can only encode
+// WinAnsi — Latin text. Drawing any Hebrew character with them throws
+// "WinAnsi cannot encode" at save time, which broke composing a signed
+// PDF the moment a courier typed a Hebrew name into a "שם" field (see
+// signed-document-composer.ts). Fix: embed a real Hebrew-capable font via
+// fontkit instead of using a standard font for any drawn text.
+//
+// @pdf-lib/fontkit ships only as a UMD/CJS bundle — like pdf-lib.min.js,
+// a browser dynamic import() against the raw UMD build silently yields no
+// usable exports. esm.sh re-publishes the same package as a real ES
+// module (with a working default export), so it's used here instead of
+// cdnjs, which doesn't carry this package at all.
+const FONTKIT_ESM_URL = "https://esm.sh/@pdf-lib/fontkit@1.1.1";
+// A hinted, statically-hosted TTF (not a Google Fonts css2 endpoint,
+// which serves WOFF2 that fontkit can't parse) covering Hebrew + Latin +
+// digits — enough for both "שם" (name) text and תאריך/שעה stamps.
+const HEBREW_FONT_URL =
+  "https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf";
+
+let hebrewFontBytesPromise: Promise<ArrayBuffer> | null = null;
+function loadHebrewFontBytes(): Promise<ArrayBuffer> {
+  if (!hebrewFontBytesPromise) {
+    hebrewFontBytesPromise = fetch(HEBREW_FONT_URL).then((r) => {
+      if (!r.ok) throw new Error("לא ניתן לטעון גופן עברי");
+      return r.arrayBuffer();
+    });
+  }
+  return hebrewFontBytesPromise;
+}
+
+// Registers fontkit on the given PDFDocument and embeds/returns the
+// Hebrew-capable font, ready to pass to page.drawText(). Call once per
+// PDFDocument, before any drawText() call that might contain Hebrew.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function embedHebrewFont(pdfDoc: any): Promise<any> {
+  const fontkitModule = await import(/* @vite-ignore */ FONTKIT_ESM_URL);
+  const fontkit = fontkitModule.default ?? fontkitModule;
+  pdfDoc.registerFontkit(fontkit);
+  const fontBytes = await loadHebrewFontBytes();
+  return pdfDoc.embedFont(fontBytes, { subset: true });
+}
+
 export function bytesToDataUrl(bytes: Uint8Array, mime: string): string {
   let binary = "";
   const chunkSize = 0x8000;

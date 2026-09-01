@@ -10,7 +10,7 @@
 // path here loads and re-saves the *real* PDF bytes via pdf-lib, so every
 // original page survives — only page 1 (where fields can be placed) gets
 // the signature images (and any date/time stamp text) drawn onto it.
-import { loadPdfLib, bytesToDataUrl } from "@/lib/pdf-lib-client";
+import { loadPdfLib, bytesToDataUrl, embedHebrewFont } from "@/lib/pdf-lib-client";
 import type { SignatureFieldKind } from "@/lib/courier-portal.functions";
 
 // A marked spot is where staff clicked on the document — typically right on
@@ -75,12 +75,18 @@ async function composeImageDocument(fileUrl: string, fields: ComposeField[]): Pr
 }
 
 async function composePdfDocument(fileUrl: string, fields: ComposeField[]): Promise<string> {
-  const { PDFDocument, StandardFonts, rgb } = await loadPdfLib();
+  const { PDFDocument, rgb } = await loadPdfLib();
   const pdfBytes = await fetch(fileUrl).then((r) => r.arrayBuffer());
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const page = pdfDoc.getPage(0);
   const { width, height } = page.getSize();
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  // A standard font (Helvetica etc.) can only encode WinAnsi — drawing any
+  // Hebrew character with it throws "WinAnsi cannot encode" at save time.
+  // Both "שם" field values (typed by the courier) and תאריך/שעה stamps are
+  // formatted in Hebrew locale, so a real embedded font is required
+  // whenever there's any text (not just signature images) to draw.
+  const hasTextFields = fields.some((f) => f.kind !== "signature" && f.displayText);
+  const font = hasTextFields ? await embedHebrewFont(pdfDoc) : null;
 
   for (const f of fields) {
     // PDF coordinates are bottom-up; xPercent/yPercent were captured
