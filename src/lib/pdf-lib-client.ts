@@ -30,11 +30,20 @@ export async function loadPdfLib(): Promise<any> {
 // module (with a working default export), so it's used here instead of
 // cdnjs, which doesn't carry this package at all.
 const FONTKIT_ESM_URL = "https://esm.sh/@pdf-lib/fontkit@1.1.1";
-// A hinted, statically-hosted TTF (not a Google Fonts css2 endpoint,
-// which serves WOFF2 that fontkit can't parse) covering Hebrew + Latin +
-// digits — enough for both "שם" (name) text and תאריך/שעה stamps.
-const HEBREW_FONT_URL =
-  "https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts/hinted/ttf/NotoSansHebrew/NotoSansHebrew-Regular.ttf";
+// Google's "Alef" Hebrew font, fetched from the canonical google/fonts
+// source repo (not a Google Fonts css2 endpoint, which serves WOFF2 that
+// fontkit can't parse). Verified glyph-by-glyph (live, via fontkit) to
+// cover digits, ".", ":", "/" AND Hebrew letters — required for both
+// "שם" (name) text and תאריך/שעה stamps, which mix both.
+//
+// The googlefonts/noto-fonts "hinted/ttf" per-script delivery build used
+// here originally does NOT include this: it maps every digit and every
+// punctuation glyph to glyph id 0 (".notdef"), so pdf-lib silently drew
+// empty/placeholder boxes for any date or time text (letters-only text
+// like a typed name still looked fine) — that per-script Noto build only
+// carries the Hebrew block, unlike a font's canonical google/fonts
+// source file, which is a full multi-script static font.
+const HEBREW_FONT_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/alef/Alef-Regular.ttf";
 
 let hebrewFontBytesPromise: Promise<ArrayBuffer> | null = null;
 function loadHebrewFontBytes(): Promise<ArrayBuffer> {
