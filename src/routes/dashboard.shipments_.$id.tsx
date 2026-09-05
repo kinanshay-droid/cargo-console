@@ -490,8 +490,20 @@ function CaseDetail() {
     typeof courierTaskRaw.pickedUpAt === "string" ? courierTaskRaw.pickedUpAt : null;
   const courierDeliveredAt =
     typeof courierTaskRaw.deliveredAt === "string" ? courierTaskRaw.deliveredAt : null;
-  const courierProofPhotoPath =
+  // Every proof photo the courier has taken, oldest first — falls back to
+  // the old single-photo field for cases recorded before this was an
+  // array, mirroring getCourierTaskState's merge on the courier side.
+  const courierLegacyProofPhotoPath =
     typeof courierTaskRaw.proofPhotoPath === "string" ? courierTaskRaw.proofPhotoPath : null;
+  const courierProofPhotoPaths: string[] = Array.isArray(courierTaskRaw.proofPhotoPaths)
+    ? courierTaskRaw.proofPhotoPaths.filter((v): v is string => typeof v === "string")
+    : [];
+  if (
+    courierLegacyProofPhotoPath &&
+    !courierProofPhotoPaths.includes(courierLegacyProofPhotoPath)
+  ) {
+    courierProofPhotoPaths.unshift(courierLegacyProofPhotoPath);
+  }
   const courierProofSignaturePath =
     typeof courierTaskRaw.proofSignaturePath === "string"
       ? courierTaskRaw.proofSignaturePath
@@ -1877,20 +1889,22 @@ function CaseDetail() {
                     </span>
                   )}
                 </div>
-                {(courierProofPhotoPath || courierProofSignaturePath) && (
+                {(courierProofPhotoPaths.length > 0 || courierProofSignaturePath) && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {courierProofPhotoPath && (
+                    {courierProofPhotoPaths.map((path, i) => (
                       <Button
+                        key={path}
                         type="button"
                         size="sm"
                         variant="outline"
                         className="gap-1.5"
                         disabled={viewCourierProof.isPending}
-                        onClick={() => viewCourierProof.mutate(courierProofPhotoPath)}
+                        onClick={() => viewCourierProof.mutate(path)}
                       >
-                        <Camera className="h-3.5 w-3.5" /> צפייה בתמונה
+                        <Camera className="h-3.5 w-3.5" />
+                        {courierProofPhotoPaths.length > 1 ? `תמונה ${i + 1}` : "צפייה בתמונה"}
                       </Button>
-                    )}
+                    ))}
                     {courierProofSignaturePath && (
                       <Button
                         type="button"

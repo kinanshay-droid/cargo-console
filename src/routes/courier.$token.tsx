@@ -132,11 +132,31 @@ function CourierPortalPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "העדכון נכשל"),
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: (vars: { kind: "photo" | "signature"; dataUrl: string }) =>
-      uploadProofFn({ data: { token, caseId: selectedId as string, ...vars } }),
+  const uploadSignatureMutation = useMutation({
+    mutationFn: (dataUrl: string) =>
+      uploadProofFn({ data: { token, caseId: selectedId as string, kind: "signature", dataUrl } }),
     onSuccess: () => {
       toast.success("האישור הועלה בהצלחה");
+      qc.invalidateQueries({ queryKey: ["courier-task-detail", token, selectedId] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "ההעלאה נכשלה"),
+  });
+
+  // Several photos can be taken/selected at once — uploaded one at a time
+  // (not in parallel) so each request's read-modify-write on the shared
+  // proofPhotoPaths array can't race and silently drop an earlier photo.
+  const uploadPhotosMutation = useMutation({
+    mutationFn: async (dataUrls: string[]) => {
+      for (const dataUrl of dataUrls) {
+        await uploadProofFn({
+          data: { token, caseId: selectedId as string, kind: "photo", dataUrl },
+        });
+      }
+    },
+    onSuccess: (_res, dataUrls) => {
+      toast.success(
+        dataUrls.length > 1 ? `${dataUrls.length} תמונות הועלו בהצלחה` : "התמונה הועלתה בהצלחה",
+      );
       qc.invalidateQueries({ queryKey: ["courier-task-detail", token, selectedId] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "ההעלאה נכשלה"),
@@ -273,9 +293,9 @@ function CourierPortalPage() {
             onMarkPickedUp={() => statusMutation.mutate("picked_up")}
             onMarkDelivered={() => statusMutation.mutate("delivered")}
             statusPending={statusMutation.isPending}
-            onUploadPhoto={(dataUrl) => uploadMutation.mutate({ kind: "photo", dataUrl })}
-            onUploadSignature={(dataUrl) => uploadMutation.mutate({ kind: "signature", dataUrl })}
-            uploadPending={uploadMutation.isPending}
+            onUploadPhotos={(dataUrls) => uploadPhotosMutation.mutate(dataUrls)}
+            onUploadSignature={(dataUrl) => uploadSignatureMutation.mutate(dataUrl)}
+            uploadPending={uploadPhotosMutation.isPending || uploadSignatureMutation.isPending}
             onViewDocument={() => viewFileMutation.mutate("document")}
             onViewReport={() => viewFileMutation.mutate("report")}
             onViewSignedDocument={() => viewFileMutation.mutate("signed-document")}
@@ -385,7 +405,7 @@ function TaskDetailCard({
   onMarkPickedUp,
   onMarkDelivered,
   statusPending,
-  onUploadPhoto,
+  onUploadPhotos,
   onUploadSignature,
   uploadPending,
   onViewDocument,
@@ -404,7 +424,7 @@ function TaskDetailCard({
   onMarkPickedUp: () => void;
   onMarkDelivered: () => void;
   statusPending: boolean;
-  onUploadPhoto: (dataUrl: string) => void;
+  onUploadPhotos: (dataUrls: string[]) => void;
   onUploadSignature: (dataUrl: string) => void;
   uploadPending: boolean;
   onViewDocument: () => void;
@@ -563,8 +583,9 @@ function TaskDetailCard({
 
       <ProofSection
         hasProofPhoto={detail.hasProofPhoto}
+        proofPhotoCount={detail.proofPhotoCount}
         hasProofSignature={detail.hasProofSignature}
-        onUploadPhoto={onUploadPhoto}
+        onUploadPhotos={onUploadPhotos}
         onUploadSignature={onUploadSignature}
         uploadPending={uploadPending}
         // When there's a document with marked sign-here spots, that's
@@ -732,15 +753,17 @@ function NameFieldPad({
 
 function ProofSection({
   hasProofPhoto,
+  proofPhotoCount,
   hasProofSignature,
-  onUploadPhoto,
+  onUploadPhotos,
   onUploadSignature,
   uploadPending,
   hideSignature = false,
 }: {
   hasProofPhoto: boolean;
+  proofPhotoCount: number;
   hasProofSignature: boolean;
-  onUploadPhoto: (dataUrl: string) => void;
+  onUploadPhotos: (dataUrls: string[]) => void;
   onUploadSignature: (dataUrl: string) => void;
   uploadPending: boolean;
   hideSignature?: boolean;
@@ -749,14 +772,25 @@ function ProofSection({
   const [signatureOpen, setSignatureOpen] = useState(false);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === "string") onUploadPhoto(reader.result);
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
+    if (files.length === 0) return;
+    Promise.all(
+      files.map(
+        (file) =>
+          new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (typeof reader.result === "string") resolve(reader.result);
+              else reject(new Error("קריאת הקובץ נכשלה"));
+            };
+            reader.onerror = () => reject(new Error("קריאת הקובץ נכשלה"));
+            reader.readAsDataURL(file);
+          }),
+      ),
+    )
+      .then((dataUrls) => onUploadPhotos(dataUrls))
+      .catch(() => toast.error("קריאת אחת התמונות נכשלה"));
   }
 
   return (
@@ -772,13 +806,14 @@ function ProofSection({
           disabled={uploadPending}
           onClick={() => fileInputRef.current?.click()}
         >
-          <Camera className="h-4 w-4" /> {hasProofPhoto ? "עדכון תמונה" : "צילום תמונה"}
+          <Camera className="h-4 w-4" /> {hasProofPhoto ? "הוספת תמונה" : "צילום תמונה"}
         </Button>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
           capture="environment"
+          multiple
           className="hidden"
           onChange={handleFileChange}
         />
@@ -794,7 +829,11 @@ function ProofSection({
           </Button>
         )}
       </div>
-      {hasProofPhoto && <div className="text-xs text-success">✓ תמונה הועלתה</div>}
+      {hasProofPhoto && (
+        <div className="text-xs text-success">
+          ✓ {proofPhotoCount > 1 ? `${proofPhotoCount} תמונות הועלו` : "תמונה הועלתה"}
+        </div>
+      )}
       {!hideSignature && hasProofSignature && (
         <div className="text-xs text-success">✓ חתימה הועלתה</div>
       )}

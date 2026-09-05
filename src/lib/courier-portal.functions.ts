@@ -183,7 +183,16 @@ type CourierTaskState = {
   status: CourierTaskStatus;
   pickedUpAt: string | null;
   deliveredAt: string | null;
+  // Legacy single-photo field — early versions only ever kept the most
+  // recent photo, overwriting any previous one. Superseded by
+  // proofPhotoPaths below, but still read (and folded into it) so photos
+  // taken before that change don't disappear.
   proofPhotoPath: string | null;
+  // Every proof-of-delivery photo the courier has taken for this case, in
+  // upload order — unlike proofPhotoPath, a new photo is appended rather
+  // than replacing the previous one, since a delivery can need more than
+  // one angle/shot.
+  proofPhotoPaths: string[];
   proofSignaturePath: string | null;
   // "Document to sign" — a file staff attaches to this specific case (see
   // uploadCaseSignatureDocument below), fresh per case. The courier views it
@@ -248,11 +257,21 @@ function getCourierTaskState(payload: unknown): CourierTaskState {
       if (typeof v === "string") fieldTextValues[k] = v;
     }
   }
+  const legacyProofPhotoPath = typeof raw.proofPhotoPath === "string" ? raw.proofPhotoPath : null;
+  const proofPhotoPaths: string[] = Array.isArray(raw.proofPhotoPaths)
+    ? raw.proofPhotoPaths.filter((v): v is string => typeof v === "string")
+    : [];
+  // Fold the old single-photo field in, so a photo taken before
+  // proofPhotoPaths existed doesn't vanish from the list.
+  if (legacyProofPhotoPath && !proofPhotoPaths.includes(legacyProofPhotoPath)) {
+    proofPhotoPaths.unshift(legacyProofPhotoPath);
+  }
   return {
     status,
     pickedUpAt: typeof raw.pickedUpAt === "string" ? raw.pickedUpAt : null,
     deliveredAt: typeof raw.deliveredAt === "string" ? raw.deliveredAt : null,
-    proofPhotoPath: typeof raw.proofPhotoPath === "string" ? raw.proofPhotoPath : null,
+    proofPhotoPath: legacyProofPhotoPath,
+    proofPhotoPaths,
     proofSignaturePath: typeof raw.proofSignaturePath === "string" ? raw.proofSignaturePath : null,
     documentPath: typeof raw.documentPath === "string" ? raw.documentPath : null,
     documentName: typeof raw.documentName === "string" ? raw.documentName : null,
@@ -360,6 +379,7 @@ export type CourierTaskDetail = {
   pickedUpAt: string | null;
   deliveredAt: string | null;
   hasProofPhoto: boolean;
+  proofPhotoCount: number;
   hasProofSignature: boolean;
   hasDocument: boolean;
   documentName: string | null;
@@ -459,7 +479,8 @@ export const getCourierTaskDetail = createServerFn({ method: "GET" })
       status: state.status,
       pickedUpAt: state.pickedUpAt,
       deliveredAt: state.deliveredAt,
-      hasProofPhoto: !!state.proofPhotoPath,
+      hasProofPhoto: state.proofPhotoPaths.length > 0,
+      proofPhotoCount: state.proofPhotoPaths.length,
       hasProofSignature: !!state.proofSignaturePath,
       hasDocument: !!state.documentPath,
       documentName: state.documentName,
@@ -562,7 +583,11 @@ export const uploadCourierProof = createServerFn({ method: "POST" })
     const [, mime, base64] = match;
     const ext = mime === "image/png" ? "png" : "jpg";
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const path = `${courier.organization_id}/${data.caseId}/${data.kind}-${Date.now()}.${ext}`;
+    // A short random suffix, not just Date.now(), so several photos taken
+    // in quick succession (or uploaded together, see uploadFn's sequential
+    // loop client-side) never collide on the same storage path.
+    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const path = `${courier.organization_id}/${data.caseId}/${data.kind}-${unique}.${ext}`;
 
     const { error: uploadErr } = await supabaseAdmin.storage
       .from(PROOF_BUCKET)
@@ -571,9 +596,12 @@ export const uploadCourierProof = createServerFn({ method: "POST" })
 
     const p = isRecord(row.payload) ? row.payload : {};
     const state = getCourierTaskState(row.payload);
+    // A photo is appended (not overwritten) — a delivery can need more
+    // than one shot. The generic proof signature stays single-value.
     const nextState: CourierTaskState = {
       ...state,
-      proofPhotoPath: data.kind === "photo" ? path : state.proofPhotoPath,
+      proofPhotoPaths:
+        data.kind === "photo" ? [...state.proofPhotoPaths, path] : state.proofPhotoPaths,
       proofSignaturePath: data.kind === "signature" ? path : state.proofSignaturePath,
     };
     const { error: updErr } = await supabaseAdmin
@@ -1105,7 +1133,7 @@ export const getCourierFileUrl = createServerFn({ method: "GET" })
     const state = getCourierTaskState(row.payload);
     const path =
       data.kind === "photo"
-        ? state.proofPhotoPath
+        ? (state.proofPhotoPaths.at(-1) ?? null)
         : data.kind === "signature"
           ? state.proofSignaturePath
           : data.kind === "document"
