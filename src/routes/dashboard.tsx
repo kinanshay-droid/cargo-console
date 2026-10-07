@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ContactButton } from "@/components/contact-button";
 import { useI18n } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n-dictionary";
 import type { CustomRolePermissionKey } from "@/lib/admin.functions";
@@ -188,6 +189,9 @@ function DashboardLayout() {
               className="h-auto w-full rounded-xl"
             />
           </div>
+          <div className="px-3 pb-2">
+            <ContactButton className="w-full bg-sidebar-accent/50 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground border-sidebar-border/50" />
+          </div>
 
           {/* Nav */}
           <nav className="flex-1 space-y-4 px-3 pt-2">
@@ -272,6 +276,7 @@ function DashboardLayout() {
             <img src="/afik-logo-white.png" alt={t("app.name")} className="h-9 w-auto rounded-md" />
           </div>
           <div className="flex items-center gap-2">
+            <ContactButton className="border-sidebar-border/50 bg-transparent text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground" />
             <ConfirmDialog
               title={t("logout.title")}
               description={t("logout.description")}
