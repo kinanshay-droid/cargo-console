@@ -17,7 +17,7 @@ import { CASE_PIPELINE_STATUS_META, getCaseDisplayCode } from "@/lib/operations.
 // renders no <Outlet/>), the same way dashboard.shipments_.$id.tsx escapes
 // nesting under dashboard.shipments.tsx. This route is a standalone
 // top-level page, just like /portal and /presentation.
-export const Route = createFileRoute("/portal/dashboard")({
+export const Route = createFileRoute("/portal_/dashboard")({
   head: () => ({
     meta: [{ title: "פורטל לקוחות — AFIK Logistics Platform" }],
   }),

@@ -8,35 +8,25 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { completeSignup } from "@/lib/auth.functions";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({
     meta: [
-      { title: "Sign up — AFIK Logistics Platform" },
+      { title: "הצטרפות עם קוד — AFIK Logistics Platform" },
       {
         name: "description",
-        content: "Create a new organization or join an existing one with a code.",
-      },
-      { property: "og:title", content: "Sign up — AFIK Logistics Platform" },
-      {
-        property: "og:description",
-        content: "Create a new organization or join an existing one with a code.",
+        content: "הצטרפות לארגון קיים באמצעות קוד שקיבלתם מהמנהל שלכם.",
       },
     ],
   }),
   component: SignupPage,
 });
 
-type Mode = "create" | "join";
-
 function SignupPage() {
   const navigate = useNavigate();
   const complete = useServerFn(completeSignup);
-  const [mode, setMode] = useState<Mode>("create");
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    organizationName: "",
     organizationCode: "",
     fullName: "",
     email: "",
@@ -63,35 +53,22 @@ function SignupPage() {
 
       // If email confirmation is required, there won't be a session yet.
       if (!authData.session) {
-        toast.success(
-          "Account created. Please check your email to confirm, then sign in.",
-        );
+        toast.success("החשבון נוצר. בדקו את תיבת המייל לאישור ואז התחברו.");
         navigate({ to: "/login" });
         return;
       }
 
-      // Session available → complete org setup.
-      const payload =
-        mode === "create"
-          ? {
-              mode: "create" as const,
-              organizationName: form.organizationName.trim(),
-              organizationCode: form.organizationCode.trim().toUpperCase(),
-              fullName: form.fullName.trim(),
-            }
-          : {
-              mode: "join" as const,
-              organizationCode: form.organizationCode.trim().toUpperCase(),
-              fullName: form.fullName.trim(),
-            };
-      await complete({ data: payload });
+      await complete({
+        data: {
+          organizationCode: form.organizationCode.trim().toUpperCase(),
+          fullName: form.fullName.trim(),
+        },
+      });
 
-      toast.success(
-        mode === "create" ? "Organization created — welcome!" : "Joined organization — welcome!",
-      );
+      toast.success("הצטרפת לארגון בהצלחה!");
       navigate({ to: "/dashboard/shipments" });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't complete signup");
+      toast.error(err instanceof Error ? err.message : "ההרשמה נכשלה");
     } finally {
       setLoading(false);
     }
@@ -99,50 +76,19 @@ function SignupPage() {
 
   return (
     <AuthLayout
-      title={mode === "create" ? "Create your organization" : "Join an organization"}
-      subtitle={
-        mode === "create"
-          ? "You'll become the first admin with full permissions."
-          : "Enter the code your admin shared with you."
-      }
+      title="הצטרפות לארגון"
+      subtitle="הזינו את הקוד שקיבלתם מהמנהל שלכם בחברה."
       footer={
         <>
-          Already have an account?{" "}
+          כבר יש לכם חשבון?{" "}
           <Link to="/login" className="font-medium text-accent hover:underline">
-            Sign in
+            כניסה
           </Link>
         </>
       }
     >
-      <div className="mb-5 flex rounded-md border bg-muted p-1 text-sm">
-        <ModeTab active={mode === "create"} onClick={() => setMode("create")}>
-          Create new
-        </ModeTab>
-        <ModeTab active={mode === "join"} onClick={() => setMode("join")}>
-          Join existing
-        </ModeTab>
-      </div>
-
       <form onSubmit={onSubmit} className="space-y-4">
-        {mode === "create" && (
-          <Field label="Organization name" required>
-            <Input
-              required
-              value={form.organizationName}
-              onChange={(e) => set("organizationName", e.target.value)}
-              placeholder="Acme Logistics"
-            />
-          </Field>
-        )}
-        <Field
-          label="Organization code"
-          hint={
-            mode === "create"
-              ? "Short, uppercase handle for your team (e.g. ACME)."
-              : "The code your admin gave you."
-          }
-          required
-        >
+        <Field label="קוד ארגון" hint="הקוד שקיבלתם מהמנהל שלכם." required>
           <Input
             required
             value={form.organizationCode}
@@ -153,15 +99,15 @@ function SignupPage() {
             maxLength={16}
           />
         </Field>
-        <Field label="Full name" required>
+        <Field label="שם מלא" required>
           <Input
             required
             value={form.fullName}
             onChange={(e) => set("fullName", e.target.value)}
-            placeholder="Jane Doe"
+            placeholder="ישראל ישראלי"
           />
         </Field>
-        <Field label="Email" required>
+        <Field label="אימייל" required>
           <Input
             required
             type="email"
@@ -171,7 +117,7 @@ function SignupPage() {
             autoComplete="email"
           />
         </Field>
-        <Field label="Password" required>
+        <Field label="סיסמה" required>
           <Input
             required
             type="password"
@@ -182,39 +128,10 @@ function SignupPage() {
           />
         </Field>
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading
-            ? "Creating…"
-            : mode === "create"
-              ? "Create organization"
-              : "Join organization"}
+          {loading ? "מצטרף…" : "הצטרפות"}
         </Button>
       </form>
     </AuthLayout>
-  );
-}
-
-function ModeTab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex-1 rounded px-3 py-1.5 font-medium transition-colors",
-        active
-          ? "bg-background text-foreground shadow-sm"
-          : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }
 

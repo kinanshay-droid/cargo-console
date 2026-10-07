@@ -24,7 +24,7 @@ import {
 import { AccessDenied } from "@/components/access-denied";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
-export const Route = createFileRoute("/dashboard/roles_/$id")({
+export const Route = createFileRoute("/dashboard/roles/$id")({
   head: () => ({
     meta: [
       { title: "תפקיד — AFIK Logistics Platform" },

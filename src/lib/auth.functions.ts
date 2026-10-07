@@ -2,30 +2,18 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const completeSignupSchema = z.discriminatedUnion("mode", [
-  z.object({
-    mode: z.literal("create"),
-    organizationName: z.string().trim().min(2).max(80),
-    organizationCode: z
-      .string()
-      .trim()
-      .min(3)
-      .max(16)
-      .regex(/^[A-Z0-9]+$/, "Only uppercase letters and numbers"),
-    fullName: z.string().trim().min(1).max(120),
-  }),
-  z.object({
-    mode: z.literal("join"),
-    organizationCode: z.string().trim().min(3).max(16),
-    fullName: z.string().trim().min(1).max(120),
-  }),
-]);
+const completeSignupSchema = z.object({
+  organizationCode: z.string().trim().min(3).max(16),
+  fullName: z.string().trim().min(1).max(120),
+});
 
 /**
- * Completes signup after `supabase.auth.signUp`. The auth-trigger creates a
- * blank profile row; this fn either creates a new org (making the caller its
- * admin) or joins an existing org by code (as member). Runs with service role
- * because `user_roles` writes are locked to service_role via RLS.
+ * Completes signup after `supabase.auth.signUp`, joining an existing
+ * organization by its code (as a member). Self-serve organization
+ * *creation* was removed — new companies now go through the
+ * request/approve flow in company-requests.functions.ts, which creates the
+ * org and invites the first admin directly. Runs with service role because
+ * `user_roles` writes are locked to service_role via RLS.
  */
 export const completeSignup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -45,38 +33,15 @@ export const completeSignup = createServerFn({ method: "POST" })
       throw new Error("You already belong to an organization.");
     }
 
-    let organizationId: string;
-    let role: "admin" | "member";
-
-    if (data.mode === "create") {
-      // Ensure code isn't taken.
-      const { data: taken, error: takenErr } = await supabaseAdmin
-        .from("organizations")
-        .select("id")
-        .eq("code", data.organizationCode)
-        .maybeSingle();
-      if (takenErr) throw new Error(takenErr.message);
-      if (taken) throw new Error("That organization code is already in use. Try another.");
-
-      const { data: org, error: orgErr } = await supabaseAdmin
-        .from("organizations")
-        .insert({ name: data.organizationName, code: data.organizationCode })
-        .select("id")
-        .single();
-      if (orgErr || !org) throw new Error(orgErr?.message ?? "Couldn't create organization");
-      organizationId = org.id;
-      role = "admin";
-    } else {
-      const { data: org, error: orgErr } = await supabaseAdmin
-        .from("organizations")
-        .select("id")
-        .eq("code", data.organizationCode)
-        .maybeSingle();
-      if (orgErr) throw new Error(orgErr.message);
-      if (!org) throw new Error("No organization matches that code.");
-      organizationId = org.id;
-      role = "member";
-    }
+    const { data: org, error: orgErr } = await supabaseAdmin
+      .from("organizations")
+      .select("id")
+      .eq("code", data.organizationCode)
+      .maybeSingle();
+    if (orgErr) throw new Error(orgErr.message);
+    if (!org) throw new Error("No organization matches that code.");
+    const organizationId = org.id;
+    const role = "member" as const;
 
     const { error: profileErr } = await supabaseAdmin
       .from("profiles")

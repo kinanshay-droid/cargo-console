@@ -13,40 +13,42 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PortalRouteImport } from './routes/portal'
+import { Route as PresentationRouteImport } from './routes/presentation'
+import { Route as RequestAccessRouteImport } from './routes/request-access'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
-import { Route as PresentationRouteImport } from './routes/presentation'
-import { Route as PortalRouteImport } from './routes/portal'
-import { Route as PortalDashboardRouteImport } from './routes/portal_.dashboard'
+import { Route as CourierTokenRouteImport } from './routes/courier.$token'
 import { Route as DashboardAccountRouteImport } from './routes/dashboard.account'
 import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
 import { Route as DashboardCommercialRouteImport } from './routes/dashboard.commercial'
+import { Route as DashboardCompanyRequestsRouteImport } from './routes/dashboard.company-requests'
 import { Route as DashboardCustomersRouteImport } from './routes/dashboard.customers'
 import { Route as DashboardOperationsRouteImport } from './routes/dashboard.operations'
 import { Route as DashboardOrganizationRouteImport } from './routes/dashboard.organization'
-import { Route as DashboardWarehouseRouteImport } from './routes/dashboard.warehouse'
 import { Route as DashboardOverviewRouteImport } from './routes/dashboard.overview'
 import { Route as DashboardPickupDistributionRouteImport } from './routes/dashboard.pickup-distribution'
 import { Route as DashboardPricelistsRouteImport } from './routes/dashboard.pricelists'
 import { Route as DashboardRolesRouteImport } from './routes/dashboard.roles'
 import { Route as DashboardShipmentsRouteImport } from './routes/dashboard.shipments'
 import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
-import { Route as DashboardPickupDistributionTodayRouteImport } from './routes/dashboard.pickup-distribution_.today'
+import { Route as DashboardWarehouseRouteImport } from './routes/dashboard.warehouse'
+import { Route as PortalDashboardRouteImport } from './routes/portal_.dashboard'
+import { Route as ApiV1CasesRouteImport } from './routes/api.v1.cases'
 import { Route as DashboardCustomersIndexRouteImport } from './routes/dashboard.customers.index'
 import { Route as DashboardCustomersIdRouteImport } from './routes/dashboard.customers.$id'
 import { Route as DashboardLeadsIndexRouteImport } from './routes/dashboard.leads.index'
 import { Route as DashboardLeadsNewRouteImport } from './routes/dashboard.leads.new'
 import { Route as DashboardOperationsIdRouteImport } from './routes/dashboard.operations.$id'
+import { Route as DashboardPickupDistributionTodayRouteImport } from './routes/dashboard.pickup-distribution_.today'
 import { Route as DashboardQuotesIndexRouteImport } from './routes/dashboard.quotes.index'
 import { Route as DashboardRolesIdRouteImport } from './routes/dashboard.roles.$id'
 import { Route as DashboardShipmentsIdRouteImport } from './routes/dashboard.shipments_.$id'
+import { Route as ApiV1CasesIdRouteImport } from './routes/api.v1.cases.$id'
 import { Route as DashboardQuotesIdIndexRouteImport } from './routes/dashboard.quotes.$id.index'
 import { Route as DashboardQuotesIdCustomerViewRouteImport } from './routes/dashboard.quotes.$id.customer-view'
 import { Route as DashboardQuotesIdEditRouteImport } from './routes/dashboard.quotes.$id.edit'
-import { Route as ApiV1CasesRouteImport } from './routes/api.v1.cases'
-import { Route as ApiV1CasesIdRouteImport } from './routes/api.v1.cases.$id'
 import { Route as ApiV1CasesIdStatusRouteImport } from './routes/api.v1.cases.$id.status'
-import { Route as CourierTokenRouteImport } from './routes/courier.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -68,6 +70,21 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PresentationRoute = PresentationRouteImport.update({
+  id: '/presentation',
+  path: '/presentation',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestAccessRoute = RequestAccessRouteImport.update({
+  id: '/request-access',
+  path: '/request-access',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
@@ -76,36 +93,6 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PresentationRoute = PresentationRouteImport.update({
-  id: '/presentation',
-  path: '/presentation',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortalRoute = PortalRouteImport.update({
-  id: '/portal',
-  path: '/portal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PortalDashboardRoute = PortalDashboardRouteImport.update({
-  id: '/portal/dashboard',
-  path: '/portal/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiV1CasesRoute = ApiV1CasesRouteImport.update({
-  id: '/api/v1/cases',
-  path: '/api/v1/cases',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiV1CasesIdRoute = ApiV1CasesIdRouteImport.update({
-  id: '/api/v1/cases/$id',
-  path: '/api/v1/cases/$id',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiV1CasesIdStatusRoute = ApiV1CasesIdStatusRouteImport.update({
-  id: '/api/v1/cases/$id/status',
-  path: '/api/v1/cases/$id/status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CourierTokenRoute = CourierTokenRouteImport.update({
@@ -128,6 +115,12 @@ const DashboardCommercialRoute = DashboardCommercialRouteImport.update({
   path: '/commercial',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardCompanyRequestsRoute =
+  DashboardCompanyRequestsRouteImport.update({
+    id: '/company-requests',
+    path: '/company-requests',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardCustomersRoute = DashboardCustomersRouteImport.update({
   id: '/customers',
   path: '/customers',
@@ -141,11 +134,6 @@ const DashboardOperationsRoute = DashboardOperationsRouteImport.update({
 const DashboardOrganizationRoute = DashboardOrganizationRouteImport.update({
   id: '/organization',
   path: '/organization',
-  getParentRoute: () => DashboardRoute,
-} as any)
-const DashboardWarehouseRoute = DashboardWarehouseRouteImport.update({
-  id: '/warehouse',
-  path: '/warehouse',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardOverviewRoute = DashboardOverviewRouteImport.update({
@@ -179,6 +167,21 @@ const DashboardUsersRoute = DashboardUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardWarehouseRoute = DashboardWarehouseRouteImport.update({
+  id: '/warehouse',
+  path: '/warehouse',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const PortalDashboardRoute = PortalDashboardRouteImport.update({
+  id: '/portal_/dashboard',
+  path: '/portal/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiV1CasesRoute = ApiV1CasesRouteImport.update({
+  id: '/api/v1/cases',
+  path: '/api/v1/cases',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardCustomersIndexRoute = DashboardCustomersIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -204,27 +207,32 @@ const DashboardOperationsIdRoute = DashboardOperationsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => DashboardOperationsRoute,
 } as any)
+const DashboardPickupDistributionTodayRoute =
+  DashboardPickupDistributionTodayRouteImport.update({
+    id: '/pickup-distribution_/today',
+    path: '/pickup-distribution/today',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardQuotesIndexRoute = DashboardQuotesIndexRouteImport.update({
   id: '/quotes/',
   path: '/quotes/',
   getParentRoute: () => DashboardRoute,
 } as any)
 const DashboardRolesIdRoute = DashboardRolesIdRouteImport.update({
-  id: '/roles_/$id',
-  path: '/roles/$id',
-  getParentRoute: () => DashboardRoute,
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => DashboardRolesRoute,
 } as any)
 const DashboardShipmentsIdRoute = DashboardShipmentsIdRouteImport.update({
   id: '/shipments_/$id',
   path: '/shipments/$id',
   getParentRoute: () => DashboardRoute,
 } as any)
-const DashboardPickupDistributionTodayRoute =
-  DashboardPickupDistributionTodayRouteImport.update({
-    id: '/pickup-distribution/today',
-    path: '/pickup-distribution/today',
-    getParentRoute: () => DashboardRoute,
-  } as any)
+const ApiV1CasesIdRoute = ApiV1CasesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiV1CasesRoute,
+} as any)
 const DashboardQuotesIdIndexRoute = DashboardQuotesIdIndexRouteImport.update({
   id: '/quotes/$id/',
   path: '/quotes/$id/',
@@ -241,85 +249,94 @@ const DashboardQuotesIdEditRoute = DashboardQuotesIdEditRouteImport.update({
   path: '/quotes/$id/edit',
   getParentRoute: () => DashboardRoute,
 } as any)
+const ApiV1CasesIdStatusRoute = ApiV1CasesIdStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => ApiV1CasesIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/portal': typeof PortalRoute
+  '/presentation': typeof PresentationRoute
+  '/request-access': typeof RequestAccessRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/presentation': typeof PresentationRoute
-  '/portal': typeof PortalRoute
-  '/portal/dashboard': typeof PortalDashboardRoute
-  '/api/v1/cases': typeof ApiV1CasesRoute
-  '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
-  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
   '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
+  '/dashboard/company-requests': typeof DashboardCompanyRequestsRoute
   '/dashboard/customers': typeof DashboardCustomersRouteWithChildren
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
-  '/dashboard/warehouse': typeof DashboardWarehouseRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
-  '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/roles': typeof DashboardRolesRouteWithChildren
   '/dashboard/shipments': typeof DashboardShipmentsRoute
   '/dashboard/users': typeof DashboardUsersRoute
+  '/dashboard/warehouse': typeof DashboardWarehouseRoute
+  '/portal/dashboard': typeof PortalDashboardRoute
+  '/api/v1/cases': typeof ApiV1CasesRouteWithChildren
   '/dashboard/customers/$id': typeof DashboardCustomersIdRoute
   '/dashboard/leads/new': typeof DashboardLeadsNewRoute
   '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
+  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
   '/dashboard/shipments/$id': typeof DashboardShipmentsIdRoute
-  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/customers/': typeof DashboardCustomersIndexRoute
   '/dashboard/leads/': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
+  '/api/v1/cases/$id': typeof ApiV1CasesIdRouteWithChildren
   '/dashboard/quotes/$id/customer-view': typeof DashboardQuotesIdCustomerViewRoute
   '/dashboard/quotes/$id/edit': typeof DashboardQuotesIdEditRoute
   '/dashboard/quotes/$id/': typeof DashboardQuotesIdIndexRoute
+  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/portal': typeof PortalRoute
+  '/presentation': typeof PresentationRoute
+  '/request-access': typeof RequestAccessRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/presentation': typeof PresentationRoute
-  '/portal': typeof PortalRoute
-  '/portal/dashboard': typeof PortalDashboardRoute
-  '/api/v1/cases': typeof ApiV1CasesRoute
-  '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
-  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
   '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
+  '/dashboard/company-requests': typeof DashboardCompanyRequestsRoute
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
-  '/dashboard/warehouse': typeof DashboardWarehouseRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
-  '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/roles': typeof DashboardRolesRouteWithChildren
   '/dashboard/shipments': typeof DashboardShipmentsRoute
   '/dashboard/users': typeof DashboardUsersRoute
+  '/dashboard/warehouse': typeof DashboardWarehouseRoute
+  '/portal/dashboard': typeof PortalDashboardRoute
+  '/api/v1/cases': typeof ApiV1CasesRouteWithChildren
   '/dashboard/customers/$id': typeof DashboardCustomersIdRoute
   '/dashboard/leads/new': typeof DashboardLeadsNewRoute
   '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
+  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/roles/$id': typeof DashboardRolesIdRoute
   '/dashboard/shipments/$id': typeof DashboardShipmentsIdRoute
-  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/customers': typeof DashboardCustomersIndexRoute
   '/dashboard/leads': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes': typeof DashboardQuotesIndexRoute
+  '/api/v1/cases/$id': typeof ApiV1CasesIdRouteWithChildren
   '/dashboard/quotes/$id/customer-view': typeof DashboardQuotesIdCustomerViewRoute
   '/dashboard/quotes/$id/edit': typeof DashboardQuotesIdEditRoute
   '/dashboard/quotes/$id': typeof DashboardQuotesIdIndexRoute
+  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -327,40 +344,42 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRouteWithChildren
   '/forgot-password': typeof ForgotPasswordRoute
   '/login': typeof LoginRoute
+  '/portal': typeof PortalRoute
+  '/presentation': typeof PresentationRoute
+  '/request-access': typeof RequestAccessRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
-  '/presentation': typeof PresentationRoute
-  '/portal': typeof PortalRoute
-  '/portal/dashboard': typeof PortalDashboardRoute
-  '/api/v1/cases': typeof ApiV1CasesRoute
-  '/api/v1/cases/$id': typeof ApiV1CasesIdRoute
-  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
   '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
+  '/dashboard/company-requests': typeof DashboardCompanyRequestsRoute
   '/dashboard/customers': typeof DashboardCustomersRouteWithChildren
   '/dashboard/operations': typeof DashboardOperationsRouteWithChildren
   '/dashboard/organization': typeof DashboardOrganizationRoute
-  '/dashboard/warehouse': typeof DashboardWarehouseRoute
   '/dashboard/overview': typeof DashboardOverviewRoute
   '/dashboard/pickup-distribution': typeof DashboardPickupDistributionRoute
   '/dashboard/pricelists': typeof DashboardPricelistsRoute
-  '/dashboard/roles': typeof DashboardRolesRoute
+  '/dashboard/roles': typeof DashboardRolesRouteWithChildren
   '/dashboard/shipments': typeof DashboardShipmentsRoute
   '/dashboard/users': typeof DashboardUsersRoute
+  '/dashboard/warehouse': typeof DashboardWarehouseRoute
+  '/portal_/dashboard': typeof PortalDashboardRoute
+  '/api/v1/cases': typeof ApiV1CasesRouteWithChildren
   '/dashboard/customers/$id': typeof DashboardCustomersIdRoute
   '/dashboard/leads/new': typeof DashboardLeadsNewRoute
   '/dashboard/operations/$id': typeof DashboardOperationsIdRoute
-  '/dashboard/roles_/$id': typeof DashboardRolesIdRoute
+  '/dashboard/pickup-distribution_/today': typeof DashboardPickupDistributionTodayRoute
+  '/dashboard/roles/$id': typeof DashboardRolesIdRoute
   '/dashboard/shipments_/$id': typeof DashboardShipmentsIdRoute
-  '/dashboard/pickup-distribution/today': typeof DashboardPickupDistributionTodayRoute
   '/dashboard/customers/': typeof DashboardCustomersIndexRoute
   '/dashboard/leads/': typeof DashboardLeadsIndexRoute
   '/dashboard/quotes/': typeof DashboardQuotesIndexRoute
+  '/api/v1/cases/$id': typeof ApiV1CasesIdRouteWithChildren
   '/dashboard/quotes/$id/customer-view': typeof DashboardQuotesIdCustomerViewRoute
   '/dashboard/quotes/$id/edit': typeof DashboardQuotesIdEditRoute
   '/dashboard/quotes/$id/': typeof DashboardQuotesIdIndexRoute
+  '/api/v1/cases/$id/status': typeof ApiV1CasesIdStatusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -369,18 +388,16 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/forgot-password'
     | '/login'
+    | '/portal'
+    | '/presentation'
+    | '/request-access'
     | '/reset-password'
     | '/signup'
-    | '/presentation'
-    | '/portal'
-    | '/portal/dashboard'
-    | '/api/v1/cases'
-    | '/api/v1/cases/$id'
-    | '/api/v1/cases/$id/status'
     | '/courier/$token'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
+    | '/dashboard/company-requests'
     | '/dashboard/customers'
     | '/dashboard/operations'
     | '/dashboard/organization'
@@ -390,36 +407,39 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/shipments'
     | '/dashboard/users'
+    | '/dashboard/warehouse'
+    | '/portal/dashboard'
+    | '/api/v1/cases'
     | '/dashboard/customers/$id'
     | '/dashboard/leads/new'
     | '/dashboard/operations/$id'
+    | '/dashboard/pickup-distribution/today'
     | '/dashboard/roles/$id'
     | '/dashboard/shipments/$id'
-    | '/dashboard/pickup-distribution/today'
     | '/dashboard/customers/'
     | '/dashboard/leads/'
     | '/dashboard/quotes/'
+    | '/api/v1/cases/$id'
     | '/dashboard/quotes/$id/customer-view'
     | '/dashboard/quotes/$id/edit'
     | '/dashboard/quotes/$id/'
+    | '/api/v1/cases/$id/status'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/dashboard'
     | '/forgot-password'
     | '/login'
+    | '/portal'
+    | '/presentation'
+    | '/request-access'
     | '/reset-password'
     | '/signup'
-    | '/presentation'
-    | '/portal'
-    | '/portal/dashboard'
-    | '/api/v1/cases'
-    | '/api/v1/cases/$id'
-    | '/api/v1/cases/$id/status'
     | '/courier/$token'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
+    | '/dashboard/company-requests'
     | '/dashboard/operations'
     | '/dashboard/organization'
     | '/dashboard/overview'
@@ -428,36 +448,39 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/shipments'
     | '/dashboard/users'
+    | '/dashboard/warehouse'
+    | '/portal/dashboard'
+    | '/api/v1/cases'
     | '/dashboard/customers/$id'
     | '/dashboard/leads/new'
     | '/dashboard/operations/$id'
+    | '/dashboard/pickup-distribution/today'
     | '/dashboard/roles/$id'
     | '/dashboard/shipments/$id'
-    | '/dashboard/pickup-distribution/today'
     | '/dashboard/customers'
     | '/dashboard/leads'
     | '/dashboard/quotes'
+    | '/api/v1/cases/$id'
     | '/dashboard/quotes/$id/customer-view'
     | '/dashboard/quotes/$id/edit'
     | '/dashboard/quotes/$id'
+    | '/api/v1/cases/$id/status'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
     | '/forgot-password'
     | '/login'
+    | '/portal'
+    | '/presentation'
+    | '/request-access'
     | '/reset-password'
     | '/signup'
-    | '/presentation'
-    | '/portal'
-    | '/portal/dashboard'
-    | '/api/v1/cases'
-    | '/api/v1/cases/$id'
-    | '/api/v1/cases/$id/status'
     | '/courier/$token'
     | '/dashboard/account'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
+    | '/dashboard/company-requests'
     | '/dashboard/customers'
     | '/dashboard/operations'
     | '/dashboard/organization'
@@ -467,18 +490,23 @@ export interface FileRouteTypes {
     | '/dashboard/roles'
     | '/dashboard/shipments'
     | '/dashboard/users'
+    | '/dashboard/warehouse'
+    | '/portal_/dashboard'
+    | '/api/v1/cases'
     | '/dashboard/customers/$id'
     | '/dashboard/leads/new'
     | '/dashboard/operations/$id'
+    | '/dashboard/pickup-distribution_/today'
     | '/dashboard/roles/$id'
     | '/dashboard/shipments_/$id'
-    | '/dashboard/pickup-distribution/today'
     | '/dashboard/customers/'
     | '/dashboard/leads/'
     | '/dashboard/quotes/'
+    | '/api/v1/cases/$id'
     | '/dashboard/quotes/$id/customer-view'
     | '/dashboard/quotes/$id/edit'
     | '/dashboard/quotes/$id/'
+    | '/api/v1/cases/$id/status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -486,15 +514,14 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRouteWithChildren
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   LoginRoute: typeof LoginRoute
+  PortalRoute: typeof PortalRoute
+  PresentationRoute: typeof PresentationRoute
+  RequestAccessRoute: typeof RequestAccessRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
-  PresentationRoute: typeof PresentationRoute
-  PortalRoute: typeof PortalRoute
-  PortalDashboardRoute: typeof PortalDashboardRoute
-  ApiV1CasesRoute: typeof ApiV1CasesRoute
-  ApiV1CasesIdRoute: typeof ApiV1CasesIdRoute
-  ApiV1CasesIdStatusRoute: typeof ApiV1CasesIdStatusRoute
   CourierTokenRoute: typeof CourierTokenRoute
+  PortalDashboardRoute: typeof PortalDashboardRoute
+  ApiV1CasesRoute: typeof ApiV1CasesRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -527,6 +554,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/presentation': {
+      id: '/presentation'
+      path: '/presentation'
+      fullPath: '/presentation'
+      preLoaderRoute: typeof PresentationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/request-access': {
+      id: '/request-access'
+      path: '/request-access'
+      fullPath: '/request-access'
+      preLoaderRoute: typeof RequestAccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
@@ -539,48 +587,6 @@ declare module '@tanstack/react-router' {
       path: '/signup'
       fullPath: '/signup'
       preLoaderRoute: typeof SignupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/presentation': {
-      id: '/presentation'
-      path: '/presentation'
-      fullPath: '/presentation'
-      preLoaderRoute: typeof PresentationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portal': {
-      id: '/portal'
-      path: '/portal'
-      fullPath: '/portal'
-      preLoaderRoute: typeof PortalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/portal/dashboard': {
-      id: '/portal/dashboard'
-      path: '/portal/dashboard'
-      fullPath: '/portal/dashboard'
-      preLoaderRoute: typeof PortalDashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/v1/cases': {
-      id: '/api/v1/cases'
-      path: '/api/v1/cases'
-      fullPath: '/api/v1/cases'
-      preLoaderRoute: typeof ApiV1CasesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/v1/cases/$id': {
-      id: '/api/v1/cases/$id'
-      path: '/api/v1/cases/$id'
-      fullPath: '/api/v1/cases/$id'
-      preLoaderRoute: typeof ApiV1CasesIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/v1/cases/$id/status': {
-      id: '/api/v1/cases/$id/status'
-      path: '/api/v1/cases/$id/status'
-      fullPath: '/api/v1/cases/$id/status'
-      preLoaderRoute: typeof ApiV1CasesIdStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/courier/$token': {
@@ -611,6 +617,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardCommercialRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/company-requests': {
+      id: '/dashboard/company-requests'
+      path: '/company-requests'
+      fullPath: '/dashboard/company-requests'
+      preLoaderRoute: typeof DashboardCompanyRequestsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/customers': {
       id: '/dashboard/customers'
       path: '/customers'
@@ -630,13 +643,6 @@ declare module '@tanstack/react-router' {
       path: '/organization'
       fullPath: '/dashboard/organization'
       preLoaderRoute: typeof DashboardOrganizationRouteImport
-      parentRoute: typeof DashboardRoute
-    }
-    '/dashboard/warehouse': {
-      id: '/dashboard/warehouse'
-      path: '/warehouse'
-      fullPath: '/dashboard/warehouse'
-      preLoaderRoute: typeof DashboardWarehouseRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/overview': {
@@ -681,6 +687,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardUsersRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/warehouse': {
+      id: '/dashboard/warehouse'
+      path: '/warehouse'
+      fullPath: '/dashboard/warehouse'
+      preLoaderRoute: typeof DashboardWarehouseRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/portal_/dashboard': {
+      id: '/portal_/dashboard'
+      path: '/portal/dashboard'
+      fullPath: '/portal/dashboard'
+      preLoaderRoute: typeof PortalDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/v1/cases': {
+      id: '/api/v1/cases'
+      path: '/api/v1/cases'
+      fullPath: '/api/v1/cases'
+      preLoaderRoute: typeof ApiV1CasesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/customers/': {
       id: '/dashboard/customers/'
       path: '/'
@@ -716,6 +743,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardOperationsIdRouteImport
       parentRoute: typeof DashboardOperationsRoute
     }
+    '/dashboard/pickup-distribution_/today': {
+      id: '/dashboard/pickup-distribution_/today'
+      path: '/pickup-distribution/today'
+      fullPath: '/dashboard/pickup-distribution/today'
+      preLoaderRoute: typeof DashboardPickupDistributionTodayRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/quotes/': {
       id: '/dashboard/quotes/'
       path: '/quotes'
@@ -723,12 +757,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardQuotesIndexRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/roles_/$id': {
-      id: '/dashboard/roles_/$id'
-      path: '/roles/$id'
+    '/dashboard/roles/$id': {
+      id: '/dashboard/roles/$id'
+      path: '/$id'
       fullPath: '/dashboard/roles/$id'
       preLoaderRoute: typeof DashboardRolesIdRouteImport
-      parentRoute: typeof DashboardRoute
+      parentRoute: typeof DashboardRolesRoute
     }
     '/dashboard/shipments_/$id': {
       id: '/dashboard/shipments_/$id'
@@ -737,12 +771,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardShipmentsIdRouteImport
       parentRoute: typeof DashboardRoute
     }
-    '/dashboard/pickup-distribution/today': {
-      id: '/dashboard/pickup-distribution/today'
-      path: '/pickup-distribution/today'
-      fullPath: '/dashboard/pickup-distribution/today'
-      preLoaderRoute: typeof DashboardPickupDistributionTodayRouteImport
-      parentRoute: typeof DashboardRoute
+    '/api/v1/cases/$id': {
+      id: '/api/v1/cases/$id'
+      path: '/$id'
+      fullPath: '/api/v1/cases/$id'
+      preLoaderRoute: typeof ApiV1CasesIdRouteImport
+      parentRoute: typeof ApiV1CasesRoute
     }
     '/dashboard/quotes/$id/': {
       id: '/dashboard/quotes/$id/'
@@ -764,6 +798,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/quotes/$id/edit'
       preLoaderRoute: typeof DashboardQuotesIdEditRouteImport
       parentRoute: typeof DashboardRoute
+    }
+    '/api/v1/cases/$id/status': {
+      id: '/api/v1/cases/$id/status'
+      path: '/status'
+      fullPath: '/api/v1/cases/$id/status'
+      preLoaderRoute: typeof ApiV1CasesIdStatusRouteImport
+      parentRoute: typeof ApiV1CasesIdRoute
     }
   }
 }
@@ -792,24 +833,36 @@ const DashboardOperationsRouteChildren: DashboardOperationsRouteChildren = {
 const DashboardOperationsRouteWithChildren =
   DashboardOperationsRoute._addFileChildren(DashboardOperationsRouteChildren)
 
+interface DashboardRolesRouteChildren {
+  DashboardRolesIdRoute: typeof DashboardRolesIdRoute
+}
+
+const DashboardRolesRouteChildren: DashboardRolesRouteChildren = {
+  DashboardRolesIdRoute: DashboardRolesIdRoute,
+}
+
+const DashboardRolesRouteWithChildren = DashboardRolesRoute._addFileChildren(
+  DashboardRolesRouteChildren,
+)
+
 interface DashboardRouteChildren {
   DashboardAccountRoute: typeof DashboardAccountRoute
   DashboardAuditLogRoute: typeof DashboardAuditLogRoute
   DashboardCommercialRoute: typeof DashboardCommercialRoute
+  DashboardCompanyRequestsRoute: typeof DashboardCompanyRequestsRoute
   DashboardCustomersRoute: typeof DashboardCustomersRouteWithChildren
   DashboardOperationsRoute: typeof DashboardOperationsRouteWithChildren
   DashboardOrganizationRoute: typeof DashboardOrganizationRoute
-  DashboardWarehouseRoute: typeof DashboardWarehouseRoute
   DashboardOverviewRoute: typeof DashboardOverviewRoute
   DashboardPickupDistributionRoute: typeof DashboardPickupDistributionRoute
   DashboardPricelistsRoute: typeof DashboardPricelistsRoute
-  DashboardRolesRoute: typeof DashboardRolesRoute
+  DashboardRolesRoute: typeof DashboardRolesRouteWithChildren
   DashboardShipmentsRoute: typeof DashboardShipmentsRoute
   DashboardUsersRoute: typeof DashboardUsersRoute
+  DashboardWarehouseRoute: typeof DashboardWarehouseRoute
   DashboardLeadsNewRoute: typeof DashboardLeadsNewRoute
-  DashboardShipmentsIdRoute: typeof DashboardShipmentsIdRoute
-  DashboardRolesIdRoute: typeof DashboardRolesIdRoute
   DashboardPickupDistributionTodayRoute: typeof DashboardPickupDistributionTodayRoute
+  DashboardShipmentsIdRoute: typeof DashboardShipmentsIdRoute
   DashboardLeadsIndexRoute: typeof DashboardLeadsIndexRoute
   DashboardQuotesIndexRoute: typeof DashboardQuotesIndexRoute
   DashboardQuotesIdCustomerViewRoute: typeof DashboardQuotesIdCustomerViewRoute
@@ -821,20 +874,20 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAccountRoute: DashboardAccountRoute,
   DashboardAuditLogRoute: DashboardAuditLogRoute,
   DashboardCommercialRoute: DashboardCommercialRoute,
+  DashboardCompanyRequestsRoute: DashboardCompanyRequestsRoute,
   DashboardCustomersRoute: DashboardCustomersRouteWithChildren,
   DashboardOperationsRoute: DashboardOperationsRouteWithChildren,
   DashboardOrganizationRoute: DashboardOrganizationRoute,
-  DashboardWarehouseRoute: DashboardWarehouseRoute,
   DashboardOverviewRoute: DashboardOverviewRoute,
   DashboardPickupDistributionRoute: DashboardPickupDistributionRoute,
   DashboardPricelistsRoute: DashboardPricelistsRoute,
-  DashboardRolesRoute: DashboardRolesRoute,
+  DashboardRolesRoute: DashboardRolesRouteWithChildren,
   DashboardShipmentsRoute: DashboardShipmentsRoute,
   DashboardUsersRoute: DashboardUsersRoute,
+  DashboardWarehouseRoute: DashboardWarehouseRoute,
   DashboardLeadsNewRoute: DashboardLeadsNewRoute,
-  DashboardShipmentsIdRoute: DashboardShipmentsIdRoute,
-  DashboardRolesIdRoute: DashboardRolesIdRoute,
   DashboardPickupDistributionTodayRoute: DashboardPickupDistributionTodayRoute,
+  DashboardShipmentsIdRoute: DashboardShipmentsIdRoute,
   DashboardLeadsIndexRoute: DashboardLeadsIndexRoute,
   DashboardQuotesIndexRoute: DashboardQuotesIndexRoute,
   DashboardQuotesIdCustomerViewRoute: DashboardQuotesIdCustomerViewRoute,
@@ -846,31 +899,44 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
+interface ApiV1CasesIdRouteChildren {
+  ApiV1CasesIdStatusRoute: typeof ApiV1CasesIdStatusRoute
+}
+
+const ApiV1CasesIdRouteChildren: ApiV1CasesIdRouteChildren = {
+  ApiV1CasesIdStatusRoute: ApiV1CasesIdStatusRoute,
+}
+
+const ApiV1CasesIdRouteWithChildren = ApiV1CasesIdRoute._addFileChildren(
+  ApiV1CasesIdRouteChildren,
+)
+
+interface ApiV1CasesRouteChildren {
+  ApiV1CasesIdRoute: typeof ApiV1CasesIdRouteWithChildren
+}
+
+const ApiV1CasesRouteChildren: ApiV1CasesRouteChildren = {
+  ApiV1CasesIdRoute: ApiV1CasesIdRouteWithChildren,
+}
+
+const ApiV1CasesRouteWithChildren = ApiV1CasesRoute._addFileChildren(
+  ApiV1CasesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRouteWithChildren,
   ForgotPasswordRoute: ForgotPasswordRoute,
   LoginRoute: LoginRoute,
+  PortalRoute: PortalRoute,
+  PresentationRoute: PresentationRoute,
+  RequestAccessRoute: RequestAccessRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
-  PresentationRoute: PresentationRoute,
-  PortalRoute: PortalRoute,
-  PortalDashboardRoute: PortalDashboardRoute,
-  ApiV1CasesRoute: ApiV1CasesRoute,
-  ApiV1CasesIdRoute: ApiV1CasesIdRoute,
-  ApiV1CasesIdStatusRoute: ApiV1CasesIdStatusRoute,
   CourierTokenRoute: CourierTokenRoute,
+  PortalDashboardRoute: PortalDashboardRoute,
+  ApiV1CasesRoute: ApiV1CasesRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

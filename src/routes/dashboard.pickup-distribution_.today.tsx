@@ -19,7 +19,7 @@ import { listCases, isCaseArchived, CASE_PIPELINE_STATUS_META, getCaseDisplayCod
 import { TONE_GRADIENT } from "@/lib/theme";
 import { getReviewStatusStyle } from "@/lib/review-status";
 
-export const Route = createFileRoute("/dashboard/pickup-distribution/today")({
+export const Route = createFileRoute("/dashboard/pickup-distribution_/today")({
   head: () => ({
     meta: [
       { title: "משימות להיום — צוות הבלדרים — AFIK Logistics Platform" },

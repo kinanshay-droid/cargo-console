@@ -30,7 +30,9 @@ export const DICTIONARY = {
   "nav.roles": { he: "תפקידים", en: "Roles" },
   "nav.organization": { he: "ארגון", en: "Organization" },
   "nav.auditLog": { he: "יומן ביקורת", en: "Audit Log" },
+  "nav.companyRequests": { he: "בקשות הצטרפות", en: "Company Requests" },
   "nav.adminSection": { he: "אדמין", en: "ADMIN" },
+  "nav.platformSection": { he: "צוות AFIK", en: "AFIK STAFF" },
   "sidebar.collapse": { he: "כווץ סרגל צד", en: "Collapse sidebar" },
 
   // Logout confirmation

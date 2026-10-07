@@ -17,6 +17,9 @@ export interface CurrentUser {
   customRoleId: string | null;
   customRoleName: string | null;
   permissions: CustomRolePermissions;
+  // AFIK staff who can review/approve company signup requests — distinct
+  // from `role`, which is scoped to the user's own organization.
+  isPlatformAdmin: boolean;
 }
 
 export function useCurrentUser() {
@@ -33,7 +36,7 @@ export function useCurrentUser() {
       const [{ data: profile }, { data: roles }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("full_name, organization_id, custom_role_id")
+          .select("full_name, organization_id, custom_role_id, is_platform_admin")
           .eq("id", userId)
           .maybeSingle(),
         supabase.from("user_roles").select("role").eq("user_id", userId),
@@ -68,6 +71,7 @@ export function useCurrentUser() {
         customRoleId: profile?.custom_role_id ?? null,
         customRoleName,
         permissions,
+        isPlatformAdmin: profile?.is_platform_admin === true,
       };
     },
     staleTime: 5 * 60 * 1000,
@@ -92,6 +96,7 @@ export function useCurrentUser() {
     user: query.data ?? null,
     role: query.data?.role ?? null,
     isAdmin,
+    isPlatformAdmin: query.data?.isPlatformAdmin ?? false,
     isLoading: query.isLoading,
     customRoleName: query.data?.customRoleName ?? null,
     hasPermission,

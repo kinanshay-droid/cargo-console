@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ArrowLeftRight,
   Package,
+  Inbox,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -110,13 +111,25 @@ const NAV_SECTIONS = [
       },
     ],
   },
+  {
+    labelKey: "nav.platformSection" as TranslationKey | null,
+    items: [
+      {
+        to: "/dashboard/company-requests",
+        labelKey: "nav.companyRequests" as TranslationKey,
+        icon: Inbox,
+        adminOnly: false,
+        platformAdminOnly: true,
+      },
+    ],
+  },
 ];
 
 function DashboardLayout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { isAdmin, user, hasPermission } = useCurrentUser();
+  const { isAdmin, isPlatformAdmin, user, hasPermission } = useCurrentUser();
   const { t } = useI18n();
   const [sessionChecked, setSessionChecked] = useState(false);
 
@@ -147,6 +160,7 @@ function DashboardLayout() {
     items: s.items.filter(
       (n) =>
         (!n.adminOnly || isAdmin) &&
+        (!("platformAdminOnly" in n && n.platformAdminOnly) || isPlatformAdmin) &&
         (!("permissionKey" in n) || hasPermission(n.permissionKey as CustomRolePermissionKey)),
     ),
   })).filter((s) => s.items.length > 0);

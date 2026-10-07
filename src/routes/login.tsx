@@ -227,9 +227,15 @@ function LoginPage() {
             </form>
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              חדש כאן?{" "}
+              חברה חדשה?{" "}
+              <Link to="/request-access" className="font-medium text-accent hover:underline">
+                בקשת הצטרפות
+              </Link>
+            </p>
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              קיבלתם קוד ארגון מהמנהל שלכם?{" "}
               <Link to="/signup" className="font-medium text-accent hover:underline">
-                הרשמה
+                הצטרפות עם קוד
               </Link>
             </p>
           </div>
