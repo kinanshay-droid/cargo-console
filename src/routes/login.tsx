@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ContactButton } from "@/components/contact-button";
 
 const FEATURES: { label: string; icon: typeof Eye }[] = [
   { label: "ניהול לידים ולקוחות", icon: Users },
@@ -134,6 +135,9 @@ function LoginPage() {
       />
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px]">
+        <div className="mb-4 flex justify-start">
+          <ContactButton className="border-white/15 bg-white/10 text-white hover:bg-white/20 hover:text-white" />
+        </div>
         <div className="mb-8 flex justify-center">
           <Link
             to="/presentation"
