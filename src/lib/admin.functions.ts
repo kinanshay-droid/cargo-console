@@ -36,7 +36,12 @@ export const CUSTOM_ROLE_PERMISSION_KEYS = [
   "warehouse",
 ] as const;
 export type CustomRolePermissionKey = (typeof CUSTOM_ROLE_PERMISSION_KEYS)[number];
-export type CustomRolePermissions = Partial<Record<CustomRolePermissionKey, boolean>>;
+// `admin: true` is not a sidebar module — it makes everyone holding the role an
+// organization admin (real admin access, same as the "מנהל" base role), scoped
+// to that organization only. See syncAdminForRoleHolders / assignCustomRole.
+export type CustomRolePermissions = Partial<Record<CustomRolePermissionKey, boolean>> & {
+  admin?: boolean;
+};
 export type CustomRoleColor =
   "primary" | "accent" | "success" | "warning" | "destructive" | "muted";
 const CUSTOM_ROLE_COLORS: CustomRoleColor[] = [
@@ -69,6 +74,7 @@ function normalizeCustomRolePermissions(value: unknown): CustomRolePermissions {
     const v = (value as Record<string, unknown>)[key];
     if (v === true) out[key] = true;
   }
+  if ((value as Record<string, unknown>).admin === true) out.admin = true;
   return out;
 }
 
@@ -129,6 +135,54 @@ async function requireOrgId(supabase: SupabaseClient<Database>, userId: string):
   if (error) throw new Error(error.message);
   if (!profile?.organization_id) throw new Error("User has no organization");
   return profile.organization_id;
+}
+
+// Admin-granting custom roles (permissions.admin) drive the real
+// user_roles table. user_roles has no write policy for regular users, so
+// this runs with the service-role client; every caller has already passed
+// requireOrgAdmin for `organizationId`.
+async function setOrgUsersAdmin(
+  organizationId: string,
+  callerId: string,
+  userIds: string[],
+  makeAdmin: boolean,
+): Promise<void> {
+  if (userIds.length === 0) return;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  if (!makeAdmin) {
+    if (userIds.includes(callerId)) {
+      throw new Error("אי אפשר להסיר את הרשאת המנהל של עצמך.");
+    }
+    const { data: admins, error } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id")
+      .eq("organization_id", organizationId)
+      .eq("role", "admin");
+    if (error) throw new Error(error.message);
+    const remaining = (admins ?? []).filter((a) => !userIds.includes(a.user_id));
+    if (remaining.length === 0) {
+      throw new Error("חייב להישאר לפחות מנהל אחד בארגון.");
+    }
+  }
+
+  const role: OrgUserRole = makeAdmin ? "admin" : "member";
+  for (const uid of userIds) {
+    const { error: delErr } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", uid)
+      .eq("organization_id", organizationId);
+    if (delErr) throw new Error(delErr.message);
+    const { error: insErr } = await supabaseAdmin
+      .from("user_roles")
+      .insert({ user_id: uid, role, organization_id: organizationId });
+    if (insErr) throw new Error(insErr.message);
+  }
+}
+
+function roleGrantsAdmin(permissions: unknown): boolean {
+  return normalizeCustomRolePermissions(permissions).admin === true;
 }
 
 export const listOrgUsers = createServerFn({ method: "GET" })
@@ -238,7 +292,37 @@ export const updateCustomRole = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    await requireOrgAdmin(context.supabase, context.userId);
+    const organizationId = await requireOrgAdmin(context.supabase, context.userId);
+
+    const { data: before, error: beforeErr } = await context.supabase
+      .from("custom_roles")
+      .select("permissions")
+      .eq("id", data.id)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (beforeErr) throw new Error(beforeErr.message);
+    if (!before) throw new Error("Custom role not found in your organization");
+    const wasAdmin = roleGrantsAdmin(before.permissions);
+    const willBeAdmin = data.permissions.admin === true;
+
+    // Sync admin access for current holders *before* saving, so a refused
+    // change (e.g. would demote yourself / the last admin) leaves the role
+    // untouched.
+    if (wasAdmin !== willBeAdmin) {
+      const { data: holders, error: holdersErr } = await context.supabase
+        .from("profiles")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("custom_role_id", data.id);
+      if (holdersErr) throw new Error(holdersErr.message);
+      await setOrgUsersAdmin(
+        organizationId,
+        context.userId,
+        (holders ?? []).map((h) => h.id),
+        willBeAdmin,
+      );
+    }
+
     const { data: row, error } = await context.supabase
       .from("custom_roles")
       .update({
@@ -261,7 +345,29 @@ export const deleteCustomRole = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data, context }) => {
-    await requireOrgAdmin(context.supabase, context.userId);
+    const organizationId = await requireOrgAdmin(context.supabase, context.userId);
+    // Holders of an admin-granting role lose that admin access with the role.
+    const { data: existing, error: existingErr } = await context.supabase
+      .from("custom_roles")
+      .select("permissions")
+      .eq("id", data.id)
+      .eq("organization_id", organizationId)
+      .maybeSingle();
+    if (existingErr) throw new Error(existingErr.message);
+    if (existing && roleGrantsAdmin(existing.permissions)) {
+      const { data: holders, error: holdersErr } = await context.supabase
+        .from("profiles")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("custom_role_id", data.id);
+      if (holdersErr) throw new Error(holdersErr.message);
+      await setOrgUsersAdmin(
+        organizationId,
+        context.userId,
+        (holders ?? []).map((h) => h.id),
+        false,
+      );
+    }
     // profiles.custom_role_id has ON DELETE SET NULL, so anyone holding this
     // role is simply unassigned rather than blocking the delete.
     const { error } = await context.supabase.from("custom_roles").delete().eq("id", data.id);
@@ -278,17 +384,51 @@ export const assignCustomRole = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const organizationId = await requireOrgAdmin(supabase, userId);
+
+    const { data: target, error: targetErr } = await supabase
+      .from("profiles")
+      .select("organization_id, custom_role_id")
+      .eq("id", data.targetUserId)
+      .maybeSingle();
+    if (targetErr) throw new Error(targetErr.message);
+    if (!target || target.organization_id !== organizationId) {
+      throw new Error("User not found in your organization");
+    }
+
+    let newGrantsAdmin = false;
     if (data.customRoleId) {
       const { data: role, error: roleErr } = await supabase
         .from("custom_roles")
-        .select("organization_id")
+        .select("organization_id, permissions")
         .eq("id", data.customRoleId)
         .maybeSingle();
       if (roleErr) throw new Error(roleErr.message);
       if (!role || role.organization_id !== organizationId) {
         throw new Error("Custom role not found in your organization");
       }
+      newGrantsAdmin = roleGrantsAdmin(role.permissions);
     }
+
+    let prevGrantsAdmin = false;
+    if (target.custom_role_id) {
+      const { data: prev, error: prevErr } = await supabase
+        .from("custom_roles")
+        .select("permissions")
+        .eq("id", target.custom_role_id)
+        .maybeSingle();
+      if (prevErr) throw new Error(prevErr.message);
+      prevGrantsAdmin = !!prev && roleGrantsAdmin(prev.permissions);
+    }
+
+    // Only touch admin access when this assignment actually grants it or
+    // takes away admin that the previous custom role had granted — a user
+    // who is admin through the base role alone is left as-is.
+    if (newGrantsAdmin) {
+      await setOrgUsersAdmin(organizationId, userId, [data.targetUserId], true);
+    } else if (prevGrantsAdmin) {
+      await setOrgUsersAdmin(organizationId, userId, [data.targetUserId], false);
+    }
+
     const { error } = await supabase
       .from("profiles")
       .update({ custom_role_id: data.customRoleId })
@@ -444,6 +584,15 @@ export const setUserRole = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const organizationId = await requireOrgAdmin(supabase, userId);
+    const { data: targetProfile, error: targetErr } = await supabase
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", data.targetUserId)
+      .maybeSingle();
+    if (targetErr) throw new Error(targetErr.message);
+    if (!targetProfile || targetProfile.organization_id !== organizationId) {
+      throw new Error("User not found in your organization");
+    }
     if (data.targetUserId === userId && data.role === "member") {
       throw new Error("You can't remove your own admin access here.");
     }

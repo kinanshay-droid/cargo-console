@@ -166,7 +166,7 @@ function RolesPage() {
           <h2 className="text-lg font-semibold tracking-tight">תפקידים מותאמים אישית</h2>
           <p className="text-sm text-muted-foreground">
             שכבת ארגון נוספת מעל "מנהל"/"חבר צוות" — קובעת אילו מודולים מופיעים בתפריט הצד לכל חבר
-            צוות. לא משנה את רמת ההרשאה האמיתית שלו.
+            צוות. תפקיד עם "הרשאות מנהל" נותן גישת אדמין מלאה, אך ורק בתוך הארגון שלכם.
           </p>
         </div>
         <CustomRoleFormDialog onSaved={refetchCustomRoles} />
@@ -229,10 +229,13 @@ function RolesPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {permKeys.length === 0 ? (
+                      {permKeys.length === 0 && !role.permissions.admin ? (
                         <span className="text-xs text-muted-foreground">ללא מודולים</span>
                       ) : (
                         <div className="flex flex-wrap gap-1">
+                          {role.permissions.admin && (
+                            <Badge className="text-xs">ADMIN · כל האפשרויות</Badge>
+                          )}
                           {permKeys.map((k) => (
                             <Badge key={k} variant="outline" className="text-xs">
                               {PERMISSION_LABEL[k]}
@@ -415,6 +418,27 @@ function CustomRoleFormDialog({ role, onSaved }: { role?: CustomRole; onSaved: (
             <p className="text-xs text-muted-foreground">
               מודולים שלא סומנו לא יופיעו בתפריט הצד עבור חברי צוות עם תפקיד זה. "החשבון שלי" ודף
               הבית נשארים גלויים לכולם.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label>הרשאות מנהל (ADMIN)</Label>
+            <button
+              type="button"
+              onClick={() => setPermissions((p) => ({ ...p, admin: !p.admin }))}
+              className={cn(
+                "w-full rounded-lg border px-3 py-2.5 text-right text-sm font-medium transition-colors",
+                permissions.admin
+                  ? cn(TONE_SOLID.primary, "shadow-sm")
+                  : TONE_OUTLINE_BUTTON.primary,
+              )}
+            >
+              {permissions.admin
+                ? "פעיל — כל מי שמחזיק בתפקיד הוא מנהל מלא"
+                : "כבוי — התפקיד משפיע רק על התפריט"}
+            </button>
+            <p className="text-xs text-muted-foreground">
+              נותן גישה מלאה לכל האפשרויות, כולל משתמשים, תפקידים, ארגון ויומן ביקורת — אך ורק
+              למשתמשים של הארגון שלכם. הסרת התפקיד ממשתמש מחזירה אותו לחבר צוות.
             </p>
           </div>
           <DialogFooter>
