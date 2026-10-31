@@ -171,18 +171,34 @@ export const approveCompanyRequest = createServerFn({ method: "POST" })
     // approval never leaves an orphan organization (or half-set-up user)
     // behind — the request simply stays pending and can be retried.
     let newUserId: string | null = null;
+    // Set only when the automatic invite email could not be sent.
+    let inviteLink: string | null = null;
     try {
+      const redirectTo = `${getOrigin()}/reset-password`;
+      const userMeta = { full_name: reqRow.contact_name };
       const { data: invited, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
         reqRow.email,
-        {
-          data: { full_name: reqRow.contact_name },
-          redirectTo: `${getOrigin()}/reset-password`,
-        },
+        { data: userMeta, redirectTo },
       );
-      if (inviteErr || !invited?.user) {
-        throw new Error(inviteErr?.message ?? "Couldn't send the invite email");
+      if (invited?.user && !inviteErr) {
+        newUserId = invited.user.id;
+      } else {
+        // Supabase's built-in mailer only delivers to the project team's own
+        // addresses (and is heavily rate limited) until custom SMTP is
+        // configured, so inviting an outside company's email commonly fails.
+        // Fall back to generating the same invite link without sending any
+        // email — the platform admin hands it to the company manually.
+        const { data: generated, error: genErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: "invite",
+          email: reqRow.email,
+          options: { data: userMeta, redirectTo },
+        });
+        if (genErr || !generated?.user || !generated.properties?.action_link) {
+          throw new Error(inviteErr?.message ?? genErr?.message ?? "Couldn't create the invite");
+        }
+        newUserId = generated.user.id;
+        inviteLink = generated.properties.action_link;
       }
-      newUserId = invited.user.id;
 
       // The on_auth_user_created trigger already inserted a blank profile row
       // for newUserId — fill in the org + name.
@@ -213,7 +229,7 @@ export const approveCompanyRequest = createServerFn({ method: "POST" })
       throw err;
     }
 
-    return { organizationId: org.id as string };
+    return { organizationId: org.id as string, inviteLink };
   });
 
 const rejectSchema = z.object({
