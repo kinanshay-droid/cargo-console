@@ -1,0 +1,108 @@
+<!--
+  Supabase Auth "Invite user" email — sent when an AFIK admin approves a
+  company's access request (see approveCompanyRequest). Paste this into
+  Supabase → Authentication → Emails → Invite user → Body (Source tab);
+  the subject goes in the Subject field:
+
+    הוזמנתם להצטרף ל-AFIK Logistics Platform
+
+  NOTE: Supabase only allows editing templates once custom SMTP is
+  configured (Authentication → Emails → SMTP Settings).
+
+  Table-based layout with inline styles on purpose — email clients ignore
+  most modern CSS. The logo is loaded from the live site, so it appears
+  once public/afik-logo-on-dark.png has been deployed.
+-->
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light only" />
+    <title>הוזמנתם להצטרף ל-AFIK Logistics Platform</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#eef2f9;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">
+      החברה שלכם אושרה במערכת. הגדירו סיסמה והתחילו לעבוד.
+    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eef2f9;">
+      <tr>
+        <td align="center" style="padding:32px 12px;">
+          <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-radius:18px;overflow:hidden;background-color:#ffffff;box-shadow:0 8px 30px rgba(11,37,89,0.15);">
+            <!-- Header: navy band with logo and a flight-route motif -->
+            <tr>
+              <td align="center" bgcolor="#0b2559" style="background-color:#0b2559;background-image:linear-gradient(135deg,#0b2559 0%,#123a82 100%);padding:36px 24px 28px 24px;">
+                <img src="https://afiklog.com/afik-logo-on-dark.png" width="220" alt="AFIK Logistics Platform" style="display:block;width:220px;max-width:70%;height:auto;border:0;" />
+                <div dir="ltr" style="margin-top:22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:20px;letter-spacing:5px;color:#5fb4ff;white-space:nowrap;overflow:hidden;">
+                  &#9679;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;<span style="color:#ffffff;font-size:20px;">&#9992;</span>&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&middot;&nbsp;&#9679;
+                </div>
+              </td>
+            </tr>
+
+            <!-- Body -->
+            <tr>
+              <td style="padding:40px 40px 8px 40px;font-family:Arial,Helvetica,sans-serif;color:#0f1b33;text-align:right;" dir="rtl">
+                <h1 style="margin:0 0 14px 0;font-size:26px;line-height:34px;font-weight:700;color:#0b2559;">
+                  ברוכים הבאים ל-AFIK
+                </h1>
+                <p style="margin:0 0 14px 0;font-size:16px;line-height:26px;color:#33415c;">
+                  בקשת ההצטרפות של החברה שלכם <strong style="color:#0b2559;">אושרה</strong>.
+                  נשאר רק להגדיר סיסמה, ותוכלו להיכנס למערכת ולנהל את המשלוחים שלכם
+                  במקום אחד.
+                </p>
+              </td>
+            </tr>
+
+            <!-- CTA -->
+            <tr>
+              <td align="center" style="padding:16px 40px 8px 40px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                  <tr>
+                    <td align="center" bgcolor="#2f8fe0" style="border-radius:12px;background-color:#2f8fe0;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:16px 44px;font-family:Arial,Helvetica,sans-serif;font-size:17px;font-weight:700;line-height:22px;color:#ffffff;text-decoration:none;border-radius:12px;">
+                        הגדרת סיסמה והתחברות
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- What you get -->
+            <tr>
+              <td style="padding:28px 40px 8px 40px;font-family:Arial,Helvetica,sans-serif;text-align:right;" dir="rtl">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f4f7fc;border-radius:12px;">
+                  <tr>
+                    <td style="padding:18px 22px;font-size:14px;line-height:24px;color:#33415c;">
+                      <div style="font-weight:700;color:#0b2559;margin-bottom:6px;">מה מחכה לכם במערכת</div>
+                      <span style="color:#2f8fe0;">&#9679;</span>&nbsp; ניהול לידים, לקוחות והצעות מחיר<br />
+                      <span style="color:#2f8fe0;">&#9679;</span>&nbsp; מעקב משלוחים בזמן אמת על המפה<br />
+                      <span style="color:#2f8fe0;">&#9679;</span>&nbsp; איסוף והפצה, מחסן ומטענים רגישי טמפרטורה
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <!-- Fallback link + notes -->
+            <tr>
+              <td style="padding:20px 40px 36px 40px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:22px;color:#6b7893;text-align:right;" dir="rtl">
+                הכפתור לא עובד? העתיקו את הקישור הבא לדפדפן:<br />
+                <a href="{{ .ConfirmationURL }}" dir="ltr" style="color:#2f8fe0;word-break:break-all;">{{ .ConfirmationURL }}</a>
+                <br /><br />
+                הקישור אישי ובתוקף לזמן מוגבל. לא ביקשתם להצטרף? אפשר להתעלם מהמייל.
+              </td>
+            </tr>
+
+            <!-- Footer -->
+            <tr>
+              <td align="center" bgcolor="#0b2559" style="background-color:#0b2559;padding:20px 24px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:20px;color:#a9bde0;">
+                AFIK Logistics Platform &middot; The Intelligence Behind Every Shipment.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
