@@ -339,3 +339,66 @@ export const listAllOrganizations = createServerFn({ method: "GET" })
       };
     });
   });
+
+const updateOrgSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z0-9]{3,16}$/, "הקוד חייב להכיל 3-16 אותיות באנגלית או ספרות"),
+});
+
+export const updateOrganization = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => updateOrgSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: clash, error: clashErr } = await supabaseAdmin
+      .from("organizations")
+      .select("id")
+      .eq("code", data.code)
+      .neq("id", data.id)
+      .maybeSingle();
+    if (clashErr) throw new Error(clashErr.message);
+    if (clash) throw new Error("קוד הארגון כבר בשימוש בארגון אחר");
+
+    const { error } = await supabaseAdmin
+      .from("organizations")
+      .update({ name: data.name, code: data.code })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+/**
+ * Permanently deletes an organization and — through the schema's
+ * ON DELETE CASCADE foreign keys — its data (shipments, cases, quotes, roles…).
+ * Its users' accounts are kept but detached (profiles.organization_id is set
+ * to NULL). The caller's own organization can't be deleted, so a platform
+ * admin can never lock themselves out.
+ */
+export const deleteOrganization = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: me, error: meErr } = await supabaseAdmin
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", context.userId)
+      .maybeSingle();
+    if (meErr) throw new Error(meErr.message);
+    if (me?.organization_id === data.id) {
+      throw new Error("אי אפשר למחוק את הארגון שלך");
+    }
+
+    const { error } = await supabaseAdmin.from("organizations").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
