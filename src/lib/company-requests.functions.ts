@@ -146,6 +146,20 @@ export const approveCompanyRequest = createServerFn({ method: "POST" })
     if (!reqRow) throw new Error("Request not found");
     if (reqRow.status !== "pending") throw new Error("This request was already reviewed");
 
+    // An invite can only create a *new* account. If this email already has
+    // one (e.g. a test request filed with a staff member's own address),
+    // fail up front with a clear message instead of creating an org we'd
+    // then have to throw away.
+    const { data: existingProfile, error: existingErr } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .ilike("email", reqRow.email)
+      .maybeSingle();
+    if (existingErr) throw new Error(existingErr.message);
+    if (existingProfile) {
+      throw new Error("כבר קיים משתמש עם כתובת המייל הזו — לא ניתן לשלוח לה הזמנה חדשה");
+    }
+
     const { data: org, error: orgErr } = await supabaseAdmin
       .from("organizations")
       .insert({ name: reqRow.company_name })
@@ -153,41 +167,51 @@ export const approveCompanyRequest = createServerFn({ method: "POST" })
       .single();
     if (orgErr || !org) throw new Error(orgErr?.message ?? "Couldn't create organization");
 
-    const { data: invited, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      reqRow.email,
-      {
-        data: { full_name: reqRow.contact_name },
-        redirectTo: `${getOrigin()}/reset-password`,
-      },
-    );
-    if (inviteErr || !invited?.user) {
-      throw new Error(inviteErr?.message ?? "Couldn't send the invite email");
+    // Everything after org creation is rolled back on failure so a failed
+    // approval never leaves an orphan organization (or half-set-up user)
+    // behind — the request simply stays pending and can be retried.
+    let newUserId: string | null = null;
+    try {
+      const { data: invited, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        reqRow.email,
+        {
+          data: { full_name: reqRow.contact_name },
+          redirectTo: `${getOrigin()}/reset-password`,
+        },
+      );
+      if (inviteErr || !invited?.user) {
+        throw new Error(inviteErr?.message ?? "Couldn't send the invite email");
+      }
+      newUserId = invited.user.id;
+
+      // The on_auth_user_created trigger already inserted a blank profile row
+      // for newUserId — fill in the org + name.
+      const { error: profileErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ organization_id: org.id, full_name: reqRow.contact_name })
+        .eq("id", newUserId);
+      if (profileErr) throw new Error(profileErr.message);
+
+      const { error: roleErr } = await supabaseAdmin
+        .from("user_roles")
+        .insert({ user_id: newUserId, role: "admin", organization_id: org.id });
+      if (roleErr) throw new Error(roleErr.message);
+
+      const { error: updateReqErr } = await supabaseAdmin
+        .from("company_signup_requests")
+        .update({
+          status: "approved",
+          organization_id: org.id,
+          reviewed_by: context.userId,
+          reviewed_at: new Date().toISOString(),
+        })
+        .eq("id", data.requestId);
+      if (updateReqErr) throw new Error(updateReqErr.message);
+    } catch (err) {
+      if (newUserId) await supabaseAdmin.auth.admin.deleteUser(newUserId).catch(() => {});
+      await supabaseAdmin.from("organizations").delete().eq("id", org.id);
+      throw err;
     }
-    const newUserId = invited.user.id;
-
-    // The on_auth_user_created trigger already inserted a blank profile row
-    // for newUserId — fill in the org + name.
-    const { error: profileErr } = await supabaseAdmin
-      .from("profiles")
-      .update({ organization_id: org.id, full_name: reqRow.contact_name })
-      .eq("id", newUserId);
-    if (profileErr) throw new Error(profileErr.message);
-
-    const { error: roleErr } = await supabaseAdmin
-      .from("user_roles")
-      .insert({ user_id: newUserId, role: "admin", organization_id: org.id });
-    if (roleErr) throw new Error(roleErr.message);
-
-    const { error: updateReqErr } = await supabaseAdmin
-      .from("company_signup_requests")
-      .update({
-        status: "approved",
-        organization_id: org.id,
-        reviewed_by: context.userId,
-        reviewed_at: new Date().toISOString(),
-      })
-      .eq("id", data.requestId);
-    if (updateReqErr) throw new Error(updateReqErr.message);
 
     return { organizationId: org.id as string };
   });
