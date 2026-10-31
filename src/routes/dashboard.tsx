@@ -121,6 +121,13 @@ const NAV_SECTIONS = [
         adminOnly: false,
         platformAdminOnly: true,
       },
+      {
+        to: "/dashboard/all-organizations",
+        labelKey: "nav.allOrganizations" as TranslationKey,
+        icon: Building2,
+        adminOnly: false,
+        platformAdminOnly: true,
+      },
     ],
   },
 ];

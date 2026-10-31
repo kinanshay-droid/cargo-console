@@ -20,6 +20,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as CourierTokenRouteImport } from './routes/courier.$token'
 import { Route as DashboardAccountRouteImport } from './routes/dashboard.account'
+import { Route as DashboardAllOrganizationsRouteImport } from './routes/dashboard.all-organizations'
 import { Route as DashboardAuditLogRouteImport } from './routes/dashboard.audit-log'
 import { Route as DashboardCommercialRouteImport } from './routes/dashboard.commercial'
 import { Route as DashboardCompanyRequestsRouteImport } from './routes/dashboard.company-requests'
@@ -105,6 +106,12 @@ const DashboardAccountRoute = DashboardAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardAllOrganizationsRoute =
+  DashboardAllOrganizationsRouteImport.update({
+    id: '/all-organizations',
+    path: '/all-organizations',
+    getParentRoute: () => DashboardRoute,
+  } as any)
 const DashboardAuditLogRoute = DashboardAuditLogRouteImport.update({
   id: '/audit-log',
   path: '/audit-log',
@@ -267,6 +274,7 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
+  '/dashboard/all-organizations': typeof DashboardAllOrganizationsRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
   '/dashboard/company-requests': typeof DashboardCompanyRequestsRoute
@@ -309,6 +317,7 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
+  '/dashboard/all-organizations': typeof DashboardAllOrganizationsRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
   '/dashboard/company-requests': typeof DashboardCompanyRequestsRoute
@@ -351,6 +360,7 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/courier/$token': typeof CourierTokenRoute
   '/dashboard/account': typeof DashboardAccountRoute
+  '/dashboard/all-organizations': typeof DashboardAllOrganizationsRoute
   '/dashboard/audit-log': typeof DashboardAuditLogRoute
   '/dashboard/commercial': typeof DashboardCommercialRoute
   '/dashboard/company-requests': typeof DashboardCompanyRequestsRoute
@@ -395,6 +405,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/courier/$token'
     | '/dashboard/account'
+    | '/dashboard/all-organizations'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
     | '/dashboard/company-requests'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/courier/$token'
     | '/dashboard/account'
+    | '/dashboard/all-organizations'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
     | '/dashboard/company-requests'
@@ -478,6 +490,7 @@ export interface FileRouteTypes {
     | '/signup'
     | '/courier/$token'
     | '/dashboard/account'
+    | '/dashboard/all-organizations'
     | '/dashboard/audit-log'
     | '/dashboard/commercial'
     | '/dashboard/company-requests'
@@ -601,6 +614,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/dashboard/account'
       preLoaderRoute: typeof DashboardAccountRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/all-organizations': {
+      id: '/dashboard/all-organizations'
+      path: '/all-organizations'
+      fullPath: '/dashboard/all-organizations'
+      preLoaderRoute: typeof DashboardAllOrganizationsRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/dashboard/audit-log': {
@@ -847,6 +867,7 @@ const DashboardRolesRouteWithChildren = DashboardRolesRoute._addFileChildren(
 
 interface DashboardRouteChildren {
   DashboardAccountRoute: typeof DashboardAccountRoute
+  DashboardAllOrganizationsRoute: typeof DashboardAllOrganizationsRoute
   DashboardAuditLogRoute: typeof DashboardAuditLogRoute
   DashboardCommercialRoute: typeof DashboardCommercialRoute
   DashboardCompanyRequestsRoute: typeof DashboardCompanyRequestsRoute
@@ -872,6 +893,7 @@ interface DashboardRouteChildren {
 
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAccountRoute: DashboardAccountRoute,
+  DashboardAllOrganizationsRoute: DashboardAllOrganizationsRoute,
   DashboardAuditLogRoute: DashboardAuditLogRoute,
   DashboardCommercialRoute: DashboardCommercialRoute,
   DashboardCompanyRequestsRoute: DashboardCompanyRequestsRoute,

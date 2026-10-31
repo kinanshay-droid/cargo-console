@@ -270,3 +270,72 @@ export const rejectCompanyRequest = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true as const };
   });
+
+export type PlatformOrganization = {
+  id: string;
+  name: string;
+  code: string;
+  createdAt: string;
+  userCount: number;
+  admins: { id: string; fullName: string; email: string; hasSignedIn: boolean }[];
+};
+
+/**
+ * Every organization on the platform, for AFIK staff. The regular
+ * "משתמשים"/"ארגון" pages are deliberately scoped to the caller's own
+ * organization, so an approved company never shows up there — this is the
+ * cross-organization view. Service-role reads, gated by requirePlatformAdmin.
+ */
+export const listAllOrganizations = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [orgsRes, profilesRes, adminRolesRes, authUsersRes] = await Promise.all([
+      supabaseAdmin
+        .from("organizations")
+        .select("id, name, code, created_at")
+        .order("created_at", { ascending: false }),
+      supabaseAdmin.from("profiles").select("id, email, full_name, organization_id"),
+      supabaseAdmin.from("user_roles").select("user_id, organization_id").eq("role", "admin"),
+      supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+    ]);
+    if (orgsRes.error) throw new Error(orgsRes.error.message);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+    if (adminRolesRes.error) throw new Error(adminRolesRes.error.message);
+    if (authUsersRes.error) throw new Error(authUsersRes.error.message);
+
+    const signedIn = new Set(
+      authUsersRes.data.users.filter((u) => !!u.last_sign_in_at).map((u) => u.id),
+    );
+    const profilesByOrg = new Map<string, typeof profilesRes.data>();
+    for (const p of profilesRes.data ?? []) {
+      if (!p.organization_id) continue;
+      const list = profilesByOrg.get(p.organization_id) ?? [];
+      list.push(p);
+      profilesByOrg.set(p.organization_id, list);
+    }
+    const adminKeys = new Set(
+      (adminRolesRes.data ?? []).map((r) => `${r.organization_id}:${r.user_id}`),
+    );
+
+    return (orgsRes.data ?? []).map<PlatformOrganization>((o) => {
+      const members = profilesByOrg.get(o.id) ?? [];
+      return {
+        id: o.id,
+        name: o.name,
+        code: o.code,
+        createdAt: o.created_at,
+        userCount: members.length,
+        admins: members
+          .filter((m) => adminKeys.has(`${o.id}:${m.id}`))
+          .map((m) => ({
+            id: m.id,
+            fullName: m.full_name,
+            email: m.email,
+            hasSignedIn: signedIn.has(m.id),
+          })),
+      };
+    });
+  });
