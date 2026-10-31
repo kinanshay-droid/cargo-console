@@ -7,6 +7,9 @@ import { toast } from "sonner";
 import {
   listAllOrganizations,
   listAllUsers,
+  updatePlatformUser,
+  deletePlatformUser,
+  type PlatformUser,
   updateOrganization,
   deleteOrganization,
   type PlatformOrganization,
@@ -190,7 +193,7 @@ function AllOrganizationsInner() {
           </TableBody>
         </Table>
       </div>
-      <AllUsersSection />
+      <AllUsersSection orgs={orgs} />
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent dir="rtl">
           <DialogHeader>
@@ -271,8 +274,47 @@ function AllOrganizationsInner() {
   );
 }
 
-function AllUsersSection() {
+function AllUsersSection({ orgs }: { orgs: PlatformOrganization[] }) {
   const listFn = useServerFn(listAllUsers);
+  const updateFn = useServerFn(updatePlatformUser);
+  const deleteFn = useServerFn(deletePlatformUser);
+  const qc = useQueryClient();
+  const { user: me } = useCurrentUser();
+  const [editing, setEditing] = useState<PlatformUser | null>(null);
+  const [deleting, setDeleting] = useState<PlatformUser | null>(null);
+  const [form, setForm] = useState({
+    fullName: "",
+    organizationId: "",
+    role: "member" as "admin" | "member",
+    isActive: true,
+    isPlatformAdmin: false,
+  });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["all-users"] });
+    qc.invalidateQueries({ queryKey: ["all-organizations"] });
+  };
+  const save = useMutation({
+    mutationFn: () =>
+      updateFn({
+        data: { id: editing!.id, ...form, organizationId: form.organizationId || null },
+      }),
+    onSuccess: () => {
+      toast.success("המשתמש עודכן");
+      refresh();
+      setEditing(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "העדכון נכשל"),
+  });
+  const remove = useMutation({
+    mutationFn: () => deleteFn({ data: { id: deleting!.id } }),
+    onSuccess: () => {
+      toast.success("המשתמש נמחק");
+      refresh();
+      setDeleting(null);
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "המחיקה נכשלה"),
+  });
+
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["all-users"],
     queryFn: () => listFn(),
@@ -315,18 +357,19 @@ function AllUsersSection() {
               <TableHead className="text-right">תפקיד</TableHead>
               <TableHead className="text-right">סטטוס</TableHead>
               <TableHead className="text-right">נוצר</TableHead>
+              <TableHead className="text-right">פעולות</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   טוען…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                   לא נמצאו משתמשים.
                 </TableCell>
               </TableRow>
@@ -342,20 +385,56 @@ function AllUsersSection() {
                       <span className="text-xs text-muted-foreground">ללא ארגון</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm">{u.isAdmin ? "מנהל" : "משתמש"}</TableCell>
+                  <TableCell className="text-sm">
+                    {u.isAdmin ? "מנהל" : "משתמש"}
+                    {u.isPlatformAdmin ? " · צוות AFIK" : ""}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant="outline"
                       className={cn(
                         "text-[10px]",
-                        TONE_BADGE[u.hasSignedIn ? "success" : "warning"],
+                        TONE_BADGE[
+                          !u.isActive ? "destructive" : u.hasSignedIn ? "success" : "warning"
+                        ],
                       )}
                     >
-                      {u.hasSignedIn ? "התחבר" : "ממתין להגדרת סיסמה"}
+                      {!u.isActive ? "מושבת" : u.hasSignedIn ? "התחבר" : "ממתין להגדרת סיסמה"}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {u.createdAt ? new Date(u.createdAt).toLocaleDateString("he-IL") : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditing(u);
+                          setForm({
+                            fullName: u.fullName,
+                            organizationId: u.organizationId ?? "",
+                            role: u.isAdmin ? "admin" : "member",
+                            isActive: u.isActive,
+                            isPlatformAdmin: u.isPlatformAdmin,
+                          });
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> עריכה
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="text-destructive"
+                        disabled={u.id === me?.id}
+                        onClick={() => setDeleting(u)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> מחק
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -363,6 +442,111 @@ function AllUsersSection() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>עריכת משתמש</DialogTitle>
+            <DialogDescription dir="ltr" className="text-right">
+              {editing?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>שם מלא</Label>
+              <Input
+                value={form.fullName}
+                onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>שיוך לארגון</Label>
+              <select
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                value={form.organizationId}
+                onChange={(e) => setForm((f) => ({ ...f, organizationId: e.target.value }))}
+              >
+                <option value="">ללא ארגון</option>
+                {orgs.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name} ({o.code})
+                  </option>
+                ))}
+              </select>
+              {editing && form.organizationId !== (editing.organizationId ?? "") ? (
+                <p className="text-xs text-muted-foreground">
+                  מעבר בין ארגונים מאפס את התפקיד המותאם של המשתמש.
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>הרשאה בארגון</Label>
+              <select
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm disabled:opacity-50"
+                value={form.role}
+                disabled={!form.organizationId}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, role: e.target.value as "admin" | "member" }))
+                }
+              >
+                <option value="member">משתמש רגיל</option>
+                <option value="admin">מנהל (ADMIN) של הארגון</option>
+              </select>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+              />
+              חשבון פעיל
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.isPlatformAdmin}
+                onChange={(e) => setForm((f) => ({ ...f, isPlatformAdmin: e.target.checked }))}
+              />
+              צוות AFIK (גישה לכל הארגונים ולבקשות הצטרפות)
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditing(null)}>
+              ביטול
+            </Button>
+            <Button
+              disabled={save.isPending || !form.fullName.trim()}
+              onClick={() => save.mutate()}
+            >
+              {save.isPending ? "שומר…" : "שמירה"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleting !== null} onOpenChange={(open) => !open && setDeleting(null)}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>מחיקת משתמש</DialogTitle>
+            <DialogDescription>
+              החשבון של {deleting?.fullName || deleting?.email} יימחק לצמיתות ולא ניתן יהיה לשחזר
+              אותו.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleting(null)}>
+              ביטול
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate()}
+            >
+              {remove.isPending ? "מוחק…" : "מחיקה"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

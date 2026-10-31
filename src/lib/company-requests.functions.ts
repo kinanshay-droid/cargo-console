@@ -374,6 +374,8 @@ export type PlatformUser = {
   organizationName: string | null;
   isAdmin: boolean;
   hasSignedIn: boolean;
+  isActive: boolean;
+  isPlatformAdmin: boolean;
   createdAt: string | null;
 };
 
@@ -386,7 +388,9 @@ export const listAllUsers = createServerFn({ method: "GET" })
 
     const [orgsRes, profilesRes, adminRolesRes, authUsersRes] = await Promise.all([
       supabaseAdmin.from("organizations").select("id, name"),
-      supabaseAdmin.from("profiles").select("id, email, full_name, organization_id"),
+      supabaseAdmin
+        .from("profiles")
+        .select("id, email, full_name, organization_id, is_active, is_platform_admin"),
       supabaseAdmin.from("user_roles").select("user_id, organization_id").eq("role", "admin"),
       supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
     ]);
@@ -411,9 +415,103 @@ export const listAllUsers = createServerFn({ method: "GET" })
         organizationName: p.organization_id ? (orgNames.get(p.organization_id) ?? null) : null,
         isAdmin: !!p.organization_id && adminKeys.has(`${p.organization_id}:${p.id}`),
         hasSignedIn: !!au?.last_sign_in_at,
+        isActive: p.is_active,
+        isPlatformAdmin: p.is_platform_admin,
         createdAt: au?.created_at ?? null,
       };
     });
+  });
+
+const updateUserSchema = z.object({
+  id: z.string().uuid(),
+  fullName: z.string().trim().min(1).max(120),
+  organizationId: z.string().uuid().nullable(),
+  role: z.enum(["admin", "member"]),
+  isActive: z.boolean(),
+  isPlatformAdmin: z.boolean(),
+});
+
+/**
+ * AFIK staff: edit any user — name, organization assignment, org role,
+ * active flag and platform-admin flag. Moving a user to another organization
+ * resets their org roles and custom role (those belong to the old org).
+ */
+export const updatePlatformUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => updateUserSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (data.id === context.userId && (!data.isPlatformAdmin || !data.isActive)) {
+      throw new Error("אי אפשר להסיר מעצמך הרשאת צוות AFIK או להשבית את החשבון שלך.");
+    }
+
+    const { data: current, error: curErr } = await supabaseAdmin
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (curErr) throw new Error(curErr.message);
+    if (!current) throw new Error("המשתמש לא נמצא");
+
+    if (data.organizationId) {
+      const { data: org, error: orgErr } = await supabaseAdmin
+        .from("organizations")
+        .select("id")
+        .eq("id", data.organizationId)
+        .maybeSingle();
+      if (orgErr) throw new Error(orgErr.message);
+      if (!org) throw new Error("הארגון לא נמצא");
+    }
+
+    const orgChanged = current.organization_id !== data.organizationId;
+    const profilePatch: {
+      full_name: string;
+      organization_id: string | null;
+      is_active: boolean;
+      is_platform_admin: boolean;
+      custom_role_id?: null;
+    } = {
+      full_name: data.fullName,
+      organization_id: data.organizationId,
+      is_active: data.isActive,
+      is_platform_admin: data.isPlatformAdmin,
+    };
+    if (orgChanged) profilePatch.custom_role_id = null;
+
+    const { error: profErr } = await supabaseAdmin
+      .from("profiles")
+      .update(profilePatch)
+      .eq("id", data.id);
+    if (profErr) throw new Error(profErr.message);
+
+    // Reset roles, then grant the chosen one in the (possibly new) org.
+    const { error: delErr } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", data.id);
+    if (delErr) throw new Error(delErr.message);
+    if (data.organizationId) {
+      const { error: roleErr } = await supabaseAdmin
+        .from("user_roles")
+        .insert({ user_id: data.id, organization_id: data.organizationId, role: data.role });
+      if (roleErr) throw new Error(roleErr.message);
+    }
+    return { ok: true };
+  });
+
+export const deletePlatformUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    if (data.id === context.userId) throw new Error("אי אפשר למחוק את החשבון שלך.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // profiles/user_roles cascade via FK.
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 const updateOrgSchema = z.object({
