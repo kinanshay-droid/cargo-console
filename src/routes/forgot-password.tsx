@@ -9,10 +9,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/forgot-password")({
   head: () => ({
     meta: [
-      { title: "Forgot password — AFIK Logistics Platform" },
-      { name: "description", content: "Request a password reset link." },
-      { property: "og:title", content: "Forgot password — AFIK Logistics Platform" },
-      { property: "og:description", content: "Request a password reset link." },
+      { title: "שכחתי סיסמה — AFIK Logistics Platform" },
+      { name: "description", content: "בקשת קישור לאיפוס סיסמה." },
+      { property: "og:title", content: "שכחתי סיסמה — AFIK Logistics Platform" },
+      { property: "og:description", content: "בקשת קישור לאיפוס סיסמה." },
     ],
   }),
   component: ForgotPage,
@@ -41,23 +41,23 @@ function ForgotPage() {
 
   return (
     <AuthLayout
-      title="Forgot password"
-      subtitle="We'll email a reset link if the account exists."
+      title="שכחתי סיסמה"
+      subtitle="אם קיים חשבון עם המייל הזה, נשלח אליו קישור לאיפוס סיסמה."
       footer={
         <Link to="/login" className="font-medium text-accent hover:underline">
-          Back to sign in
+          חזרה למסך הכניסה
         </Link>
       }
     >
       {sent ? (
         <div className="rounded-md border bg-muted/50 p-4 text-sm text-foreground">
-          If an account exists for that email, we've sent a reset link. Please check
-          your inbox and spam folder.
+          אם קיים חשבון עם כתובת המייל הזו, נשלח אליה קישור לאיפוס סיסמה. בדקו את תיבת הדואר ואת
+          תיקיית הספאם.
         </div>
       ) : (
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Email</Label>
+            <Label>אימייל</Label>
             <Input
               required
               type="email"
@@ -67,7 +67,7 @@ function ForgotPage() {
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Sending…" : "Send reset link"}
+            {loading ? "שולח…" : "שליחת קישור"}
           </Button>
         </form>
       )}

@@ -10,12 +10,12 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
-      { title: "Reset password — AFIK Logistics Platform" },
-      { name: "description", content: "Choose a new password for your account." },
-      { property: "og:title", content: "Reset password — AFIK Logistics Platform" },
+      { title: "הגדרת סיסמה — AFIK Logistics Platform" },
+      { name: "description", content: "בחירת סיסמה לחשבון שלך." },
+      { property: "og:title", content: "הגדרת סיסמה — AFIK Logistics Platform" },
       {
         property: "og:description",
-        content: "Choose a new password for your account.",
+        content: "בחירת סיסמה לחשבון שלך.",
       },
     ],
   }),
@@ -50,7 +50,7 @@ function ResetPage() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (pwd !== confirm) {
-      toast.error("Passwords don't match");
+      toast.error("הסיסמאות אינן תואמות");
       return;
     }
     setLoading(true);
@@ -60,7 +60,7 @@ function ResetPage() {
       await supabase.auth.signOut();
       setDone(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Couldn't reset password");
+      toast.error(err instanceof Error ? err.message : "לא ניתן היה להגדיר את הסיסמה");
     } finally {
       setLoading(false);
     }
@@ -70,25 +70,22 @@ function ResetPage() {
 
   if (done) {
     return (
-      <AuthLayout
-        title="Password updated"
-        subtitle="Sign in with your new password."
-      >
+      <AuthLayout title="הסיסמה עודכנה" subtitle="התחברו עם הסיסמה החדשה.">
         <Link
           to="/login"
           className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
-          Go to sign in
+          מעבר למסך הכניסה
         </Link>
       </AuthLayout>
     );
   }
 
   return (
-    <AuthLayout title="Set a new password" subtitle="Choose something strong you'll remember.">
+    <AuthLayout title="הגדרת סיסמה" subtitle="בחרו סיסמה חזקה שתזכרו.">
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label>New password</Label>
+          <Label>סיסמה חדשה</Label>
           <Input
             required
             type="password"
@@ -99,7 +96,7 @@ function ResetPage() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Confirm new password</Label>
+          <Label>אימות סיסמה</Label>
           <Input
             required
             type="password"
@@ -110,7 +107,7 @@ function ResetPage() {
           />
         </div>
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "Updating…" : "Update password"}
+          {loading ? "מעדכן…" : "עדכון סיסמה"}
         </Button>
       </form>
     </AuthLayout>
@@ -120,11 +117,11 @@ function ResetPage() {
 function InvalidLink() {
   return (
     <AuthLayout
-      title="This link is invalid or has expired"
-      subtitle="Request a fresh reset link and try again."
+      title="הקישור אינו תקין או שפג תוקפו"
+      subtitle="בקשו קישור חדש ונסו שוב."
       footer={
         <Link to="/login" className="font-medium text-accent hover:underline">
-          Back to sign in
+          חזרה למסך הכניסה
         </Link>
       }
     >
@@ -132,7 +129,7 @@ function InvalidLink() {
         to="/forgot-password"
         className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
       >
-        Request a new link
+        בקשת קישור חדש
       </Link>
     </AuthLayout>
   );
