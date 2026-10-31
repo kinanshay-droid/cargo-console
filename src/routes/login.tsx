@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ContactButton } from "@/components/contact-button";
+import { AirFreightBackground } from "@/components/air-freight-background";
 
 const FEATURES: { label: string; icon: typeof Eye }[] = [
   { label: "ניהול לידים ולקוחות", icon: Users },
@@ -125,14 +126,7 @@ function LoginPage() {
             "var(--primary)",
         }}
       />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.15]"
-        style={{
-          backgroundImage:
-            "radial-gradient(color-mix(in oklab, var(--accent) 80%, white) 1.5px, transparent 1.5px)",
-          backgroundSize: "18px 18px",
-        }}
-      />
+      <AirFreightBackground />
 
       <div className="relative z-10 mx-auto w-full max-w-[1400px]">
         <div className="mb-4 flex justify-start">
