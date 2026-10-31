@@ -514,6 +514,103 @@ export const deletePlatformUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const createOrgSchema = z.object({
+  companyName: z.string().trim().min(2).max(120),
+  code: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .optional()
+    .transform((v) => (v ? v : undefined))
+    .refine((v) => v === undefined || /^[A-Z0-9]{3,16}$/.test(v), {
+      message: "הקוד חייב להכיל 3-16 אותיות באנגלית או ספרות",
+    }),
+  contactName: z.string().trim().min(1).max(120),
+  email: z.string().trim().toLowerCase().email().max(255),
+});
+
+/**
+ * AFIK staff: create an organization directly (no request) and invite its
+ * first admin. Mirrors approveCompanyRequest, including rollback and the
+ * manual invite-link fallback when the invite email can't be sent.
+ */
+export const createOrganizationWithAdmin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => createOrgSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: existingProfile, error: existingErr } = await supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("email", data.email)
+      .maybeSingle();
+    if (existingErr) throw new Error(existingErr.message);
+    if (existingProfile) {
+      throw new Error("כבר קיים משתמש עם כתובת המייל הזו — אפשר לשייך אותו לארגון דרך עריכת משתמש");
+    }
+
+    if (data.code) {
+      const { data: clash, error: clashErr } = await supabaseAdmin
+        .from("organizations")
+        .select("id")
+        .eq("code", data.code)
+        .maybeSingle();
+      if (clashErr) throw new Error(clashErr.message);
+      if (clash) throw new Error("קוד הארגון כבר תפוס");
+    }
+
+    const { data: org, error: orgErr } = await supabaseAdmin
+      .from("organizations")
+      .insert(data.code ? { name: data.companyName, code: data.code } : { name: data.companyName })
+      .select("id")
+      .single();
+    if (orgErr || !org) throw new Error(orgErr?.message ?? "Couldn't create organization");
+
+    let newUserId: string | null = null;
+    let inviteLink: string | null = null;
+    try {
+      const redirectTo = `${getOrigin()}/reset-password`;
+      const userMeta = { full_name: data.contactName };
+      const { data: invited, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+        data.email,
+        { data: userMeta, redirectTo },
+      );
+      if (invited?.user && !inviteErr) {
+        newUserId = invited.user.id;
+      } else {
+        const { data: generated, error: genErr } = await supabaseAdmin.auth.admin.generateLink({
+          type: "invite",
+          email: data.email,
+          options: { data: userMeta, redirectTo },
+        });
+        if (genErr || !generated?.user || !generated.properties?.action_link) {
+          throw new Error(inviteErr?.message ?? genErr?.message ?? "Couldn't create the invite");
+        }
+        newUserId = generated.user.id;
+        inviteLink = generated.properties.action_link;
+      }
+
+      const { error: profileErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ organization_id: org.id, full_name: data.contactName })
+        .eq("id", newUserId);
+      if (profileErr) throw new Error(profileErr.message);
+
+      const { error: roleErr } = await supabaseAdmin
+        .from("user_roles")
+        .insert({ user_id: newUserId, role: "admin", organization_id: org.id });
+      if (roleErr) throw new Error(roleErr.message);
+    } catch (err) {
+      if (newUserId) await supabaseAdmin.auth.admin.deleteUser(newUserId).catch(() => {});
+      await supabaseAdmin.from("organizations").delete().eq("id", org.id);
+      throw err;
+    }
+
+    return { organizationId: org.id as string, inviteLink };
+  });
+
 const updateOrgSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(2).max(120),

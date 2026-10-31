@@ -2,11 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Building2, Pencil, Search, Trash2, Users } from "lucide-react";
+import { Building2, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   listAllOrganizations,
   listAllUsers,
+  createOrganizationWithAdmin,
   updatePlatformUser,
   deletePlatformUser,
   type PlatformUser,
@@ -62,7 +63,34 @@ function AllOrganizationsInner() {
   const listFn = useServerFn(listAllOrganizations);
   const updateFn = useServerFn(updateOrganization);
   const deleteFn = useServerFn(deleteOrganization);
+  const createFn = useServerFn(createOrganizationWithAdmin);
   const qc = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const [newOrg, setNewOrg] = useState({ companyName: "", code: "", contactName: "", email: "" });
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const create = useMutation({
+    mutationFn: () =>
+      createFn({
+        data: {
+          companyName: newOrg.companyName,
+          code: newOrg.code || undefined,
+          contactName: newOrg.contactName,
+          email: newOrg.email,
+        },
+      }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ["all-organizations"] });
+      qc.invalidateQueries({ queryKey: ["all-users"] });
+      setCreating(false);
+      setNewOrg({ companyName: "", code: "", contactName: "", email: "" });
+      if (res.inviteLink) {
+        setInviteLink(res.inviteLink);
+      } else {
+        toast.success("הארגון נוצר וההזמנה נשלחה במייל");
+      }
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "יצירת הארגון נכשלה"),
+  });
   const { data: orgs = [], isLoading } = useQuery({
     queryKey: ["all-organizations"],
     queryFn: () => listFn(),
@@ -99,6 +127,11 @@ function AllOrganizationsInner() {
         title="כל הארגונים"
         description="כל החברות שמחוברות לפלטפורמה — כולל חברות שאושרו וממתינות להגדרת סיסמה."
         icon={Building2}
+        action={
+          <Button type="button" onClick={() => setCreating(true)}>
+            <Plus className="h-4 w-4" /> ארגון חדש
+          </Button>
+        }
       />
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
@@ -194,6 +227,90 @@ function AllOrganizationsInner() {
         </Table>
       </div>
       <AllUsersSection orgs={orgs} />
+      <Dialog open={creating} onOpenChange={setCreating}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>ארגון חדש</DialogTitle>
+            <DialogDescription>
+              הארגון ייווצר והמנהל יקבל הזמנה להגדרת סיסמה וכניסה למערכת.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>שם החברה</Label>
+              <Input
+                value={newOrg.companyName}
+                onChange={(e) => setNewOrg((f) => ({ ...f, companyName: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>קוד ארגון (לא חובה — נוצר אוטומטית)</Label>
+              <Input
+                dir="ltr"
+                className="uppercase tracking-wider"
+                maxLength={16}
+                value={newOrg.code}
+                onChange={(e) => setNewOrg((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>שם המנהל</Label>
+              <Input
+                value={newOrg.contactName}
+                onChange={(e) => setNewOrg((f) => ({ ...f, contactName: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>אימייל המנהל</Label>
+              <Input
+                dir="ltr"
+                type="email"
+                value={newOrg.email}
+                onChange={(e) => setNewOrg((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreating(false)}>
+              ביטול
+            </Button>
+            <Button
+              disabled={
+                create.isPending ||
+                newOrg.companyName.trim().length < 2 ||
+                !newOrg.contactName.trim() ||
+                !newOrg.email.includes("@")
+              }
+              onClick={() => create.mutate()}
+            >
+              {create.isPending ? "יוצר…" : "יצירה ושליחת הזמנה"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inviteLink !== null} onOpenChange={(open) => !open && setInviteLink(null)}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle>הארגון נוצר</DialogTitle>
+            <DialogDescription>
+              לא ניתן היה לשלוח את מייל ההזמנה אוטומטית. העבירו למנהל את הקישור הבא:
+            </DialogDescription>
+          </DialogHeader>
+          <Input dir="ltr" readOnly value={inviteLink ?? ""} onFocus={(e) => e.target.select()} />
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (inviteLink) navigator.clipboard.writeText(inviteLink);
+                toast.success("הקישור הועתק");
+              }}
+            >
+              העתקת קישור
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent dir="rtl">
           <DialogHeader>
