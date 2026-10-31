@@ -78,10 +78,17 @@ export function useCurrentUser() {
     retry: false,
   });
 
-  const demoRole = typeof window !== "undefined" ? window.localStorage.getItem("demo_role") : null;
-  const dbIsAdmin = query.data?.role === "admin";
-  // When impersonating a non-admin demo role, hide admin surfaces in the UI.
-  const isAdmin = demoRole && demoRole !== "admin" ? false : dbIsAdmin;
+  // The demo login (which stored a "demo_role" in localStorage to hide admin
+  // surfaces) was removed. Browsers that used it still hold that stale key and
+  // would keep seeing a member-only UI even as a real admin — so drop it.
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem("demo_role");
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  const isAdmin = query.data?.role === "admin";
 
   // No custom role assigned = unrestricted (today's behavior). Admins also
   // always see every module regardless of a custom role's permissions —
