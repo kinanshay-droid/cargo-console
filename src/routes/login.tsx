@@ -137,12 +137,14 @@ function LoginPage() {
             to="/presentation"
             target="_blank"
             title="פתח את מצגת המערכת"
-            className="max-w-xs transition-opacity hover:opacity-90"
+            className="block w-[260px] transition-opacity hover:opacity-90 sm:w-[300px]"
           >
+            {/* Transparent, white-lettered variant so the mark sits directly on the
+                navy backdrop instead of in a white box. */}
             <img
-              src="/afik-logo-white.png"
+              src="/afik-logo-on-dark.png"
               alt="AFIK Logistics Platform — The Intelligence Behind Every Shipment."
-              className="h-auto w-full"
+              className="h-auto w-full drop-shadow-[0_4px_24px_rgba(47,155,255,0.25)]"
             />
           </Link>
         </div>
