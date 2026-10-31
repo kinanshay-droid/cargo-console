@@ -57,7 +57,6 @@ function ResetPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: pwd });
       if (error) throw error;
-      await supabase.auth.signOut();
       setDone(true);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "לא ניתן היה להגדיר את הסיסמה");
@@ -70,12 +69,12 @@ function ResetPage() {
 
   if (done) {
     return (
-      <AuthLayout title="הסיסמה עודכנה" subtitle="התחברו עם הסיסמה החדשה.">
+      <AuthLayout title="הסיסמה עודכנה" subtitle="הסיסמה נשמרה, והחשבון מחובר.">
         <Link
-          to="/login"
+          to="/dashboard/shipments"
           className="inline-flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
-          מעבר למסך הכניסה
+          כניסה למערכת
         </Link>
       </AuthLayout>
     );

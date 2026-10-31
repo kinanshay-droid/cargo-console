@@ -58,7 +58,7 @@ function getOrigin(): string {
 const submitSchema = z.object({
   companyName: z.string().trim().min(2).max(120),
   contactName: z.string().trim().min(1).max(120),
-  email: z.string().trim().email().max(255),
+  email: z.string().trim().toLowerCase().email().max(255),
   phone: z
     .string()
     .trim()
@@ -82,6 +82,18 @@ export const submitCompanyRequest = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => submitSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Same address already waiting for review → don't pile up duplicates
+    // (double-clicks, repeat submissions). The visitor just sees success.
+    const { data: dup, error: dupErr } = await supabaseAdmin
+      .from("company_signup_requests")
+      .select("id")
+      .eq("email", data.email)
+      .eq("status", "pending")
+      .limit(1);
+    if (dupErr) throw new Error(dupErr.message);
+    if ((dup ?? []).length > 0) return { ok: true as const };
+
     const { error } = await supabaseAdmin.from("company_signup_requests").insert({
       company_name: data.companyName,
       contact_name: data.contactName,
@@ -119,6 +131,18 @@ export const listCompanyRequests = createServerFn({ method: "GET" })
     }));
   });
 
+export const countPendingCompanyRequests = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { count, error } = await context.supabase
+      .from("company_signup_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending");
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+  });
+
 const approveSchema = z.object({ requestId: z.string().uuid() });
 
 /**
@@ -153,7 +177,9 @@ export const approveCompanyRequest = createServerFn({ method: "POST" })
     const { data: existingProfile, error: existingErr } = await supabaseAdmin
       .from("profiles")
       .select("id")
-      .ilike("email", reqRow.email)
+      // eq on the lowercased address: ilike would treat "_" / "%" in an
+      // email as wildcards and could match a different person's account.
+      .eq("email", reqRow.email.toLowerCase())
       .maybeSingle();
     if (existingErr) throw new Error(existingErr.message);
     if (existingProfile) {

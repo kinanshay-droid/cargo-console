@@ -46,14 +46,21 @@ function SignupPage() {
         password: form.password,
         options: {
           emailRedirectTo: `${window.location.origin}/dashboard/shipments`,
-          data: { full_name: form.fullName },
+          data: {
+            full_name: form.fullName,
+            // Lets the dashboard finish the join on first sign-in when email
+            // confirmation means there's no session to do it right now.
+            join_org_code: form.organizationCode.trim().toUpperCase(),
+          },
         },
       });
       if (signUpErr) throw signUpErr;
 
       // If email confirmation is required, there won't be a session yet.
       if (!authData.session) {
-        toast.success("החשבון נוצר. בדקו את תיבת המייל לאישור ואז התחברו.");
+        toast.success(
+          "החשבון נוצר. אשרו את המייל שנשלח אליכם ואז התחברו — ההצטרפות לארגון תושלם אוטומטית.",
+        );
         navigate({ to: "/login" });
         return;
       }

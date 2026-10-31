@@ -1,6 +1,7 @@
 import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Truck,
   Users,
@@ -21,6 +22,9 @@ import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ContactButton } from "@/components/contact-button";
+import { countPendingCompanyRequests } from "@/lib/company-requests.functions";
+import { completePendingJoin } from "@/lib/auth.functions";
+import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import type { TranslationKey } from "@/lib/i18n-dictionary";
 import type { CustomRolePermissionKey } from "@/lib/admin.functions";
@@ -136,9 +140,41 @@ function DashboardLayout() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { isAdmin, isPlatformAdmin, user, hasPermission } = useCurrentUser();
+  const { isAdmin, isPlatformAdmin, isLoading: meLoading, user, hasPermission } = useCurrentUser();
   const { t } = useI18n();
   const [sessionChecked, setSessionChecked] = useState(false);
+  const countPendingFn = useServerFn(countPendingCompanyRequests);
+  const completeJoinFn = useServerFn(completePendingJoin);
+  const [joinChecked, setJoinChecked] = useState(false);
+  const [joinDone, setJoinDone] = useState(false);
+
+  // Pending company requests, shown as a badge on the requests nav item.
+  const { data: pendingRequests = 0 } = useQuery({
+    queryKey: ["company-requests", "pending-count"],
+    queryFn: () => countPendingFn(),
+    enabled: sessionChecked && isPlatformAdmin,
+    refetchInterval: 60_000,
+  });
+
+  // A user who signed up with an org code while email confirmation was on
+  // has no organization yet (no session existed to finish the join) — finish
+  // it now from the code stashed in their metadata.
+  const needsOrg = sessionChecked && !meLoading && !!user && !user.organizationId;
+  useEffect(() => {
+    if (!needsOrg || joinChecked) return;
+    setJoinChecked(true);
+    completeJoinFn()
+      .then((res) => {
+        if (res.joined) {
+          toast.success("הצטרפת לארגון בהצלחה!");
+          queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+        }
+      })
+      .catch(() => {
+        /* nothing pending / code invalid — the "no organization" screen explains */
+      })
+      .finally(() => setJoinDone(true));
+  }, [needsOrg, joinChecked, completeJoinFn, queryClient]);
 
   useEffect(() => {
     let mounted = true;
@@ -184,6 +220,43 @@ function DashboardLayout() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-sm text-muted-foreground">{t("common.loading")}</div>
+      </div>
+    );
+  }
+
+  if (needsOrg) {
+    // Either the pending join is still running, or there's nothing to join.
+    if (!joinDone) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background">
+          <div className="text-sm text-muted-foreground">{t("common.loading")}</div>
+        </div>
+      );
+    }
+    return (
+      <div dir="rtl" className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="max-w-md space-y-4 text-center">
+          <h1 className="text-xl font-semibold tracking-tight">החשבון עדיין לא משויך לארגון</h1>
+          <p className="text-sm text-muted-foreground">
+            כדי להשתמש במערכת צריך להשתייך לארגון. אם החברה שלכם עדיין לא הצטרפה, הגישו בקשת
+            הצטרפות; אם קיבלתם קוד ארגון מהמנהל, הצטרפו איתו.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Link
+              to="/request-access"
+              className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              בקשת הצטרפות
+            </Link>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted"
+            >
+              {t("logout.button")}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -249,6 +322,11 @@ function DashboardLayout() {
                           <Icon className="h-4 w-4" />
                         </span>
                         {t(item.labelKey)}
+                        {item.to === "/dashboard/company-requests" && pendingRequests > 0 ? (
+                          <span className="ms-2 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                            {pendingRequests}
+                          </span>
+                        ) : null}
                       </span>
                       {active && (
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
@@ -327,6 +405,11 @@ function DashboardLayout() {
                   )}
                 >
                   {t(item.labelKey)}
+                  {item.to === "/dashboard/company-requests" && pendingRequests > 0 ? (
+                    <span className="ms-2 rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                      {pendingRequests}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}
