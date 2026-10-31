@@ -2,10 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Building2, Pencil, Trash2 } from "lucide-react";
+import { Building2, Pencil, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   listAllOrganizations,
+  listAllUsers,
   updateOrganization,
   deleteOrganization,
   type PlatformOrganization,
@@ -70,8 +71,7 @@ function AllOrganizationsInner() {
   const [confirmText, setConfirmText] = useState("");
 
   const save = useMutation({
-    mutationFn: () =>
-      updateFn({ data: { id: editing!.id, name: editName, code: editCode } }),
+    mutationFn: () => updateFn({ data: { id: editing!.id, name: editName, code: editCode } }),
     onSuccess: () => {
       toast.success("הארגון עודכן");
       qc.invalidateQueries({ queryKey: ["all-organizations"] });
@@ -190,6 +190,7 @@ function AllOrganizationsInner() {
           </TableBody>
         </Table>
       </div>
+      <AllUsersSection />
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent dir="rtl">
           <DialogHeader>
@@ -266,6 +267,102 @@ function AllOrganizationsInner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function AllUsersSection() {
+  const listFn = useServerFn(listAllUsers);
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ["all-users"],
+    queryFn: () => listFn(),
+  });
+  const [q, setQ] = useState("");
+  const needle = q.trim().toLowerCase();
+  const rows = users
+    .filter(
+      (u) =>
+        !needle ||
+        u.fullName.toLowerCase().includes(needle) ||
+        u.email.toLowerCase().includes(needle) ||
+        (u.organizationName ?? "").toLowerCase().includes(needle),
+    )
+    .sort((a, b) => (a.organizationName ?? "").localeCompare(b.organizationName ?? "", "he"));
+
+  return (
+    <div className="mt-8">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
+          <Users className="h-5 w-5" /> כל המשתמשים ({users.length})
+        </h2>
+        <div className="relative w-full max-w-xs">
+          <Search className="pointer-events-none absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="חיפוש לפי שם, מייל או ארגון"
+            className="pr-8"
+          />
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="text-right">שם</TableHead>
+              <TableHead className="text-right">אימייל</TableHead>
+              <TableHead className="text-right">ארגון</TableHead>
+              <TableHead className="text-right">תפקיד</TableHead>
+              <TableHead className="text-right">סטטוס</TableHead>
+              <TableHead className="text-right">נוצר</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                  טוען…
+                </TableCell>
+              </TableRow>
+            ) : rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                  לא נמצאו משתמשים.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((u) => (
+                <TableRow key={u.id}>
+                  <TableCell className="font-medium">{u.fullName || "—"}</TableCell>
+                  <TableCell dir="ltr" className="text-right text-sm">
+                    {u.email}
+                  </TableCell>
+                  <TableCell>
+                    {u.organizationName ?? (
+                      <span className="text-xs text-muted-foreground">ללא ארגון</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm">{u.isAdmin ? "מנהל" : "משתמש"}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "text-[10px]",
+                        TONE_BADGE[u.hasSignedIn ? "success" : "warning"],
+                      )}
+                    >
+                      {u.hasSignedIn ? "התחבר" : "ממתין להגדרת סיסמה"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {u.createdAt ? new Date(u.createdAt).toLocaleDateString("he-IL") : "—"}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

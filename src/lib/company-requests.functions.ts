@@ -366,6 +366,56 @@ export const listAllOrganizations = createServerFn({ method: "GET" })
     });
   });
 
+export type PlatformUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  organizationId: string | null;
+  organizationName: string | null;
+  isAdmin: boolean;
+  hasSignedIn: boolean;
+  createdAt: string | null;
+};
+
+/** Flat list of every user across all organizations (AFIK staff only). */
+export const listAllUsers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [orgsRes, profilesRes, adminRolesRes, authUsersRes] = await Promise.all([
+      supabaseAdmin.from("organizations").select("id, name"),
+      supabaseAdmin.from("profiles").select("id, email, full_name, organization_id"),
+      supabaseAdmin.from("user_roles").select("user_id, organization_id").eq("role", "admin"),
+      supabaseAdmin.auth.admin.listUsers({ perPage: 1000 }),
+    ]);
+    if (orgsRes.error) throw new Error(orgsRes.error.message);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+    if (adminRolesRes.error) throw new Error(adminRolesRes.error.message);
+    if (authUsersRes.error) throw new Error(authUsersRes.error.message);
+
+    const orgNames = new Map((orgsRes.data ?? []).map((o) => [o.id, o.name]));
+    const authById = new Map(authUsersRes.data.users.map((u) => [u.id, u]));
+    const adminKeys = new Set(
+      (adminRolesRes.data ?? []).map((r) => `${r.organization_id}:${r.user_id}`),
+    );
+
+    return (profilesRes.data ?? []).map<PlatformUser>((p) => {
+      const au = authById.get(p.id);
+      return {
+        id: p.id,
+        fullName: p.full_name ?? "",
+        email: p.email ?? "",
+        organizationId: p.organization_id,
+        organizationName: p.organization_id ? (orgNames.get(p.organization_id) ?? null) : null,
+        isAdmin: !!p.organization_id && adminKeys.has(`${p.organization_id}:${p.id}`),
+        hasSignedIn: !!au?.last_sign_in_at,
+        createdAt: au?.created_at ?? null,
+      };
+    });
+  });
+
 const updateOrgSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
