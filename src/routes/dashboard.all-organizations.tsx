@@ -2,11 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Building2, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
+import { Building2, LogIn, Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   listAllOrganizations,
   listAllUsers,
+  enterOrganization,
   createOrganizationWithAdmin,
   updatePlatformUser,
   deletePlatformUser,
@@ -64,6 +65,13 @@ function AllOrganizationsInner() {
   const updateFn = useServerFn(updateOrganization);
   const deleteFn = useServerFn(deleteOrganization);
   const createFn = useServerFn(createOrganizationWithAdmin);
+  const enterFn = useServerFn(enterOrganization);
+  const enter = useMutation({
+    mutationFn: (organizationId: string) => enterFn({ data: { organizationId } }),
+    // Full reload so every cached query and the user's role reflect the new org.
+    onSuccess: () => window.location.assign("/dashboard/shipments"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "הכניסה לארגון נכשלה"),
+  });
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [newOrg, setNewOrg] = useState({ companyName: "", code: "", contactName: "", email: "" });
@@ -194,6 +202,14 @@ function AllOrganizationsInner() {
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={enter.isPending}
+                        onClick={() => enter.mutate(o.id)}
+                      >
+                        <LogIn className="h-3.5 w-3.5" /> כניסה לארגון
+                      </Button>
                       <Button
                         type="button"
                         size="sm"

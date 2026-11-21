@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SupportBanner } from "@/components/support-banner";
 import { ContactButton } from "@/components/contact-button";
 import { countPendingCompanyRequests } from "@/lib/company-requests.functions";
 import { completePendingJoin } from "@/lib/auth.functions";
@@ -416,8 +417,11 @@ function DashboardLayout() {
           </div>
         </div>
 
-        <main className="flex-1 p-6 md:p-8">
-          <Outlet />
+        <main className="flex-1">
+          <SupportBanner />
+          <div className="p-6 md:p-8">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

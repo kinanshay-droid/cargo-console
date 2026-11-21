@@ -611,6 +611,161 @@ export const createOrganizationWithAdmin = createServerFn({ method: "POST" })
     return { organizationId: org.id as string, inviteLink };
   });
 
+// ---------------------------------------------------------------------------
+// Support mode: lets AFIK staff step into any organization (full ADMIN there)
+// to view/fix its data, then return to their own. The data model scopes every
+// query to profiles.organization_id, so "entering" an org means re-pointing
+// the staff member's own profile and granting a temporary admin role. Their
+// home organization is remembered in auth user_metadata (no migration).
+// ---------------------------------------------------------------------------
+
+type SupportMeta = { support_active?: boolean; support_home_org_id?: string | null };
+
+async function readSupportMeta(userId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (error || !data.user) throw new Error(error?.message ?? "User not found");
+  return {
+    supabaseAdmin,
+    meta: (data.user.user_metadata ?? {}) as Record<string, unknown> & SupportMeta,
+  };
+}
+
+export const getSupportStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin, meta } = await readSupportMeta(context.userId);
+    if (!meta.support_active) return { active: false as const, organizationName: null };
+    const { data: prof } = await supabaseAdmin
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", context.userId)
+      .maybeSingle();
+    let name: string | null = null;
+    if (prof?.organization_id) {
+      const { data: org } = await supabaseAdmin
+        .from("organizations")
+        .select("name")
+        .eq("id", prof.organization_id)
+        .maybeSingle();
+      name = org?.name ?? null;
+    }
+    return { active: true as const, organizationName: name };
+  });
+
+async function leaveSupportOrg(userId: string) {
+  const { supabaseAdmin, meta } = await readSupportMeta(userId);
+  if (!meta.support_active) return { supabaseAdmin, meta, left: false };
+  const { data: prof, error: profErr } = await supabaseAdmin
+    .from("profiles")
+    .select("organization_id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profErr) throw new Error(profErr.message);
+  const home = meta.support_home_org_id ?? null;
+  const current = prof?.organization_id ?? null;
+  // Drop the temporary admin role in the organization being left.
+  if (current && current !== home) {
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+      .eq("organization_id", current);
+    if (error) throw new Error(error.message);
+  }
+  const { error: upErr } = await supabaseAdmin
+    .from("profiles")
+    .update({ organization_id: home, custom_role_id: null })
+    .eq("id", userId);
+  if (upErr) throw new Error(upErr.message);
+  const { error: metaErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    user_metadata: { ...meta, support_active: false, support_home_org_id: null },
+  });
+  if (metaErr) throw new Error(metaErr.message);
+  return { supabaseAdmin, meta: { ...meta, support_active: false }, left: true };
+}
+
+export const enterOrganization = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => z.object({ organizationId: z.string().uuid() }).parse(data))
+  .handler(async ({ data, context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    const { supabaseAdmin, meta } = await readSupportMeta(context.userId);
+
+    const { data: org, error: orgErr } = await supabaseAdmin
+      .from("organizations")
+      .select("id")
+      .eq("id", data.organizationId)
+      .maybeSingle();
+    if (orgErr) throw new Error(orgErr.message);
+    if (!org) throw new Error("הארגון לא נמצא");
+
+    // Remember the real home org once; hopping between orgs keeps it.
+    let home: string | null;
+    if (meta.support_active) {
+      home = meta.support_home_org_id ?? null;
+    } else {
+      const { data: prof, error: profErr } = await supabaseAdmin
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", context.userId)
+        .maybeSingle();
+      if (profErr) throw new Error(profErr.message);
+      home = prof?.organization_id ?? null;
+    }
+
+    // Returning to the home org is the same as leaving support mode.
+    if (data.organizationId === home) {
+      await leaveSupportOrg(context.userId);
+      return { ok: true as const };
+    }
+
+    // Leaving a previous support org: drop its temporary admin role.
+    if (meta.support_active) {
+      const { data: cur } = await supabaseAdmin
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", context.userId)
+        .maybeSingle();
+      if (cur?.organization_id && cur.organization_id !== home) {
+        await supabaseAdmin
+          .from("user_roles")
+          .delete()
+          .eq("user_id", context.userId)
+          .eq("organization_id", cur.organization_id);
+      }
+    }
+
+    const { error: metaErr } = await supabaseAdmin.auth.admin.updateUserById(context.userId, {
+      user_metadata: { ...meta, support_active: true, support_home_org_id: home },
+    });
+    if (metaErr) throw new Error(metaErr.message);
+
+    const { error: profErr2 } = await supabaseAdmin
+      .from("profiles")
+      .update({ organization_id: data.organizationId, custom_role_id: null })
+      .eq("id", context.userId);
+    if (profErr2) throw new Error(profErr2.message);
+
+    const { error: roleErr } = await supabaseAdmin
+      .from("user_roles")
+      .upsert(
+        { user_id: context.userId, organization_id: data.organizationId, role: "admin" },
+        { onConflict: "user_id,role,organization_id", ignoreDuplicates: true },
+      );
+    if (roleErr) throw new Error(roleErr.message);
+    return { ok: true as const };
+  });
+
+export const exitSupportOrganization = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await requirePlatformAdmin(context.supabase, context.userId);
+    await leaveSupportOrg(context.userId);
+    return { ok: true as const };
+  });
+
 const updateOrgSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
