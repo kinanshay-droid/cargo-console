@@ -36,7 +36,7 @@ function normalizeCurrency(value: string): WarehouseCurrency {
 }
 
 const ITEM_COLUMNS =
-  "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg";
+  "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg, temp_series";
 
 export type BoxDimensions = { length: number | null; width: number | null; height: number | null };
 
@@ -58,6 +58,7 @@ export type WarehouseItem = {
   externalDims: BoxDimensions;
   internalDims: BoxDimensions;
   weightKg: number | null;
+  tempSeries: string[];
 };
 
 export type WarehouseMovement = {
@@ -93,6 +94,7 @@ function toWarehouseItem(row: {
   int_width_cm: number | null;
   int_height_cm: number | null;
   weight_kg: number | null;
+  temp_series: string[];
 }): WarehouseItem {
   return {
     id: row.id,
@@ -120,6 +122,7 @@ function toWarehouseItem(row: {
       height: row.int_height_cm,
     },
     weightKg: row.weight_kg,
+    tempSeries: row.temp_series ?? [],
   };
 }
 
@@ -151,6 +154,7 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
       externalDims?: BoxDimensions | null;
       internalDims?: BoxDimensions | null;
       weightKg?: number | null;
+      tempSeries?: string[];
     }) => {
       if (!input?.name?.trim()) throw new Error("name is required");
       if (!WAREHOUSE_CATEGORIES.includes(input.category)) {
@@ -190,6 +194,7 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
         int_width_cm: data.internalDims?.width ?? null,
         int_height_cm: data.internalDims?.height ?? null,
         weight_kg: data.weightKg ?? null,
+        temp_series: data.tempSeries ?? [],
       })
       .select(ITEM_COLUMNS)
       .single();
@@ -229,6 +234,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       externalDims?: BoxDimensions | null;
       internalDims?: BoxDimensions | null;
       weightKg?: number | null;
+      tempSeries?: string[];
     }) => {
       if (!input?.id) throw new Error("id is required");
       return input;
@@ -257,6 +263,7 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       patch.int_height_cm = data.internalDims?.height ?? null;
     }
     if (data.weightKg !== undefined) patch.weight_kg = data.weightKg;
+    if (data.tempSeries !== undefined) patch.temp_series = data.tempSeries;
 
     const { data: row, error } = await supabase
       .from("warehouse_items")

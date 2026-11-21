@@ -1,3 +1,4 @@
+import { TEMP_SERIES } from "@/components/new-quote-dialog";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1006,6 +1007,7 @@ function ItemFormDialog({
     ext: dimsToForm(item?.externalDims),
     int: dimsToForm(item?.internalDims),
     weightKg: item?.weightKg != null ? String(item.weightKg) : "",
+    tempSeries: item?.tempSeries ?? ([] as string[]),
   });
   const isBox = form.category === "boxes";
   const boxExtras = isBox
@@ -1013,8 +1015,9 @@ function ItemFormDialog({
         externalDims: formToDims(form.ext),
         internalDims: formToDims(form.int),
         weightKg: form.weightKg ? Number(form.weightKg) : null,
+        tempSeries: form.tempSeries,
       }
-    : { externalDims: null, internalDims: null, weightKg: null };
+    : { externalDims: null, internalDims: null, weightKg: null, tempSeries: [] };
 
   const save = useMutation({
     mutationFn: () =>
@@ -1207,6 +1210,40 @@ function ItemFormDialog({
                 value={form.int}
                 onChange={(int) => setForm((f) => ({ ...f, int }))}
               />
+              <div className="space-y-1.5">
+                <Label>מתאים לטווחי טמפרטורה</Label>
+                <div className="flex flex-wrap gap-2">
+                  {TEMP_SERIES.map((ts) => {
+                    const on = form.tempSeries.includes(ts.key);
+                    return (
+                      <button
+                        key={ts.key}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            tempSeries: on
+                              ? f.tempSeries.filter((k) => k !== ts.key)
+                              : [...f.tempSeries, ts.key],
+                          }))
+                        }
+                        className={cn(
+                          "rounded-md border px-2.5 py-1.5 text-xs transition-colors",
+                          on
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "bg-background hover:bg-muted",
+                        )}
+                      >
+                        {ts.label}
+                        <span className="ms-1 opacity-70" dir="ltr">
+                          {ts.range}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>משקל המארז (ק״ג, לא חובה)</Label>
                 <Input
