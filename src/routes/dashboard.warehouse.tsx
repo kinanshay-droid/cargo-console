@@ -18,7 +18,12 @@ import {
   ArchiveRestore,
   FileDown,
   Check,
+  Upload,
+  FileText,
+  X,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   listWarehouseItems,
   createWarehouseItem,
@@ -1008,7 +1013,11 @@ function ItemFormDialog({
     int: dimsToForm(item?.internalDims),
     weightKg: item?.weightKg != null ? String(item.weightKg) : "",
     tempSeries: item?.tempSeries ?? ([] as string[]),
+    sheetPath: item?.productSheetPath ?? "",
+    sheetName: item?.productSheetName ?? "",
   });
+  const [uploadingSheet, setUploadingSheet] = useState(false);
+  const { user: currentUser } = useCurrentUser();
   const isBox = form.category === "boxes";
   const boxExtras = isBox
     ? {
@@ -1016,8 +1025,17 @@ function ItemFormDialog({
         internalDims: formToDims(form.int),
         weightKg: form.weightKg ? Number(form.weightKg) : null,
         tempSeries: form.tempSeries,
+        productSheetPath: form.sheetPath || null,
+        productSheetName: form.sheetName || null,
       }
-    : { externalDims: null, internalDims: null, weightKg: null, tempSeries: [] };
+    : {
+        externalDims: null,
+        internalDims: null,
+        weightKg: null,
+        tempSeries: [],
+        productSheetPath: null,
+        productSheetName: null,
+      };
 
   const save = useMutation({
     mutationFn: () =>
@@ -1053,6 +1071,13 @@ function ItemFormDialog({
             },
           }),
     onSuccess: () => {
+      if (
+        isEdit &&
+        item.productSheetPath &&
+        item.productSheetPath !== (boxExtras.productSheetPath ?? "")
+      ) {
+        void supabase.storage.from("product-sheets").remove([item.productSheetPath]);
+      }
       toast.success(isEdit ? "הפריט עודכן" : "הפריט נוצר");
       setOpen(false);
       onSaved();
@@ -1235,13 +1260,93 @@ function ItemFormDialog({
                             : "bg-background hover:bg-muted",
                         )}
                       >
-                        {ts.label}
-                        <span className="ms-1 opacity-70" dir="ltr">
+                        <span className="block font-medium" dir="ltr">
+                          {ts.label}
+                        </span>
+                        <span className="block opacity-80" dir="ltr">
                           {ts.range}
                         </span>
                       </button>
                     );
                   })}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>דף מוצר (נתוני יצרן)</Label>
+                <input
+                  id="product-sheet-upload"
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (!file) return;
+                    if (!currentUser?.organizationId) {
+                      toast.error("המשתמש לא משויך לארגון");
+                      return;
+                    }
+                    if (file.size > 20 * 1024 * 1024) {
+                      toast.error("הקובץ גדול מדי (עד 20MB)");
+                      return;
+                    }
+                    setUploadingSheet(true);
+                    try {
+                      const ext = file.name.split(".").pop() ?? "bin";
+                      const path = `${currentUser.organizationId}/${crypto.randomUUID()}.${ext}`;
+                      const { error } = await supabase.storage
+                        .from("product-sheets")
+                        .upload(path, file, { upsert: false });
+                      if (error) throw error;
+                      setForm((f) => ({ ...f, sheetPath: path, sheetName: file.name }));
+                      toast.success("דף המוצר הועלה — לחצו שמירה כדי לשמור");
+                    } catch (err) {
+                      toast.error((err as Error).message || "ההעלאה נכשלה");
+                    } finally {
+                      setUploadingSheet(false);
+                    }
+                  }}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadingSheet}
+                    onClick={() => document.getElementById("product-sheet-upload")?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {uploadingSheet ? "מעלה…" : form.sheetPath ? "החלפת דף מוצר" : "העלאת דף מוצר"}
+                  </Button>
+                  {form.sheetPath ? (
+                    <span className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1 text-xs">
+                      <FileText className="h-3.5 w-3.5 text-primary" />
+                      <button
+                        type="button"
+                        className="hover:underline"
+                        onClick={async () => {
+                          const { data, error } = await supabase.storage
+                            .from("product-sheets")
+                            .createSignedUrl(form.sheetPath, 600);
+                          if (error || !data) {
+                            toast.error("לא ניתן לפתוח את הקובץ");
+                            return;
+                          }
+                          window.open(data.signedUrl, "_blank");
+                        }}
+                      >
+                        {form.sheetName || "דף מוצר"}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="הסרה"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setForm((f) => ({ ...f, sheetPath: "", sheetName: "" }))}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="space-y-1.5">

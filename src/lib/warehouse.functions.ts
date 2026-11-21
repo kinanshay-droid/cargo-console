@@ -36,7 +36,7 @@ function normalizeCurrency(value: string): WarehouseCurrency {
 }
 
 const ITEM_COLUMNS =
-  "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg, temp_series";
+  "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg, temp_series, product_sheet_path, product_sheet_name";
 
 export type BoxDimensions = { length: number | null; width: number | null; height: number | null };
 
@@ -59,6 +59,8 @@ export type WarehouseItem = {
   internalDims: BoxDimensions;
   weightKg: number | null;
   tempSeries: string[];
+  productSheetPath: string | null;
+  productSheetName: string | null;
 };
 
 export type WarehouseMovement = {
@@ -95,6 +97,8 @@ function toWarehouseItem(row: {
   int_height_cm: number | null;
   weight_kg: number | null;
   temp_series: string[];
+  product_sheet_path: string | null;
+  product_sheet_name: string | null;
 }): WarehouseItem {
   return {
     id: row.id,
@@ -123,6 +127,8 @@ function toWarehouseItem(row: {
     },
     weightKg: row.weight_kg,
     tempSeries: row.temp_series ?? [],
+    productSheetPath: row.product_sheet_path,
+    productSheetName: row.product_sheet_name,
   };
 }
 
@@ -155,6 +161,8 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
       internalDims?: BoxDimensions | null;
       weightKg?: number | null;
       tempSeries?: string[];
+      productSheetPath?: string | null;
+      productSheetName?: string | null;
     }) => {
       if (!input?.name?.trim()) throw new Error("name is required");
       if (!WAREHOUSE_CATEGORIES.includes(input.category)) {
@@ -195,6 +203,8 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
         int_height_cm: data.internalDims?.height ?? null,
         weight_kg: data.weightKg ?? null,
         temp_series: data.tempSeries ?? [],
+        product_sheet_path: data.productSheetPath ?? null,
+        product_sheet_name: data.productSheetName ?? null,
       })
       .select(ITEM_COLUMNS)
       .single();
@@ -235,6 +245,8 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       internalDims?: BoxDimensions | null;
       weightKg?: number | null;
       tempSeries?: string[];
+      productSheetPath?: string | null;
+      productSheetName?: string | null;
     }) => {
       if (!input?.id) throw new Error("id is required");
       return input;
@@ -264,6 +276,10 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
     }
     if (data.weightKg !== undefined) patch.weight_kg = data.weightKg;
     if (data.tempSeries !== undefined) patch.temp_series = data.tempSeries;
+    if (data.productSheetPath !== undefined) {
+      patch.product_sheet_path = data.productSheetPath;
+      patch.product_sheet_name = data.productSheetPath ? (data.productSheetName ?? null) : null;
+    }
 
     const { data: row, error } = await supabase
       .from("warehouse_items")
