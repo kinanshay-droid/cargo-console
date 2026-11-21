@@ -36,7 +36,7 @@ function normalizeCurrency(value: string): WarehouseCurrency {
 }
 
 const ITEM_COLUMNS =
-  "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg, temp_series, product_sheets";
+  "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg, temp_series, product_sheets, sale_price, sale_price_currency";
 
 export type ProductSheet = { path: string; name: string };
 
@@ -53,6 +53,8 @@ export type WarehouseItem = {
   expiryDate: string | null;
   unitCost: number | null;
   unitCostCurrency: WarehouseCurrency;
+  salePrice: number | null;
+  salePriceCurrency: WarehouseCurrency;
   notes: string | null;
   active: boolean;
   createdAt: string;
@@ -86,6 +88,8 @@ function toWarehouseItem(row: {
   expiry_date: string | null;
   unit_cost: number | null;
   unit_cost_currency: string;
+  sale_price: number | null;
+  sale_price_currency: string;
   notes: string | null;
   active: boolean;
   created_at: string;
@@ -111,6 +115,8 @@ function toWarehouseItem(row: {
     expiryDate: row.expiry_date,
     unitCost: row.unit_cost,
     unitCostCurrency: normalizeCurrency(row.unit_cost_currency),
+    salePrice: row.sale_price,
+    salePriceCurrency: normalizeCurrency(row.sale_price_currency),
     notes: row.notes,
     active: row.active,
     createdAt: row.created_at,
@@ -157,6 +163,8 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
       expiryDate?: string | null;
       unitCost?: number | null;
       unitCostCurrency?: WarehouseCurrency;
+      salePrice?: number | null;
+      salePriceCurrency?: WarehouseCurrency;
       notes?: string | null;
       externalDims?: BoxDimensions | null;
       internalDims?: BoxDimensions | null;
@@ -195,6 +203,8 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
         expiry_date: data.expiryDate || null,
         unit_cost: data.unitCost ?? null,
         unit_cost_currency: data.unitCostCurrency ?? "ILS",
+        sale_price: data.salePrice ?? null,
+        sale_price_currency: data.salePriceCurrency ?? "ILS",
         ext_length_cm: data.externalDims?.length ?? null,
         ext_width_cm: data.externalDims?.width ?? null,
         ext_height_cm: data.externalDims?.height ?? null,
@@ -239,6 +249,8 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       expiryDate?: string | null;
       unitCost?: number | null;
       unitCostCurrency?: WarehouseCurrency;
+      salePrice?: number | null;
+      salePriceCurrency?: WarehouseCurrency;
       notes?: string | null;
       externalDims?: BoxDimensions | null;
       internalDims?: BoxDimensions | null;
@@ -261,6 +273,8 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
     if (data.expiryDate !== undefined) patch.expiry_date = data.expiryDate || null;
     if (data.unitCost !== undefined) patch.unit_cost = data.unitCost;
     if (data.unitCostCurrency !== undefined) patch.unit_cost_currency = data.unitCostCurrency;
+    if (data.salePrice !== undefined) patch.sale_price = data.salePrice;
+    if (data.salePriceCurrency !== undefined) patch.sale_price_currency = data.salePriceCurrency;
     if (data.notes !== undefined) patch.notes = data.notes?.trim() || null;
     if (data.externalDims !== undefined) {
       patch.ext_length_cm = data.externalDims?.length ?? null;

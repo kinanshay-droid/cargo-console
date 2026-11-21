@@ -328,6 +328,7 @@ function WarehouseItemsTable({
             <TableHead className="text-right">מק"ט</TableHead>
             <TableHead className="text-right">כמות במלאי</TableHead>
             <TableHead className="text-right">עלות יחידה</TableHead>
+            <TableHead className="text-right">עלות מכירה</TableHead>
             <TableHead className="text-right">תוקף</TableHead>
             <TableHead className="text-right">סטטוס</TableHead>
             <TableHead className="text-right">פעולות</TableHead>
@@ -336,7 +337,7 @@ function WarehouseItemsTable({
         <TableBody>
           {items.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+              <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                 {emptyMessage}
               </TableCell>
             </TableRow>
@@ -375,6 +376,11 @@ function WarehouseItemsTable({
                   ) : (
                     "—"
                   )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {item.salePrice != null
+                    ? `${item.salePrice.toLocaleString("he-IL", { minimumFractionDigits: 2 })} ${CURRENCY_SYMBOL[item.salePriceCurrency]}`
+                    : "—"}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {item.expiryDate ? (
@@ -1054,6 +1060,8 @@ function ItemFormDialog({
     expiryDate: item?.expiryDate ?? "",
     unitCost: item?.unitCost != null ? String(item.unitCost) : "",
     unitCostCurrency: item?.unitCostCurrency ?? ("ILS" as WarehouseCurrency),
+    salePrice: item?.salePrice != null ? String(item.salePrice) : "",
+    salePriceCurrency: item?.salePriceCurrency ?? ("ILS" as WarehouseCurrency),
     notes: item?.notes ?? "",
     ext: dimsToForm(item?.externalDims),
     int: dimsToForm(item?.internalDims),
@@ -1094,6 +1102,8 @@ function ItemFormDialog({
               expiryDate: form.expiryDate || null,
               unitCost: form.unitCost ? Number(form.unitCost) : null,
               unitCostCurrency: form.unitCostCurrency,
+              salePrice: form.salePrice ? Number(form.salePrice) : null,
+              salePriceCurrency: form.salePriceCurrency,
               notes: form.notes || null,
               ...boxExtras,
             },
@@ -1109,6 +1119,8 @@ function ItemFormDialog({
               expiryDate: form.expiryDate || null,
               unitCost: form.unitCost ? Number(form.unitCost) : null,
               unitCostCurrency: form.unitCostCurrency,
+              salePrice: form.salePrice ? Number(form.salePrice) : null,
+              salePriceCurrency: form.salePriceCurrency,
               notes: form.notes || null,
               ...boxExtras,
             },
@@ -1251,6 +1263,34 @@ function ItemFormDialog({
                   value={form.unitCostCurrency}
                   onValueChange={(v) =>
                     setForm((f) => ({ ...f, unitCostCurrency: v as WarehouseCurrency }))
+                  }
+                >
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ILS">₪</SelectItem>
+                    <SelectItem value="USD">$</SelectItem>
+                    <SelectItem value="EUR">€</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>עלות מכירה (לא חובה)</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.salePrice}
+                  onChange={(e) => setForm((f) => ({ ...f, salePrice: e.target.value }))}
+                  className="flex-1"
+                />
+                <Select
+                  value={form.salePriceCurrency}
+                  onValueChange={(v) =>
+                    setForm((f) => ({ ...f, salePriceCurrency: v as WarehouseCurrency }))
                   }
                 >
                   <SelectTrigger className="w-20">
