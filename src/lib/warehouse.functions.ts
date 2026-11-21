@@ -35,6 +35,11 @@ function normalizeCurrency(value: string): WarehouseCurrency {
   return (WAREHOUSE_CURRENCIES as string[]).includes(value) ? (value as WarehouseCurrency) : "ILS";
 }
 
+const ITEM_COLUMNS =
+  "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg";
+
+export type BoxDimensions = { length: number | null; width: number | null; height: number | null };
+
 export type WarehouseItem = {
   id: string;
   name: string;
@@ -50,6 +55,9 @@ export type WarehouseItem = {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  externalDims: BoxDimensions;
+  internalDims: BoxDimensions;
+  weightKg: number | null;
 };
 
 export type WarehouseMovement = {
@@ -78,6 +86,13 @@ function toWarehouseItem(row: {
   active: boolean;
   created_at: string;
   updated_at: string;
+  ext_length_cm: number | null;
+  ext_width_cm: number | null;
+  ext_height_cm: number | null;
+  int_length_cm: number | null;
+  int_width_cm: number | null;
+  int_height_cm: number | null;
+  weight_kg: number | null;
 }): WarehouseItem {
   return {
     id: row.id,
@@ -94,6 +109,17 @@ function toWarehouseItem(row: {
     active: row.active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    externalDims: {
+      length: row.ext_length_cm,
+      width: row.ext_width_cm,
+      height: row.ext_height_cm,
+    },
+    internalDims: {
+      length: row.int_length_cm,
+      width: row.int_width_cm,
+      height: row.int_height_cm,
+    },
+    weightKg: row.weight_kg,
   };
 }
 
@@ -102,9 +128,7 @@ export const listWarehouseItems = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("warehouse_items")
-      .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
-      )
+      .select(ITEM_COLUMNS)
       .order("name", { ascending: true });
     if (error) throw new Error(error.message);
     return (data ?? []).map(toWarehouseItem);
@@ -124,6 +148,9 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
       unitCost?: number | null;
       unitCostCurrency?: WarehouseCurrency;
       notes?: string | null;
+      externalDims?: BoxDimensions | null;
+      internalDims?: BoxDimensions | null;
+      weightKg?: number | null;
     }) => {
       if (!input?.name?.trim()) throw new Error("name is required");
       if (!WAREHOUSE_CATEGORIES.includes(input.category)) {
@@ -156,10 +183,15 @@ export const createWarehouseItem = createServerFn({ method: "POST" })
         expiry_date: data.expiryDate || null,
         unit_cost: data.unitCost ?? null,
         unit_cost_currency: data.unitCostCurrency ?? "ILS",
+        ext_length_cm: data.externalDims?.length ?? null,
+        ext_width_cm: data.externalDims?.width ?? null,
+        ext_height_cm: data.externalDims?.height ?? null,
+        int_length_cm: data.internalDims?.length ?? null,
+        int_width_cm: data.internalDims?.width ?? null,
+        int_height_cm: data.internalDims?.height ?? null,
+        weight_kg: data.weightKg ?? null,
       })
-      .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
-      )
+      .select(ITEM_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
 
@@ -194,6 +226,9 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
       unitCost?: number | null;
       unitCostCurrency?: WarehouseCurrency;
       notes?: string | null;
+      externalDims?: BoxDimensions | null;
+      internalDims?: BoxDimensions | null;
+      weightKg?: number | null;
     }) => {
       if (!input?.id) throw new Error("id is required");
       return input;
@@ -211,14 +246,23 @@ export const updateWarehouseItem = createServerFn({ method: "POST" })
     if (data.unitCost !== undefined) patch.unit_cost = data.unitCost;
     if (data.unitCostCurrency !== undefined) patch.unit_cost_currency = data.unitCostCurrency;
     if (data.notes !== undefined) patch.notes = data.notes?.trim() || null;
+    if (data.externalDims !== undefined) {
+      patch.ext_length_cm = data.externalDims?.length ?? null;
+      patch.ext_width_cm = data.externalDims?.width ?? null;
+      patch.ext_height_cm = data.externalDims?.height ?? null;
+    }
+    if (data.internalDims !== undefined) {
+      patch.int_length_cm = data.internalDims?.length ?? null;
+      patch.int_width_cm = data.internalDims?.width ?? null;
+      patch.int_height_cm = data.internalDims?.height ?? null;
+    }
+    if (data.weightKg !== undefined) patch.weight_kg = data.weightKg;
 
     const { data: row, error } = await supabase
       .from("warehouse_items")
       .update(patch as never)
       .eq("id", data.id)
-      .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
-      )
+      .select(ITEM_COLUMNS)
       .single();
     if (error) throw new Error(error.message);
     return toWarehouseItem(row);
@@ -283,9 +327,7 @@ export const adjustWarehouseStock = createServerFn({ method: "POST" })
 
     const { data: updated, error: reloadErr } = await supabase
       .from("warehouse_items")
-      .select(
-        "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at",
-      )
+      .select(ITEM_COLUMNS)
       .eq("id", data.itemId)
       .single();
     if (reloadErr) throw new Error(reloadErr.message);

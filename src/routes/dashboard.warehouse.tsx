@@ -916,6 +916,68 @@ function WarehousePage() {
   );
 }
 
+type DimsForm = { length: string; width: string; height: string };
+
+function dimsToForm(d?: { length: number | null; width: number | null; height: number | null }) {
+  return {
+    length: d?.length != null ? String(d.length) : "",
+    width: d?.width != null ? String(d.width) : "",
+    height: d?.height != null ? String(d.height) : "",
+  };
+}
+
+function formToDims(d: DimsForm) {
+  const n = (v: string) => (v ? Number(v) : null);
+  return { length: n(d.length), width: n(d.width), height: n(d.height) };
+}
+
+/** Length × width × height inputs with the computed volume in liters. */
+function DimsFields({
+  title,
+  value,
+  onChange,
+}: {
+  title: string;
+  value: DimsForm;
+  onChange: (v: DimsForm) => void;
+}) {
+  const l = Number(value.length);
+  const w = Number(value.width);
+  const h = Number(value.height);
+  const liters = l > 0 && w > 0 && h > 0 ? (l * w * h) / 1000 : null;
+  const fields: [keyof DimsForm, string][] = [
+    ["length", "אורך"],
+    ["width", "רוחב"],
+    ["height", "גובה"],
+  ];
+  return (
+    <div className="space-y-1.5">
+      <Label>
+        {title}
+        {liters != null ? (
+          <span className="ms-2 text-xs font-normal text-muted-foreground">
+            נפח: {liters.toLocaleString("he-IL", { maximumFractionDigits: 1 })} ליטר
+          </span>
+        ) : null}
+      </Label>
+      <div className="grid grid-cols-3 gap-2">
+        {fields.map(([key, label]) => (
+          <Input
+            key={key}
+            type="number"
+            min={0}
+            step="0.1"
+            placeholder={label}
+            aria-label={label}
+            value={value[key]}
+            onChange={(e) => onChange({ ...value, [key]: e.target.value })}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ItemFormDialog({
   item,
   onSaved,
@@ -941,7 +1003,18 @@ function ItemFormDialog({
     unitCost: item?.unitCost != null ? String(item.unitCost) : "",
     unitCostCurrency: item?.unitCostCurrency ?? ("ILS" as WarehouseCurrency),
     notes: item?.notes ?? "",
+    ext: dimsToForm(item?.externalDims),
+    int: dimsToForm(item?.internalDims),
+    weightKg: item?.weightKg != null ? String(item.weightKg) : "",
   });
+  const isBox = form.category === "boxes";
+  const boxExtras = isBox
+    ? {
+        externalDims: formToDims(form.ext),
+        internalDims: formToDims(form.int),
+        weightKg: form.weightKg ? Number(form.weightKg) : null,
+      }
+    : { externalDims: null, internalDims: null, weightKg: null };
 
   const save = useMutation({
     mutationFn: () =>
@@ -958,6 +1031,7 @@ function ItemFormDialog({
               unitCost: form.unitCost ? Number(form.unitCost) : null,
               unitCostCurrency: form.unitCostCurrency,
               notes: form.notes || null,
+              ...boxExtras,
             },
           })
         : createFn({
@@ -972,6 +1046,7 @@ function ItemFormDialog({
               unitCost: form.unitCost ? Number(form.unitCost) : null,
               unitCostCurrency: form.unitCostCurrency,
               notes: form.notes || null,
+              ...boxExtras,
             },
           }),
     onSuccess: () => {
@@ -1120,6 +1195,30 @@ function ItemFormDialog({
               </div>
             </div>
           </div>
+          {isBox && (
+            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+              <DimsFields
+                title="מידות חיצוניות (ס״מ)"
+                value={form.ext}
+                onChange={(ext) => setForm((f) => ({ ...f, ext }))}
+              />
+              <DimsFields
+                title="מידות פנימיות (ס״מ)"
+                value={form.int}
+                onChange={(int) => setForm((f) => ({ ...f, int }))}
+              />
+              <div className="space-y-1.5">
+                <Label>משקל המארז (ק״ג, לא חובה)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.weightKg}
+                  onChange={(e) => setForm((f) => ({ ...f, weightKg: e.target.value }))}
+                />
+              </div>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label>הערות</Label>
             <Textarea
