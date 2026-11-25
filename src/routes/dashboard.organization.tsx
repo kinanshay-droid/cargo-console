@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Plug, Plus, Copy, Check, Truck, RefreshCw } from "lucide-react";
+import { ImagePlus, Plug, Plus, Copy, Check, Truck, RefreshCw } from "lucide-react";
 import { getMyOrganization, updateMyOrganization } from "@/lib/admin.functions";
 import {
   listApiPartners,
@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { AccessDenied } from "@/components/access-denied";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/dashboard/organization")({
   head: () => ({
@@ -76,6 +77,37 @@ function OrganizationPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "העדכון נכשל"),
   });
 
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoUrl = org?.logoPath
+    ? supabase.storage.from("org-logos").getPublicUrl(org.logoPath).data.publicUrl
+    : null;
+
+  async function setLogo(file: File | null) {
+    if (!org) return;
+    setUploadingLogo(true);
+    try {
+      let newPath: string | null = null;
+      if (file) {
+        if (file.size > 2 * 1024 * 1024) throw new Error("הקובץ גדול מדי (עד 2MB)");
+        const ext = file.name.split(".").pop() ?? "png";
+        newPath = `${org.id}/logo-${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage
+          .from("org-logos")
+          .upload(newPath, file, { upsert: false, contentType: file.type });
+        if (error) throw error;
+      }
+      await updateMyOrganizationFn({ data: { logoPath: newPath } });
+      if (org.logoPath) void supabase.storage.from("org-logos").remove([org.logoPath]);
+      qc.invalidateQueries({ queryKey: ["my-organization"] });
+      qc.invalidateQueries({ queryKey: ["org-logo"] });
+      toast.success(file ? "הלוגו עודכן" : "הלוגו הוסר");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "העדכון נכשל");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
   if (!meLoading && !isAdmin) return <AccessDenied message="עמוד זה זמין רק למנהלי הארגון." />;
 
   return (
@@ -103,6 +135,62 @@ function OrganizationPage() {
               </Button>
             </div>
           </form>
+
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              לוגו הארגון
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              הלוגו מוצג בראש התפריט לכל משתמשי הארגון. מומלץ רקע שקוף או לבן, עד 2MB.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              <div className="flex h-20 w-48 items-center justify-center rounded-lg border bg-white p-2">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={org.name}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                ) : (
+                  <span className="text-xs text-muted-foreground">ללא לוגו</span>
+                )}
+              </div>
+              <input
+                id="org-logo-upload"
+                type="file"
+                className="hidden"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  if (f) void setLogo(f);
+                }}
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadingLogo}
+                  onClick={() => document.getElementById("org-logo-upload")?.click()}
+                >
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  {uploadingLogo ? "מעלה…" : logoUrl ? "החלפת לוגו" : "העלאת לוגו"}
+                </Button>
+                {logoUrl ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadingLogo}
+                    onClick={() => void setLogo(null)}
+                  >
+                    הסרה
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
 
           <div className="rounded-lg border bg-card p-6">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">

@@ -620,6 +620,7 @@ export type OrganizationInfo = {
   name: string;
   code: string;
   createdAt: string;
+  logoPath: string | null;
 };
 
 export const getMyOrganization = createServerFn({ method: "GET" })
@@ -629,7 +630,7 @@ export const getMyOrganization = createServerFn({ method: "GET" })
     const organizationId = await requireOrgId(supabase, userId);
     const { data, error } = await supabase
       .from("organizations")
-      .select("id, name, code, created_at")
+      .select("id, name, code, created_at, logo_path")
       .eq("id", organizationId)
       .single();
     if (error) throw new Error(error.message);
@@ -638,23 +639,24 @@ export const getMyOrganization = createServerFn({ method: "GET" })
       name: data.name,
       code: data.code,
       createdAt: data.created_at,
+      logoPath: data.logo_path,
     } satisfies OrganizationInfo;
   });
 
 export const updateMyOrganization = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { name: string }) => {
-    if (!input?.name?.trim()) throw new Error("name is required");
+  .inputValidator((input: { name?: string; logoPath?: string | null }) => {
+    if (input?.name !== undefined && !input.name.trim()) throw new Error("name is required");
     return input;
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const organizationId = await requireOrgAdmin(supabase, userId);
     // RLS's "Admins update their organization" policy covers this directly.
-    const { error } = await supabase
-      .from("organizations")
-      .update({ name: data.name.trim() })
-      .eq("id", organizationId);
+    const patch: { name?: string; logo_path?: string | null } = {};
+    if (data.name !== undefined) patch.name = data.name.trim();
+    if (data.logoPath !== undefined) patch.logo_path = data.logoPath;
+    const { error } = await supabase.from("organizations").update(patch).eq("id", organizationId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

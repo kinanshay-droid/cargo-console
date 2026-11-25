@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useOrgLogo } from "@/hooks/use-org-logo";
 import { SupportBanner } from "@/components/support-banner";
 import { ContactButton } from "@/components/contact-button";
 import { countPendingCompanyRequests } from "@/lib/company-requests.functions";
@@ -142,6 +143,7 @@ function DashboardLayout() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { isAdmin, isPlatformAdmin, isLoading: meLoading, user, hasPermission } = useCurrentUser();
+  const orgLogo = useOrgLogo();
   const { t } = useI18n();
   const [sessionChecked, setSessionChecked] = useState(false);
   const countPendingFn = useServerFn(countPendingCompanyRequests);
@@ -278,11 +280,17 @@ function DashboardLayout() {
         <div className="flex flex-1 flex-col rounded-2xl bg-sidebar text-sidebar-foreground shadow-xl ring-1 ring-sidebar-border/50">
           {/* Header */}
           <div className="flex items-center justify-center px-3 py-4">
-            <img
-              src="/afik-logo-white.png"
-              alt={t("app.name")}
-              className="h-auto w-full rounded-xl"
-            />
+            {orgLogo ? (
+              <div className="flex h-28 w-full items-center justify-center rounded-xl bg-white p-3">
+                <img src={orgLogo} alt="" className="max-h-full max-w-full object-contain" />
+              </div>
+            ) : (
+              <img
+                src="/afik-logo-white.png"
+                alt={t("app.name")}
+                className="h-auto w-full rounded-xl"
+              />
+            )}
           </div>
           <div className="px-3 pb-2">
             <ContactButton className="w-full bg-sidebar-accent/50 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground border-sidebar-border/50" />
@@ -373,7 +381,17 @@ function DashboardLayout() {
       <div className="flex flex-1 flex-col">
         <div className="flex items-center justify-between border-b bg-sidebar px-4 py-3 text-sidebar-foreground md:hidden print:hidden">
           <div className="flex items-center gap-2">
-            <img src="/afik-logo-white.png" alt={t("app.name")} className="h-9 w-auto rounded-md" />
+            {orgLogo ? (
+              <div className="flex h-9 items-center rounded-md bg-white px-2">
+                <img src={orgLogo} alt="" className="max-h-7 w-auto object-contain" />
+              </div>
+            ) : (
+              <img
+                src="/afik-logo-white.png"
+                alt={t("app.name")}
+                className="h-9 w-auto rounded-md"
+              />
+            )}
           </div>
           <div className="flex items-center gap-2">
             <ContactButton className="border-sidebar-border/50 bg-transparent text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground" />
