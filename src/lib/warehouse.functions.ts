@@ -38,7 +38,7 @@ function normalizeCurrency(value: string): WarehouseCurrency {
 const ITEM_COLUMNS =
   "id, name, category, sku, unit, quantity_on_hand, min_threshold, expiry_date, unit_cost, unit_cost_currency, notes, active, created_at, updated_at, ext_length_cm, ext_width_cm, ext_height_cm, int_length_cm, int_width_cm, int_height_cm, weight_kg, temp_series, product_sheets, sale_price, sale_price_currency";
 
-export type ProductSheet = { path: string; name: string };
+export type ProductSheet = { path: string; name: string; description?: string };
 
 export type BoxDimensions = { length: number | null; width: number | null; height: number | null };
 

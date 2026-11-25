@@ -965,7 +965,14 @@ function ProductSheetsDialog({ item }: { item: WarehouseItem }) {
               className="flex w-full items-center gap-2 rounded-md border bg-card px-3 py-2 text-right text-sm hover:bg-muted"
             >
               <FileText className="h-4 w-4 shrink-0 text-primary" />
-              <span className="flex-1 truncate">{sh.name}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate">{sh.name}</span>
+                {sh.description ? (
+                  <span className="mt-0.5 block whitespace-pre-line text-xs text-muted-foreground">
+                    {sh.description}
+                  </span>
+                ) : null}
+              </span>
             </button>
           ))}
         </div>
@@ -1408,31 +1415,44 @@ function ItemFormDialog({
                     {uploadingSheet ? "מעלה…" : "העלאת מסמכים"}
                   </Button>
                   {form.sheets.map((sh) => (
-                    <div
-                      key={sh.path}
-                      className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1 text-xs"
-                    >
-                      <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      <button
-                        type="button"
-                        className="flex-1 truncate text-right hover:underline"
-                        onClick={() => openProductSheet(sh.path)}
-                      >
-                        {sh.name}
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="הסרה"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() =>
+                    <div key={sh.path} className="space-y-1.5 rounded-md border bg-background p-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <FileText className="h-3.5 w-3.5 shrink-0 text-primary" />
+                        <button
+                          type="button"
+                          className="flex-1 truncate text-right hover:underline"
+                          onClick={() => openProductSheet(sh.path)}
+                        >
+                          {sh.name}
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="הסרה"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              sheets: f.sheets.filter((x) => x.path !== sh.path),
+                            }))
+                          }
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <Textarea
+                        rows={2}
+                        placeholder="פירוט על תוכן הקובץ (למשל: מפרט טכני, תעודת ביצועים, הוראות שימוש)"
+                        value={sh.description ?? ""}
+                        onChange={(e) =>
                           setForm((f) => ({
                             ...f,
-                            sheets: f.sheets.filter((x) => x.path !== sh.path),
+                            sheets: f.sheets.map((x) =>
+                              x.path === sh.path ? { ...x, description: e.target.value } : x,
+                            ),
                           }))
                         }
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
+                        className="text-xs"
+                      />
                     </div>
                   ))}
                 </div>
